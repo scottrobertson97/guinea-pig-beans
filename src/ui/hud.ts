@@ -1,6 +1,7 @@
 import {
   buyFeedUpgrade,
   buyPig,
+  buyRobot,
   buyScoopUpgrade,
   refillHay,
   refillWater,
@@ -8,7 +9,13 @@ import {
 import { getCosts } from "../simulation/balance";
 import type { GameState } from "../simulation/types";
 
-type ButtonId = "adopt-pig" | "better-hay" | "better-scoop" | "refill-hay" | "refill-water";
+type ButtonId =
+  | "adopt-pig"
+  | "better-hay"
+  | "better-scoop"
+  | "poop-roomba"
+  | "refill-hay"
+  | "refill-water";
 
 export class Hud {
   private buttons: Record<ButtonId, HTMLButtonElement>;
@@ -21,6 +28,7 @@ export class Hud {
       "adopt-pig": getButton("adopt-pig"),
       "better-hay": getButton("better-hay"),
       "better-scoop": getButton("better-scoop"),
+      "poop-roomba": getButton("poop-roomba"),
       "refill-hay": getButton("refill-hay"),
       "refill-water": getButton("refill-water"),
     };
@@ -31,6 +39,9 @@ export class Hud {
     );
     this.buttons["better-scoop"].addEventListener("click", () =>
       this.runAction(() => buyScoopUpgrade(this.state)),
+    );
+    this.buttons["poop-roomba"].addEventListener("click", () =>
+      this.runAction(() => buyRobot(this.state)),
     );
     this.buttons["refill-hay"].addEventListener("click", () => this.runAction(() => refillHay(this.state)));
     this.buttons["refill-water"].addEventListener("click", () =>
@@ -48,6 +59,7 @@ export class Hud {
     setText("adopt-cost", `${costs.pig} Beans`);
     setText("feed-cost", `${costs.feed} Beans`);
     setText("scoop-cost", `${costs.scoop} Beans`);
+    setText("robot-cost", this.state.robot ? "Active" : `${costs.robot} Beans`);
     setText("status-line", getStatusLine(this.state));
 
     setMeter("hay-meter", this.state.needs.hay);
@@ -56,6 +68,7 @@ export class Hud {
     this.buttons["adopt-pig"].disabled = this.state.beans < costs.pig;
     this.buttons["better-hay"].disabled = this.state.beans < costs.feed;
     this.buttons["better-scoop"].disabled = this.state.beans < costs.scoop;
+    this.buttons["poop-roomba"].disabled = Boolean(this.state.robot) || this.state.beans < costs.robot;
 
     const log = document.querySelector<HTMLOListElement>("#event-log");
     if (log) {

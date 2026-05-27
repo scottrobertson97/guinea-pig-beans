@@ -2,6 +2,7 @@ export type PigMood = "content" | "hungry" | "thirsty" | "messy";
 export type PigBreed = "American" | "Abyssinian" | "Peruvian" | "Teddy" | "Rex";
 export type PigTrait = "Chonker" | "Zoomer" | "Neat Freak" | "Gremlin";
 export type PoopType = "normal" | "golden" | "stinky";
+export type RobotState = "wandering" | "sweeping";
 
 export interface Pig {
   id: number;
@@ -31,10 +32,23 @@ export interface Poop {
   age: number;
 }
 
+export interface Robot {
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  speed: number;
+  sensorRadius: number;
+  sweepRadius: number;
+  state: RobotState;
+  cleanLogCooldown: number;
+}
+
 export interface GameState {
   beans: number;
   pigs: Pig[];
   poops: Poop[];
+  robot: Robot | null;
   upgrades: {
     feedLevel: number;
     scoopLevel: number;
@@ -55,4 +69,5 @@ export interface Costs {
   pig: number;
   feed: number;
   scoop: number;
+  robot: number;
 }

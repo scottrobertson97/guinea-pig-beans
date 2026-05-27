@@ -3,12 +3,14 @@ import type { Costs, GameState, Pig } from "./types";
 export const CAGE_PADDING = 34;
 export const BASE_POOP_INTERVAL = 5;
 export const MAX_LOG_ITEMS = 8;
+export const ROBOT_COST = 75;
 
 export function getCosts(state: GameState): Costs {
   return {
     pig: Math.ceil(15 * 1.35 ** Math.max(0, state.pigs.length - 1)),
     feed: Math.ceil(25 * 1.6 ** state.upgrades.feedLevel),
     scoop: Math.ceil(20 * 1.7 ** state.upgrades.scoopLevel),
+    robot: ROBOT_COST,
   };
 }
 

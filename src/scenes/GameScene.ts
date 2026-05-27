@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAt } from "../simulation/actions";
 import { updateSimulation } from "../simulation/systems";
-import type { GameState, Pig, Poop } from "../simulation/types";
+import type { GameState, Pig, Poop, Robot } from "../simulation/types";
 
 interface SceneData {
   state: GameState;
@@ -14,6 +14,7 @@ export class GameScene extends Phaser.Scene {
   private onStateChanged!: () => void;
   private pigViews = new Map<number, Phaser.GameObjects.Container>();
   private poopViews = new Map<number, Phaser.GameObjects.Ellipse>();
+  private robotView: Phaser.GameObjects.Container | null = null;
   private hayPile!: Phaser.GameObjects.Container;
   private waterBottle!: Phaser.GameObjects.Container;
   private scoopPreview!: Phaser.GameObjects.Ellipse;
@@ -136,6 +137,16 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    if (this.state.robot) {
+      if (!this.robotView) {
+        this.robotView = this.createRobotView(this.state.robot);
+      }
+      this.syncRobotView(this.robotView, this.state.robot);
+    } else if (this.robotView) {
+      this.robotView.destroy();
+      this.robotView = null;
+    }
+
     this.scoopPreview.setSize(getScoopRadius(this.state) * 2, getScoopRadius(this.state) * 2);
     this.hayPile.setAlpha(this.state.needs.hay <= 0 ? 0.25 : this.state.needs.hay < 25 ? 0.55 : 1);
     this.waterBottle.setAlpha(
@@ -194,6 +205,40 @@ export class GameScene extends Phaser.Scene {
     view.setSize(14, 9);
     view.setFillStyle(poop.value > poop.baseValue ? 0x6e4827 : 0x47301d, 1);
     view.setStrokeStyle(1, 0x2a1c12, 0.45);
+  }
+
+  private createRobotView(robot: Robot): Phaser.GameObjects.Container {
+    const shadow = this.add.ellipse(0, 13, 38, 12, 0x000000, 0.16);
+    const body = this.add.graphics();
+    body.fillStyle(0xb8c0c6, 1);
+    body.fillRoundedRect(-19, -14, 38, 28, 8);
+    body.lineStyle(3, 0x54616a, 0.78);
+    body.strokeRoundedRect(-19, -14, 38, 28, 8);
+    const face = this.add.rectangle(8, -1, 14, 10, 0x2e3a42).setStrokeStyle(1, 0x172027, 0.7);
+    const eyeA = this.add.circle(4, -2, 1.7, 0x92e6ff);
+    const eyeB = this.add.circle(12, -2, 1.7, 0x92e6ff);
+    const brush = this.add.rectangle(-15, 10, 18, 5, 0x7a5736).setRotation(-0.24);
+    const antenna = this.add.rectangle(-10, -18, 3, 14, 0x54616a).setRotation(-0.32);
+    const light = this.add.circle(-15, -24, 4, 0xe4b83b);
+    const view = this.add.container(robot.x, robot.y, [
+      shadow,
+      antenna,
+      light,
+      body,
+      face,
+      eyeA,
+      eyeB,
+      brush,
+    ]);
+    view.setDepth(15);
+    return view;
+  }
+
+  private syncRobotView(view: Phaser.GameObjects.Container, robot: Robot): void {
+    const dx = robot.targetX - robot.x;
+    view.setPosition(robot.x, robot.y);
+    view.setScale(dx < 0 ? -1 : 1, 1);
+    view.setRotation(robot.state === "sweeping" ? Math.sin(this.time.now / 85) * 0.05 : 0);
   }
 
   private createHayPile(x: number, y: number): Phaser.GameObjects.Container {

@@ -49,6 +49,7 @@ export function createInitialState(): GameState {
     beans: 0,
     pigs: [],
     poops: [],
+    robot: null,
     upgrades: {
       feedLevel: 0,
       scoopLevel: 0,
