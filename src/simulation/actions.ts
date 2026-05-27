@@ -6,17 +6,23 @@ export function cleanAt(state: GameState, x: number, y: number): number {
   const radius = getScoopRadius(state);
   const before = state.poops.length;
   let earned = 0;
+  let golden = 0;
+  let stinky = 0;
 
   state.poops = state.poops.filter((poop) => {
     const hit = Math.hypot(poop.x - x, poop.y - y) <= radius;
-    if (hit) earned += poop.value;
+    if (hit) {
+      earned += poop.value;
+      if (poop.type === "golden") golden += 1;
+      if (poop.type === "stinky") stinky += 1;
+    }
     return !hit;
   });
 
   const cleaned = before - state.poops.length;
   if (cleaned > 0) {
     state.beans += earned;
-    addLog(state, `Cleaned ${cleaned} bean${cleaned === 1 ? "" : "s"} for +${earned}.`);
+    addLog(state, getCleanLog(cleaned, earned, golden, stinky));
   }
 
   return earned;
@@ -37,7 +43,7 @@ export function buyPig(state: GameState): boolean {
   if (state.beans < cost) return false;
   state.beans -= cost;
   const pig = addPig(state);
-  addLog(state, `${pig.name} joined the cage.`);
+  addLog(state, `${pig.name} joined as a ${pig.breed} ${pig.trait}. Favorite: ${pig.favoriteFood}.`);
   return true;
 }
 
@@ -57,4 +63,10 @@ export function buyScoopUpgrade(state: GameState): boolean {
   state.upgrades.scoopLevel += 1;
   addLog(state, `Better Scoop level ${state.upgrades.scoopLevel} unlocked.`);
   return true;
+}
+
+function getCleanLog(cleaned: number, earned: number, golden: number, stinky: number): string {
+  if (golden > 0) return `Cleaned ${cleaned} beans, including ${golden} golden, for +${earned}.`;
+  if (stinky > 0) return `Removed ${stinky} stinky bean${stinky === 1 ? "" : "s"} and earned +${earned}.`;
+  return `Cleaned ${cleaned} bean${cleaned === 1 ? "" : "s"} for +${earned}.`;
 }

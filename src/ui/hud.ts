@@ -67,6 +67,21 @@ export class Hud {
         }),
       );
     }
+
+    const roster = document.querySelector<HTMLUListElement>("#pig-roster");
+    if (roster) {
+      roster.replaceChildren(
+        ...this.state.pigs.map((pig) => {
+          const item = document.createElement("li");
+          const identity = document.createElement("strong");
+          const details = document.createElement("span");
+          identity.textContent = pig.name;
+          details.textContent = `${pig.breed} ${pig.trait} - ${pig.quirk}`;
+          item.append(identity, details);
+          return item;
+        }),
+      );
+    }
   }
 
   private runAction(action: () => boolean | void): void {
@@ -98,6 +113,10 @@ function getStatusLine(state: GameState): string {
   if (state.needs.hay <= 0) return "The hay rack is empty. The pigs have filed a complaint.";
   if (state.needs.water <= 0) return "The water bottle is empty, and the cage is giving you a look.";
   if (state.cage.cleanliness < 35) return "The cage is getting bold. Clean a few beans.";
+  if (state.poops.some((poop) => poop.type === "golden")) return "A golden bean is glinting in the bedding.";
+  if (state.poops.some((poop) => poop.type === "stinky")) return "A stinky bean is escalating the cleanliness situation.";
   if (state.poops.length > 8) return "There are beans everywhere. This is probably fine.";
-  return `${state.pigs[0]?.name ?? "A pig"} is considering a bean.`;
+  const pig = state.pigs[0];
+  if (pig) return `${pig.name} the ${pig.trait} is considering a bean.`;
+  return "A pig is considering a bean.";
 }

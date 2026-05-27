@@ -164,6 +164,7 @@ h1 {
 
 .meters,
 .shop,
+.pig-roster,
 .log {
   padding: 14px;
   border: 1px solid rgba(23, 32, 26, 0.12);
@@ -217,6 +218,7 @@ h1 {
 }
 
 .shop h2,
+.pig-roster h2,
 .log h2 {
   font-size: 0.95rem;
 }
@@ -234,6 +236,32 @@ h1 {
 .shop button strong {
   white-space: nowrap;
   font-size: 0.85rem;
+}
+
+.pig-roster ul {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pig-roster li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(23, 32, 26, 0.08);
+}
+
+.pig-roster strong {
+  font-size: 0.9rem;
+}
+
+.pig-roster span {
+  color: #5f6a5e;
+  font-size: 0.78rem;
 }
 
 .log {

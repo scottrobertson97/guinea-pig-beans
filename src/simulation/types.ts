@@ -1,8 +1,15 @@
 export type PigMood = "content" | "hungry" | "thirsty" | "messy";
+export type PigBreed = "American" | "Abyssinian" | "Peruvian" | "Teddy" | "Rex";
+export type PigTrait = "Chonker" | "Zoomer" | "Neat Freak" | "Gremlin";
+export type PoopType = "normal" | "golden" | "stinky";
 
 export interface Pig {
   id: number;
   name: string;
+  breed: PigBreed;
+  trait: PigTrait;
+  favoriteFood: string;
+  quirk: string;
   x: number;
   y: number;
   targetX: number;
@@ -16,8 +23,10 @@ export interface Pig {
 
 export interface Poop {
   id: number;
+  type: PoopType;
   x: number;
   y: number;
+  baseValue: number;
   value: number;
   age: number;
 }

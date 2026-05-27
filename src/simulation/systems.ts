@@ -42,12 +42,21 @@ function updatePigs(state: GameState, deltaSeconds: number): void {
 function updatePoops(state: GameState, deltaSeconds: number): void {
   for (const poop of state.poops) {
     poop.age += deltaSeconds;
-    poop.value = poop.age > 18 ? 2 : 1;
+    if (poop.type === "golden") {
+      poop.value = poop.baseValue;
+    } else if (poop.type === "stinky") {
+      poop.value = poop.baseValue;
+    } else {
+      poop.value = poop.baseValue + (poop.age > 18 ? 1 : 0);
+    }
   }
 }
 
 function updateCleanliness(state: GameState): void {
-  const mess = Math.min(100, state.poops.length * 5.5);
+  const mess = Math.min(
+    100,
+    state.poops.reduce((total, poop) => total + (poop.type === "stinky" ? 8 : 5.5), 0),
+  );
   state.cage.cleanliness = Math.max(0, Math.round(100 - mess));
 }
 

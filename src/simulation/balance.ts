@@ -20,6 +20,14 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
   const feedMultiplier = 0.9 ** state.upgrades.feedLevel;
   const hayPenalty = state.needs.hay <= 0 ? 1.3 : state.needs.hay < 25 ? 1.15 : 1;
   const waterPenalty = state.needs.water <= 0 ? 1.2 : state.needs.water < 25 ? 1.1 : 1;
-  const messPenalty = state.cage.cleanliness < 35 ? 1.2 : 1;
-  return BASE_POOP_INTERVAL * feedMultiplier * hayPenalty * waterPenalty * messPenalty;
+  const messPenalty =
+    pig.trait === "Gremlin" && state.cage.cleanliness < 60
+      ? 0.82
+      : state.cage.cleanliness < 35
+        ? 1.2
+        : 1;
+  const traitMultiplier =
+    pig.trait === "Chonker" ? 1.25 : pig.trait === "Zoomer" ? 0.9 : pig.trait === "Neat Freak" ? 1.05 : 1;
+  const breedMultiplier = pig.breed === "Rex" ? 0.92 : pig.breed === "Abyssinian" ? 0.96 : 1;
+  return BASE_POOP_INTERVAL * feedMultiplier * hayPenalty * waterPenalty * messPenalty * traitMultiplier * breedMultiplier;
 }

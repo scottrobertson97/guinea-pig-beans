@@ -126,7 +126,7 @@ export class GameScene extends Phaser.Scene {
         this.poopViews.set(poop.id, view);
       }
       view.setPosition(poop.x, poop.y);
-      view.setFillStyle(poop.value > 1 ? 0x6e4827 : 0x47301d, 1);
+      this.applyPoopStyle(view, poop);
     }
 
     for (const [id, view] of this.poopViews) {
@@ -174,6 +174,26 @@ export class GameScene extends Phaser.Scene {
       .setDepth(10);
     view.setRotation(Math.random() * Math.PI);
     return view;
+  }
+
+  private applyPoopStyle(view: Phaser.GameObjects.Ellipse, poop: Poop): void {
+    if (poop.type === "golden") {
+      view.setSize(17, 11);
+      view.setFillStyle(0xe4b83b, 1);
+      view.setStrokeStyle(2, 0xffef9a, 0.8);
+      return;
+    }
+
+    if (poop.type === "stinky") {
+      view.setSize(16, 10);
+      view.setFillStyle(0x395f2a, 1);
+      view.setStrokeStyle(2, 0x223819, 0.62);
+      return;
+    }
+
+    view.setSize(14, 9);
+    view.setFillStyle(poop.value > poop.baseValue ? 0x6e4827 : 0x47301d, 1);
+    view.setStrokeStyle(1, 0x2a1c12, 0.45);
   }
 
   private createHayPile(x: number, y: number): Phaser.GameObjects.Container {
