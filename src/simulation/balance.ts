@@ -13,11 +13,11 @@ export function getCosts(state: GameState): Costs {
   ) as Record<FurnitureId, number>;
 
   return {
-    pig: Math.ceil(15 * 1.35 ** Math.max(0, state.pigs.length - 1)),
-    feed: Math.ceil(25 * 1.6 ** state.upgrades.feedLevel),
-    scoop: Math.ceil(20 * 1.7 ** state.upgrades.scoopLevel),
-    robot: ROBOT_COST,
-    cage: Math.ceil(80 * 2.1 ** state.upgrades.cageLevel),
+    pig: Math.ceil(10 * 1.35 ** Math.max(0, state.pigs.length - 1)),
+    feed: Math.ceil(18 * 1.6 ** state.upgrades.feedLevel),
+    scoop: Math.ceil(14 * 1.7 ** state.upgrades.scoopLevel),
+    robot: Math.max(55, ROBOT_COST - state.upgrades.scoopLevel * 5),
+    cage: Math.ceil(60 * 2.1 ** state.upgrades.cageLevel),
     furniture,
     rarePig: Math.ceil(220 * 1.8 ** state.stats.legendaryPigsAdopted),
     prestige: 5000,
@@ -34,6 +34,7 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
   const waterPenalty = state.needs.water <= 0 ? 1.2 : state.needs.water < 25 ? 1.1 : 1;
   const enrichmentMultiplier = 1 - Math.min(0.22, state.cage.enrichment / 500);
   const socialMultiplier = 1 - Math.min(0.18, state.cage.socialization / 600);
+  const happinessMultiplier = state.cage.happiness >= 85 ? 0.88 : state.cage.happiness < 45 ? 1.22 : 1;
   const eventMultiplier =
     state.event.active?.id === "hayFrenzy" || state.event.active?.id === "greatWheeking"
       ? 0.68
@@ -51,6 +52,7 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
   const traitMultiplier = getTraitPoopMultiplier(pig);
   const breedMultiplier = getBreedPoopMultiplier(pig);
   const wisdomMultiplier = 0.98 ** state.cavyWisdom;
+  const earlyMultiplier = state.stats.cleanedPoops < 5 ? 0.64 : state.stats.cleanedPoops < 15 ? 0.82 : 1;
   return (
     BASE_POOP_INTERVAL *
     feedMultiplier *
@@ -61,9 +63,11 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
     breedMultiplier *
     enrichmentMultiplier *
     socialMultiplier *
+    happinessMultiplier *
     eventMultiplier *
     abilityMultiplier *
-    wisdomMultiplier
+    wisdomMultiplier *
+    earlyMultiplier
   );
 }
 

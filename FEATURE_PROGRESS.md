@@ -65,3 +65,33 @@
 - Whether special poop aging should reward waiting more aggressively or mostly punish mess.
 - Whether active abilities should remain cooldown-only or spend Squeaks.
 - Whether Cavy Wisdom should become a permanent upgrade tree or stay as a global multiplier for the next pass.
+
+## Core Loop Improvement Queue
+
+- [x] Make poop placement matter more through stronger zone effects, litter tray auto-cleaning, compost aging, and clustered mess.
+- [x] Add real furniture placement for purchased cage objects.
+- [x] Make pig personalities visibly drive behavior and preferred targets.
+- [x] Add mess piles that form from clustered poops and require multiple cleans.
+- [x] Add a visible happiness meter connected to cleanliness, needs, enrichment, socialization, and space.
+- [x] Add rotating short-term objectives beyond static quests.
+- [x] Make random events interactive instead of purely timed modifiers.
+- [x] Tune early pacing around first poop, first special poop, first upgrade, second pig, first mess moment, and first automation.
+
+## Active Core Loop Pass
+
+- [x] Queued the core-loop improvements as a tracked checklist.
+- [x] Convert furniture from passive-only purchases into placeable cage objects.
+- [x] Strengthen trait targeting so pigs make predictable, exploitable messes.
+- [x] Add mess pile formation and multi-clean rewards.
+- [x] Verify build and browser smoke test.
+
+## Core Loop Pass Notes
+
+- Furniture purchases now arm placement mode; the next cage click places that object instead of cleaning.
+- Neat Freak, Shy Beaner, Hay Goblin, Gremlin, and Royal Pig targeting now prefers relevant placed objects or messy areas.
+- Litter trays can auto-clean nearby beans.
+- Clusters of four or more beans can merge into a mess pile with multiple clean hits and higher value.
+- Happiness is now visible and affects production speed plus rare poop chance.
+- Rotating objectives provide timed short-term tasks with Bean rewards.
+- Active events expose an Event response button for direct player interaction.
+- Early costs and initial poop timing were lowered to hit the first upgrades and second pig sooner.

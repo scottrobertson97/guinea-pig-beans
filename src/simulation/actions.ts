@@ -17,6 +17,7 @@ export interface CleanResult {
 export function cleanAt(state: GameState, x: number, y: number): number {
   const result = cleanPoopsInRadius(state, x, y, getScoopRadius(state));
   if (result.cleaned > 0) {
+    advanceObjective(state, "cleanBurst", result.cleaned);
     addLog(
       state,
       getCleanLog(result.cleaned, result.earned, result.comboBonus, result.comboCount, result.golden, result.stinky),
@@ -42,6 +43,13 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
   state.poops = state.poops.filter((poop) => {
     const hit = Math.hypot(poop.x - x, poop.y - y) <= radius;
     if (!hit) return true;
+
+    if (poop.hitsRemaining > 1) {
+      poop.hitsRemaining -= 1;
+      poop.value = Math.max(1, poop.value - 1);
+      addLog(state, `Mess pile weakened. ${poop.hitsRemaining} cleanups remain.`);
+      return true;
+    }
 
     result.cleaned += 1;
     result.baseEarned += poop.value;
@@ -152,7 +160,9 @@ export function buyFurniture(state: GameState, id: FurnitureId): boolean {
   state.beans -= cost;
   state.furniture[id] += 1;
   state.stats.furnitureBought += 1;
-  addLog(state, `${getFurnitureName(id)} added to the cage.`);
+  state.placement.pendingFurniture = id;
+  advanceObjective(state, "placeFurniture", 1);
+  addLog(state, `${getFurnitureName(id)} purchased. Click the cage to place it.`);
   updateMilestones(state);
   return true;
 }
@@ -263,6 +273,44 @@ export function useAbility(state: GameState, id: AbilityId): boolean {
   }
 
   state.stats.abilitiesUsed += 1;
+  advanceObjective(state, "useAbility", 1);
+  updateMilestones(state);
+  return true;
+}
+
+export function respondToEvent(state: GameState): boolean {
+  const event = state.event.active;
+  if (!event || !state.event.responseReady) return false;
+
+  if (event.id === "bottleJam") {
+    state.event.bottleJammed = false;
+    state.needs.water = Math.min(100, state.needs.water + 35);
+    addLog(state, "Bottle Jam handled before the herd could draft a complaint.");
+  } else if (event.id === "cageInspection") {
+    const reward = state.cage.cleanliness >= 85 ? 40 : 12;
+    state.beans += reward;
+    state.stats.lifetimeBeans += reward;
+    addLog(state, `Cage Inspection response earned +${reward} Beans.`);
+  } else if (event.id === "compostBloom") {
+    state.compost += 10;
+    addLog(state, "Compost Bloom harvested for +10 Compost.");
+  } else if (event.id === "greatWheeking") {
+    state.squeaks += 8;
+    addLog(state, "The Great Wheeking was answered with alarming unity.");
+  } else if (event.id === "hayFrenzy") {
+    state.needs.hay = Math.min(100, state.needs.hay + 25);
+    addLog(state, "Hay Frenzy stabilized with emergency timothy.");
+  } else if (event.id === "zoomies") {
+    state.combo.timer = Math.max(state.combo.timer, 3);
+    state.combo.count = Math.max(state.combo.count, 2);
+    addLog(state, "Zoomies redirected into cleaning momentum.");
+  } else {
+    state.cage.happiness = Math.min(100, state.cage.happiness + 12);
+    addLog(state, "Nap Time protected. The pigs respect this.");
+  }
+
+  state.event.responseReady = false;
+  state.stats.eventResponses += 1;
   updateMilestones(state);
   return true;
 }
@@ -293,7 +341,17 @@ export function prestige(state: GameState): boolean {
   state.event.active = null;
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;
+  state.event.responseReady = false;
   state.stats.prestiges += 1;
+  state.furniturePlacements = [];
+  state.placement.pendingFurniture = null;
+  state.objective = {
+    id: "cleanBurst",
+    title: "Clean 3 beans quickly",
+    progress: 0,
+    target: 3,
+    timer: 45,
+  };
   state.prestige.ascensions += 1;
   state.prestige.unlocked = Array.from(new Set([...state.prestige.unlocked, "Sacred Scoop", "Ancient Hay Lore"]));
   addLog(state, `The Great Composting grants ${wisdomGained} Cavy Wisdom.`);
@@ -341,6 +399,11 @@ function applyMysteryBean(state: GameState): void {
     state.needs.hay = Math.min(100, state.needs.hay + 20);
     addLog(state, "Mystery bean somehow improved the hay situation.");
   }
+}
+
+function advanceObjective(state: GameState, id: GameState["objective"]["id"], amount: number): void {
+  if (state.objective.id !== id) return;
+  state.objective.progress = Math.min(state.objective.target, state.objective.progress + amount);
 }
 
 function getFurnitureName(id: FurnitureId): string {

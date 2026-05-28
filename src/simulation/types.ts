@@ -28,7 +28,8 @@ export type PoopType =
   | "mystery"
   | "hay"
   | "royal"
-  | "cursed";
+  | "cursed"
+  | "messPile";
 export type RobotState = "wandering" | "sweeping";
 export type FurnitureId =
   | "hideyHouse"
@@ -47,6 +48,13 @@ export type EventId =
   | "cageInspection"
   | "compostBloom"
   | "greatWheeking";
+export type ObjectiveId =
+  | "cleanBurst"
+  | "keepClean"
+  | "collectRare"
+  | "useAbility"
+  | "placeFurniture"
+  | "earnBeans";
 
 export interface Pig {
   id: number;
@@ -76,6 +84,7 @@ export interface Poop {
   baseValue: number;
   value: number;
   age: number;
+  hitsRemaining: number;
 }
 
 export interface Robot {
@@ -93,6 +102,21 @@ export interface Robot {
 export interface ActiveEvent {
   id: EventId;
   name: string;
+  timer: number;
+}
+
+export interface FurniturePlacement {
+  id: number;
+  furnitureId: FurnitureId;
+  x: number;
+  y: number;
+}
+
+export interface ActiveObjective {
+  id: ObjectiveId;
+  title: string;
+  progress: number;
+  target: number;
   timer: number;
 }
 
@@ -118,17 +142,24 @@ export interface GameState {
     width: number;
     height: number;
     cleanliness: number;
+    happiness: number;
     enrichment: number;
     socialization: number;
     space: number;
   };
   furniture: Record<FurnitureId, number>;
+  furniturePlacements: FurniturePlacement[];
+  placement: {
+    pendingFurniture: FurnitureId | null;
+  };
   abilities: Record<AbilityId, number>;
   event: {
     active: ActiveEvent | null;
     nextTimer: number;
     bottleJammed: boolean;
+    responseReady: boolean;
   };
+  objective: ActiveObjective;
   prestige: {
     ascensions: number;
     unlocked: string[];
@@ -160,6 +191,8 @@ export interface GameState {
     furnitureBought: number;
     legendaryPigsAdopted: number;
     prestiges: number;
+    eventResponses: number;
+    objectivesCompleted: number;
   };
   milestones: {
     quests: string[];

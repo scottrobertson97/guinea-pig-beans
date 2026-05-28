@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAt } from "../simulation/actions";
+import { placeFurniture } from "../simulation/state";
 import { updateSimulation } from "../simulation/systems";
 import type { FurnitureId, GameState, Pig, Poop, Robot } from "../simulation/types";
 
@@ -14,7 +15,7 @@ export class GameScene extends Phaser.Scene {
   private onStateChanged!: () => void;
   private pigViews = new Map<number, Phaser.GameObjects.Container>();
   private poopViews = new Map<number, Phaser.GameObjects.Ellipse>();
-  private furnitureViews = new Map<FurnitureId, Phaser.GameObjects.Container>();
+  private furnitureViews = new Map<number, Phaser.GameObjects.Container>();
   private robotView: Phaser.GameObjects.Container | null = null;
   private hayPile!: Phaser.GameObjects.Container;
   private waterBottle!: Phaser.GameObjects.Container;
@@ -47,6 +48,12 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      if (placeFurniture(this.state, pointer.worldX, pointer.worldY)) {
+        this.onStateChanged();
+        this.syncViews();
+        return;
+      }
+
       cleanAt(this.state, pointer.worldX, pointer.worldY);
       this.onStateChanged();
       this.syncViews();
@@ -169,15 +176,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncFurnitureViews(): void {
-    const furnitureIds = Object.keys(this.state.furniture) as FurnitureId[];
-    for (const id of furnitureIds) {
-      const count = this.state.furniture[id];
-      let view = this.furnitureViews.get(id);
-      if (count > 0 && !view) {
-        view = this.createFurnitureView(id);
-        this.furnitureViews.set(id, view);
+    const seenIds = new Set<number>();
+    for (const placement of this.state.furniturePlacements) {
+      seenIds.add(placement.id);
+      let view = this.furnitureViews.get(placement.id);
+      if (!view) {
+        view = this.createFurnitureView(placement.furnitureId, placement.x, placement.y);
+        this.furnitureViews.set(placement.id, view);
       }
-      if (view) view.setVisible(count > 0);
+      view.setPosition(placement.x, placement.y);
+    }
+
+    for (const [id, view] of this.furnitureViews) {
+      if (!seenIds.has(id)) {
+        view.destroy();
+        this.furnitureViews.delete(id);
+      }
     }
   }
 
@@ -250,6 +264,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (poop.type === "messPile") {
+      view.setSize(34, 22);
+      view.setFillStyle(0x4b3020, 1);
+      view.setStrokeStyle(3, 0x1f140d, 0.8);
+      view.setAlpha(0.86 + Math.sin(this.time.now / 160) * 0.08);
+      return;
+    }
+
     if (poop.type === "mystery") {
       view.setSize(17, 11);
       view.setFillStyle(0x7c65a9, 1);
@@ -279,6 +301,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     view.setSize(14, 9);
+    view.setAlpha(1);
     view.setFillStyle(poop.value > poop.baseValue ? 0x6e4827 : 0x47301d, 1);
     view.setStrokeStyle(1, 0x2a1c12, 0.45);
   }
@@ -336,17 +359,7 @@ export class GameScene extends Phaser.Scene {
     return this.add.container(x, y, [bottle, cap, spout]).setDepth(4);
   }
 
-  private createFurnitureView(id: FurnitureId): Phaser.GameObjects.Container {
-    const positions: Record<FurnitureId, [number, number]> = {
-      hideyHouse: [116, this.state.cage.height - 108],
-      tunnel: [this.state.cage.width / 2, 70],
-      litterTray: [this.state.cage.width - 120, this.state.cage.height - 92],
-      chewToy: [this.state.cage.width / 2 + 120, this.state.cage.height - 86],
-      snuggleSack: [182, this.state.cage.height - 76],
-      cardboardCastle: [this.state.cage.width / 2 - 110, this.state.cage.height - 86],
-      royalThrone: [this.state.cage.width - 96, 172],
-    };
-    const [x, y] = positions[id];
+  private createFurnitureView(id: FurnitureId, x: number, y: number): Phaser.GameObjects.Container {
     const parts = this.createFurnitureParts(id);
     return this.add.container(x, y, parts).setDepth(5);
   }

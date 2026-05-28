@@ -9,6 +9,7 @@ import {
   prestige,
   refillHay,
   refillWater,
+  respondToEvent,
   unlockLateGameSystem,
   useAbility,
 } from "../simulation/actions";
@@ -25,6 +26,7 @@ type ButtonId =
   | "rare-pig"
   | "refill-hay"
   | "refill-water"
+  | "event-response"
   | "hidey-house"
   | "tunnel"
   | "litter-tray"
@@ -61,6 +63,7 @@ export class Hud {
       "rare-pig": getButton("rare-pig"),
       "refill-hay": getButton("refill-hay"),
       "refill-water": getButton("refill-water"),
+      "event-response": getButton("event-response"),
       "hidey-house": getButton("hidey-house"),
       tunnel: getButton("tunnel"),
       "litter-tray": getButton("litter-tray"),
@@ -99,6 +102,9 @@ export class Hud {
     this.buttons["refill-hay"].addEventListener("click", () => this.runAction(() => refillHay(this.state)));
     this.buttons["refill-water"].addEventListener("click", () =>
       this.runAction(() => refillWater(this.state)),
+    );
+    this.buttons["event-response"].addEventListener("click", () =>
+      this.runAction(() => respondToEvent(this.state)),
     );
     this.bindFurnitureButton("hidey-house", "hideyHouse");
     this.bindFurnitureButton("tunnel", "tunnel");
@@ -142,6 +148,12 @@ export class Hud {
     setText("cavy-wisdom", this.state.cavyWisdom.toString());
     setText("hay-value", `${Math.ceil(this.state.needs.hay)}%`);
     setText("water-value", `${Math.ceil(this.state.needs.water)}%`);
+    setText("happiness-value", `${Math.ceil(this.state.cage.happiness)}%`);
+    setText("objective-title", this.state.objective.title);
+    setText(
+      "objective-progress",
+      `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
+    );
     setText("combo-value", getComboText(this.state));
     setText("adopt-cost", `${costs.pig} Beans`);
     setText("feed-cost", `${costs.feed} Beans`);
@@ -157,6 +169,7 @@ export class Hud {
 
     setMeter("hay-meter", this.state.needs.hay);
     setMeter("water-meter", this.state.needs.water);
+    setMeter("happiness-meter", this.state.cage.happiness);
 
     this.buttons["adopt-pig"].disabled = this.state.beans < costs.pig;
     this.buttons["better-hay"].disabled = this.state.beans < costs.feed;
@@ -164,6 +177,7 @@ export class Hud {
     this.buttons["poop-roomba"].disabled = Boolean(this.state.robot) || this.state.beans < costs.robot;
     this.buttons["bigger-cage"].disabled = this.state.beans < costs.cage;
     this.buttons["rare-pig"].disabled = this.state.beans < costs.rarePig || this.state.goldenBeans < 1;
+    this.buttons["event-response"].disabled = !this.state.event.active || !this.state.event.responseReady;
     this.updateFurnitureDisabled(costs.furniture);
     this.updateAbilityDisabled();
     this.updateLateGameDisabled();
@@ -292,6 +306,9 @@ function setMeter(id: string, value: number): void {
 }
 
 function getStatusLine(state: GameState): string {
+  if (state.placement.pendingFurniture) return `Place ${getFurnitureName(state.placement.pendingFurniture)} in the cage.`;
+  if (state.event.active && state.event.responseReady)
+    return `${state.event.active.name} is active. Use Event to respond.`;
   if (state.event.active) return `${state.event.active.name} is active for ${Math.ceil(state.event.active.timer)}s.`;
   if (state.needs.hay <= 0) return "The hay rack is empty. The pigs have filed a complaint.";
   if (state.needs.water <= 0) return "The water bottle is empty, and the cage is giving you a look.";
@@ -304,6 +321,19 @@ function getStatusLine(state: GameState): string {
   const pig = state.pigs[0];
   if (pig) return `${pig.name} the ${pig.trait} is considering a bean.`;
   return "A pig is considering a bean.";
+}
+
+function getFurnitureName(id: FurnitureId): string {
+  const names: Record<FurnitureId, string> = {
+    hideyHouse: "Hidey House",
+    tunnel: "Tunnel",
+    litterTray: "Litter Tray",
+    chewToy: "Chew Toy",
+    snuggleSack: "Snuggle Sack",
+    cardboardCastle: "Cardboard Castle",
+    royalThrone: "Royal Throne",
+  };
+  return names[id];
 }
 
 function getComboText(state: GameState): string {
