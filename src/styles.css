@@ -114,7 +114,7 @@ h1 {
 
 .stats {
   display: grid;
-  grid-template-columns: repeat(3, minmax(74px, 1fr));
+  grid-template-columns: repeat(8, minmax(70px, 1fr));
   gap: 8px;
 }
 
@@ -183,6 +183,7 @@ h1 {
 .meters,
 .shop,
 .pig-roster,
+.goals,
 .log {
   padding: 14px;
   border: 1px solid rgba(23, 32, 26, 0.12);
@@ -237,6 +238,7 @@ h1 {
 
 .shop h2,
 .pig-roster h2,
+.goals h2,
 .log h2 {
   font-size: 0.95rem;
 }
@@ -254,6 +256,20 @@ h1 {
 .shop button strong {
   white-space: nowrap;
   font-size: 0.85rem;
+}
+
+.compact-shop {
+  gap: 7px;
+}
+
+.compact-shop button {
+  min-height: 36px;
+  padding: 7px 9px;
+  font-size: 0.82rem;
+}
+
+.compact-shop h2 + button {
+  margin-top: 2px;
 }
 
 .pig-roster ul {
@@ -284,6 +300,44 @@ h1 {
   font-size: 0.78rem;
 }
 
+.goals {
+  display: grid;
+  gap: 10px;
+}
+
+.goals ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.goals li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 30px;
+  padding: 6px 8px;
+  border: 1px solid rgba(23, 32, 26, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.68);
+  color: #4f594f;
+  font-size: 0.8rem;
+}
+
+.goals li.complete {
+  color: #697366;
+  background: rgba(217, 234, 208, 0.56);
+}
+
+.goals li strong {
+  flex: 0 0 auto;
+  color: #243126;
+  font-size: 0.76rem;
+}
+
 .log {
   flex: 1;
   min-height: 0;
@@ -301,6 +355,51 @@ h1 {
 
 #event-log li + li {
   margin-top: 6px;
+}
+
+#dev-tools {
+  position: fixed;
+  left: 18px;
+  bottom: 18px;
+  z-index: 1000;
+  display: grid;
+  gap: 8px;
+  width: min(220px, calc(100vw - 36px));
+  pointer-events: none;
+}
+
+#dev-tools button {
+  pointer-events: auto;
+}
+
+.dev-tools-toggle {
+  width: 52px;
+  min-height: 34px;
+  background: #ffffff;
+  border: 1px solid rgba(23, 32, 26, 0.16);
+  box-shadow: 0 8px 20px rgba(31, 48, 35, 0.12);
+}
+
+.dev-tools-panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(23, 32, 26, 0.14);
+  border-radius: 8px;
+  background: rgba(255, 252, 244, 0.96);
+  box-shadow: 0 12px 28px rgba(31, 48, 35, 0.16);
+  pointer-events: auto;
+}
+
+.dev-tools-panel[hidden] {
+  display: none;
+}
+
+.dev-tools-panel button {
+  min-height: 34px;
+  padding: 7px 8px;
+  font-size: 0.74rem;
 }
 
 @media (max-width: 900px) {
@@ -323,7 +422,7 @@ h1 {
   }
 
   .stats {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .layout {

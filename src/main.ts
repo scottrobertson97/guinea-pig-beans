@@ -2,6 +2,7 @@ import Phaser from "phaser";
 import "./styles.css";
 import { GameScene } from "./scenes/GameScene";
 import { createInitialState } from "./simulation/state";
+import { DevTools } from "./ui/devTools";
 import { Hud } from "./ui/hud";
 
 const state = createInitialState();
@@ -27,6 +28,10 @@ hud = new Hud(state, () => {
   hud.render();
 });
 hud.render();
+
+if (import.meta.env.DEV) {
+  new DevTools(state, () => hud.render());
+}
 
 game.scene.start("GameScene", {
   state,

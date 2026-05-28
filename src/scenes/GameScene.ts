@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAt } from "../simulation/actions";
 import { updateSimulation } from "../simulation/systems";
-import type { GameState, Pig, Poop, Robot } from "../simulation/types";
+import type { FurnitureId, GameState, Pig, Poop, Robot } from "../simulation/types";
 
 interface SceneData {
   state: GameState;
@@ -14,6 +14,7 @@ export class GameScene extends Phaser.Scene {
   private onStateChanged!: () => void;
   private pigViews = new Map<number, Phaser.GameObjects.Container>();
   private poopViews = new Map<number, Phaser.GameObjects.Ellipse>();
+  private furnitureViews = new Map<FurnitureId, Phaser.GameObjects.Container>();
   private robotView: Phaser.GameObjects.Container | null = null;
   private hayPile!: Phaser.GameObjects.Container;
   private waterBottle!: Phaser.GameObjects.Container;
@@ -86,6 +87,17 @@ export class GameScene extends Phaser.Scene {
       graphics.lineBetween(12, y, width - 12, y);
     }
 
+    graphics.fillStyle(0xc9d6a0, 0.38);
+    graphics.fillRoundedRect(38, 38, 132, 86, 12);
+    graphics.fillStyle(0xa8c7c9, 0.28);
+    graphics.fillRoundedRect(width / 2 - 86, 28, 172, 70, 12);
+    graphics.fillStyle(0x8c7658, 0.26);
+    graphics.fillRoundedRect(width - 176, height - 128, 112, 72, 14);
+    graphics.fillStyle(0x9c835f, 0.24);
+    graphics.fillRoundedRect(46, height - 164, 150, 104, 14);
+    graphics.fillStyle(0x7fa878, 0.22);
+    graphics.fillRoundedRect(width / 2 - 118, height - 118, 236, 66, 14);
+
     graphics.fillStyle(0xbca47c, 1);
     graphics.fillRoundedRect(width - 176, height - 128, 112, 72, 14);
     graphics.fillStyle(0x7a5736, 1);
@@ -137,6 +149,8 @@ export class GameScene extends Phaser.Scene {
       }
     }
 
+    this.syncFurnitureViews();
+
     if (this.state.robot) {
       if (!this.robotView) {
         this.robotView = this.createRobotView(this.state.robot);
@@ -152,6 +166,19 @@ export class GameScene extends Phaser.Scene {
     this.waterBottle.setAlpha(
       this.state.needs.water <= 0 ? 0.3 : this.state.needs.water < 25 ? 0.6 : 1,
     );
+  }
+
+  private syncFurnitureViews(): void {
+    const furnitureIds = Object.keys(this.state.furniture) as FurnitureId[];
+    for (const id of furnitureIds) {
+      const count = this.state.furniture[id];
+      let view = this.furnitureViews.get(id);
+      if (count > 0 && !view) {
+        view = this.createFurnitureView(id);
+        this.furnitureViews.set(id, view);
+      }
+      if (view) view.setVisible(count > 0);
+    }
   }
 
   private createPigView(pig: Pig): Phaser.GameObjects.Container {
@@ -195,10 +222,59 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (poop.type === "compost") {
+      view.setSize(16, 10);
+      view.setFillStyle(0x6f5b2f, 1);
+      view.setStrokeStyle(2, 0xa58c4c, 0.7);
+      return;
+    }
+
     if (poop.type === "stinky") {
       view.setSize(16, 10);
       view.setFillStyle(0x395f2a, 1);
       view.setStrokeStyle(2, 0x223819, 0.62);
+      return;
+    }
+
+    if (poop.type === "blessed") {
+      view.setSize(16, 10);
+      view.setFillStyle(0xf1e7a2, 1);
+      view.setStrokeStyle(2, 0xffffff, 0.85);
+      return;
+    }
+
+    if (poop.type === "mega") {
+      view.setSize(24, 15);
+      view.setFillStyle(0x5b351d, 1);
+      view.setStrokeStyle(2, 0x2a1c12, 0.65);
+      return;
+    }
+
+    if (poop.type === "mystery") {
+      view.setSize(17, 11);
+      view.setFillStyle(0x7c65a9, 1);
+      view.setStrokeStyle(2, 0xe4d7ff, 0.75);
+      return;
+    }
+
+    if (poop.type === "hay") {
+      view.setSize(16, 10);
+      view.setFillStyle(0xc9b94e, 1);
+      view.setStrokeStyle(2, 0xefe28a, 0.72);
+      return;
+    }
+
+    if (poop.type === "royal") {
+      view.setSize(18, 12);
+      view.setFillStyle(0x9b5ab6, 1);
+      view.setStrokeStyle(2, 0xe4b83b, 0.9);
+      return;
+    }
+
+    if (poop.type === "cursed") {
+      view.setSize(19, 12);
+      view.setFillStyle(0x22202b, 1);
+      view.setStrokeStyle(2, 0x87cfe0, 0.78);
       return;
     }
 
@@ -258,5 +334,65 @@ export class GameScene extends Phaser.Scene {
     const cap = this.add.rectangle(0, -42, 34, 12, 0xd55c4a);
     const spout = this.add.rectangle(-18, 42, 30, 5, 0xaeb5b3).setRotation(0.46);
     return this.add.container(x, y, [bottle, cap, spout]).setDepth(4);
+  }
+
+  private createFurnitureView(id: FurnitureId): Phaser.GameObjects.Container {
+    const positions: Record<FurnitureId, [number, number]> = {
+      hideyHouse: [116, this.state.cage.height - 108],
+      tunnel: [this.state.cage.width / 2, 70],
+      litterTray: [this.state.cage.width - 120, this.state.cage.height - 92],
+      chewToy: [this.state.cage.width / 2 + 120, this.state.cage.height - 86],
+      snuggleSack: [182, this.state.cage.height - 76],
+      cardboardCastle: [this.state.cage.width / 2 - 110, this.state.cage.height - 86],
+      royalThrone: [this.state.cage.width - 96, 172],
+    };
+    const [x, y] = positions[id];
+    const parts = this.createFurnitureParts(id);
+    return this.add.container(x, y, parts).setDepth(5);
+  }
+
+  private createFurnitureParts(id: FurnitureId): Phaser.GameObjects.GameObject[] {
+    if (id === "tunnel") {
+      return [
+        this.add.ellipse(0, 0, 96, 36, 0x7a5736).setStrokeStyle(3, 0x51351f, 0.72),
+        this.add.ellipse(0, 6, 68, 22, 0x3d2c20),
+      ];
+    }
+    if (id === "litterTray") {
+      return [
+        this.add.rectangle(0, 0, 82, 48, 0x6d7f84).setStrokeStyle(3, 0x33484e, 0.72),
+        this.add.rectangle(0, 6, 66, 28, 0xbfae91, 0.9),
+      ];
+    }
+    if (id === "royalThrone") {
+      return [
+        this.add.rectangle(0, 10, 52, 38, 0x7c65a9).setStrokeStyle(3, 0x4e376b, 0.8),
+        this.add.rectangle(0, -18, 44, 44, 0x9b5ab6),
+        this.add.circle(0, -40, 8, 0xe4b83b),
+      ];
+    }
+    if (id === "chewToy") {
+      return [
+        this.add.circle(-10, 0, 13, 0xd55c4a).setStrokeStyle(2, 0x8e352d, 0.7),
+        this.add.circle(12, 0, 13, 0xdfc84f).setStrokeStyle(2, 0x998326, 0.7),
+      ];
+    }
+    if (id === "snuggleSack") {
+      return [
+        this.add.ellipse(0, 0, 78, 42, 0xd6d1c4).setStrokeStyle(3, 0x8f8a80, 0.7),
+        this.add.ellipse(0, 4, 48, 20, 0x6a5f54),
+      ];
+    }
+    if (id === "cardboardCastle") {
+      return [
+        this.add.rectangle(0, 8, 72, 54, 0xa66a3f).setStrokeStyle(3, 0x6d4225, 0.72),
+        this.add.rectangle(-22, -24, 18, 22, 0xa66a3f),
+        this.add.rectangle(22, -24, 18, 22, 0xa66a3f),
+      ];
+    }
+    return [
+      this.add.rectangle(0, 12, 76, 48, 0x8a6e4d).setStrokeStyle(3, 0x5d4129, 0.7),
+      this.add.ellipse(0, 28, 38, 24, 0x3d2c20),
+    ];
   }
 }
