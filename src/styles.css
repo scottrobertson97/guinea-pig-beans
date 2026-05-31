@@ -121,6 +121,23 @@ h1 {
   font-size: 0.9rem;
 }
 
+.sound-toggle {
+  flex: 0 0 auto;
+  min-width: 62px;
+  min-height: 38px;
+  padding: 8px 12px;
+  border: 1px solid rgba(23, 32, 26, 0.12);
+  background: #ffffff;
+  box-shadow: 0 8px 18px rgba(31, 48, 35, 0.08);
+  font-size: 0.78rem;
+  letter-spacing: 0;
+}
+
+.sound-toggle[aria-pressed="true"] {
+  color: #6f4f2f;
+  background: #eee8da;
+}
+
 .stats {
   display: grid;
   grid-template-columns: repeat(9, minmax(70px, 1fr));
@@ -186,6 +203,47 @@ h1 {
   display: block;
   width: 100%;
   height: 100%;
+}
+
+.tutorial-hint {
+  position: absolute;
+  left: 14px;
+  bottom: 14px;
+  z-index: 24;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(310px, calc(100% - 28px));
+  padding: 10px 10px 10px 12px;
+  border: 1px solid rgba(23, 32, 26, 0.16);
+  border-radius: 8px;
+  background: rgba(255, 250, 240, 0.94);
+  box-shadow: 0 12px 28px rgba(31, 48, 35, 0.18);
+  pointer-events: none;
+}
+
+.tutorial-hint[hidden] {
+  display: none;
+}
+
+.tutorial-hint span {
+  min-width: 0;
+  color: #2e3a2f;
+  font-size: 0.84rem;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.tutorial-hint button {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(23, 32, 26, 0.12);
+  background: #ffffff;
+  font-size: 0.72rem;
+  line-height: 1;
+  pointer-events: auto;
 }
 
 .meters,
@@ -358,6 +416,10 @@ button.attention {
   background: #f0d56b;
   box-shadow: inset 0 0 0 2px rgba(123, 93, 26, 0.12);
   animation: button-attention-pulse 1.2s ease-in-out infinite;
+}
+
+button.action-success {
+  animation: action-success-flash 560ms ease-out;
 }
 
 .stat-pulse {
@@ -551,6 +613,18 @@ button.attention {
   font-size: 0.78rem;
 }
 
+.pig-roster li.empty-state,
+.goals li.empty-state,
+#event-log li.empty-state {
+  display: block;
+  color: #687365;
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px dashed rgba(23, 32, 26, 0.14);
+  font-size: 0.8rem;
+  font-weight: 650;
+  line-height: 1.35;
+}
+
 .goals {
   display: grid;
   gap: 10px;
@@ -608,6 +682,13 @@ button.attention {
   margin-top: 6px;
 }
 
+#event-log li.empty-state {
+  margin-left: -20px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  list-style: none;
+}
+
 #section-modal {
   width: min(620px, calc(100vw - 28px));
   max-height: min(760px, calc(100vh - 28px));
@@ -643,8 +724,27 @@ button.attention {
   background: rgba(255, 252, 244, 0.96);
 }
 
+.modal-title-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.modal-section-icon {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 38px;
+  object-fit: contain;
+  filter: drop-shadow(0 5px 6px rgba(31, 48, 35, 0.16));
+}
+
 #section-modal-title {
   margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .modal-close {
@@ -774,6 +874,28 @@ button.attention {
   }
 }
 
+@keyframes action-success-flash {
+  0% {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5),
+      0 0 0 0 rgba(240, 213, 107, 0);
+  }
+
+  42% {
+    border-color: rgba(123, 93, 26, 0.48);
+    background: #fff5c6;
+    box-shadow:
+      inset 0 0 0 2px rgba(255, 255, 255, 0.7),
+      0 0 0 5px rgba(240, 213, 107, 0.34);
+  }
+
+  100% {
+    box-shadow:
+      inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+      0 0 0 0 rgba(240, 213, 107, 0);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -797,6 +919,10 @@ button.attention {
   .topbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .sound-toggle {
+    align-self: flex-start;
   }
 
   .stats {
@@ -898,6 +1024,22 @@ button.attention {
   .dock-button img {
     width: 36px;
     height: 32px;
+  }
+
+  .tutorial-hint {
+    left: 10px;
+    bottom: 10px;
+    max-width: calc(100% - 20px);
+    padding: 8px 8px 8px 10px;
+  }
+
+  .tutorial-hint span {
+    font-size: 0.78rem;
+  }
+
+  .modal-section-icon {
+    width: 34px;
+    height: 31px;
   }
 
   .modal-body {

@@ -2,11 +2,15 @@ import Phaser from "phaser";
 import "./styles.css";
 import { GameScene } from "./scenes/GameScene";
 import { createInitialState } from "./simulation/state";
+import { AudioManager } from "./ui/audioManager";
 import { DevTools } from "./ui/devTools";
 import { Hud } from "./ui/hud";
+import { TutorialController } from "./ui/tutorialController";
 
 const state = createInitialState();
 let hud: Hud;
+new AudioManager();
+new TutorialController();
 
 const game = new Phaser.Game({
   type: Phaser.AUTO,

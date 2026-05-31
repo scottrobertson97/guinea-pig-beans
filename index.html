@@ -16,6 +16,9 @@
               <p id="status-line">Muffin is considering a bean.</p>
             </div>
           </div>
+          <button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" aria-label="Mute sound effects">
+            SFX
+          </button>
           <div class="stats">
             <div><span>Beans</span><strong id="beans">0</strong></div>
             <div><span>Pigs</span><strong id="pig-count">1</strong></div>
@@ -33,6 +36,10 @@
           <section class="play-area" aria-label="Cage play area">
             <div id="canvas-wrap">
               <div id="game-canvas"></div>
+              <div id="tutorial-hint" class="tutorial-hint" role="status" aria-live="polite" hidden>
+                <span id="tutorial-hint-text"></span>
+                <button id="tutorial-dismiss" type="button" aria-label="Dismiss tutorial">X</button>
+              </div>
             </div>
 
             <section class="care-strip" aria-label="Cage care status">
@@ -125,7 +132,10 @@
         <dialog id="section-modal" aria-labelledby="section-modal-title">
           <div class="modal-shell">
             <header class="modal-header">
-              <h2 id="section-modal-title">Care</h2>
+              <div class="modal-title-group">
+                <img id="section-modal-icon" class="modal-section-icon" src="/assets/sprites/decor/hay_rack_full.png" alt="" />
+                <h2 id="section-modal-title">Care</h2>
+              </div>
               <button id="close-section-modal" class="modal-close" type="button" aria-label="Close section">X</button>
             </header>
 

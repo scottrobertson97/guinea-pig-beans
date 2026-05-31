@@ -127,6 +127,8 @@ Implementation notes:
 
 Priority: P1
 
+Status: First pass implemented.
+
 Description: Make pigs feel less like moving counters by adding small personality-driven idle and reaction states. Pigs should occasionally wiggle, sniff, eat, drink, pause, or show a tiny thought bubble tied to their current target or need.
 
 Acceptance criteria:
@@ -192,6 +194,8 @@ Implementation notes:
 
 Priority: P1
 
+Status: First pass implemented.
+
 Description: Buying upgrades should produce a satisfying moment in the UI and cage. Purchases currently update state, but they should also briefly animate the button and the related cage object so players notice what changed.
 
 Acceptance criteria:
@@ -233,6 +237,8 @@ Implementation notes:
 
 Priority: P2
 
+Status: First pass implemented.
+
 Description: Show hay and water levels directly in the cage, not only in meters. The hay rack and water bottle should visually change as resources fall, making upkeep easier to read at a glance.
 
 Acceptance criteria:
@@ -252,6 +258,8 @@ Implementation notes:
 
 Priority: P2
 
+Status: First pass implemented.
+
 Description: Add soft shadows and consistent depth treatment to pigs, beans, decor, and upgrade sprites. This will help the cage read as a single coherent scene instead of separate pasted sprites.
 
 Acceptance criteria:
@@ -270,6 +278,8 @@ Implementation notes:
 
 Priority: P2
 
+Status: First pass implemented.
+
 Description: Add small environmental details that make the cage feel hand-built and cozy: fleece stitching, loose hay strands, chew marks, rim highlights, and a few soft bedding variations.
 
 Acceptance criteria:
@@ -287,6 +297,8 @@ Implementation notes:
 ### PB-010: Modal Header Icons And Section Theming
 
 Priority: P2
+
+Status: First pass implemented.
 
 Description: Give each modal section a stronger identity by adding the same graphic used in the dock to the modal header. The current modal is functional, but headers should reinforce where the player is.
 
@@ -346,6 +358,8 @@ Implementation notes:
 
 Priority: P2
 
+Status: First pass implemented.
+
 Description: Add a small sound layer for repeated actions: cleanup, button click, pig squeak, upgrade purchase, event response, and modal open/close. Sound must be optional and easy to mute.
 
 Acceptance criteria:
@@ -386,6 +400,8 @@ Implementation notes:
 
 Priority: P2
 
+Status: First pass implemented.
+
 Description: Add small pig reactions when the player cleans nearby beans, clicks near a pig, buys furniture, or triggers abilities. These reactions should make pigs feel aware of the player's actions.
 
 Acceptance criteria:
@@ -425,6 +441,8 @@ Implementation notes:
 
 Priority: P3
 
+Status: First pass implemented.
+
 Description: Add friendly empty or low-content states to read-only sections. These modals should feel intentional even when there are few pigs, no new achievements, or a short log.
 
 Acceptance criteria:
@@ -442,6 +460,8 @@ Implementation notes:
 ### PB-018: First-Run Tutorial Sequence
 
 Priority: P2
+
+Status: First pass implemented.
 
 Description: Add a compact first-run tutorial for the earliest loop: clean a bean, refill care, open the shop, and buy the first upgrade. The tutorial should guide without blocking experimentation.
 
@@ -479,6 +499,8 @@ Implementation notes:
 ### PB-020: Keyboard Shortcuts For Section Dock
 
 Priority: P3
+
+Status: First pass implemented.
 
 Description: Add keyboard shortcuts for opening modal sections and closing the modal. Escape already closes the modal through native dialog behavior; the dock should also be reachable through predictable keys.
 
