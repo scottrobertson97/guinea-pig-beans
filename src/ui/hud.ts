@@ -9,7 +9,6 @@ import {
   buyRobot,
   buyScoopUpgrade,
   fuelAutomation,
-  getBeanRecipeStatus,
   prestige,
   refillHay,
   refillWater,
@@ -69,8 +68,49 @@ type ButtonId =
   | "wisdom-chorus-training"
   | "prestige";
 
+type QuickCareButtonId = "quick-refill-hay" | "quick-refill-water" | "quick-event-response";
+
+type SectionId =
+  | "care"
+  | "shop"
+  | "furniture"
+  | "abilities"
+  | "recipes"
+  | "mythos"
+  | "wisdom"
+  | "herd"
+  | "goals"
+  | "log";
+
+const SECTION_TITLES: Record<SectionId, string> = {
+  care: "Care",
+  shop: "Shop",
+  furniture: "Furniture",
+  abilities: "Abilities",
+  recipes: "Bean Recipes",
+  mythos: "Mythos",
+  wisdom: "Wisdom",
+  herd: "Herd",
+  goals: "Goals",
+  log: "Cage Log",
+};
+
 export class Hud {
   private buttons: Record<ButtonId, HTMLButtonElement>;
+  private quickButtons: Record<QuickCareButtonId, HTMLButtonElement>;
+  private launchers: Record<SectionId, HTMLButtonElement>;
+  private badges: Record<SectionId, HTMLElement>;
+  private modal: HTMLDialogElement;
+  private modalTitle: HTMLElement;
+  private modalCloseButton: HTMLButtonElement;
+  private panels: Record<SectionId, HTMLElement>;
+  private activeSection: SectionId | null = null;
+  private activeLauncher: HTMLButtonElement | null = null;
+  private previousComboCount = 0;
+  private previousGoalSignature: string | null = null;
+  private previousLogSignature: string | null = null;
+  private hasGoalUpdate = false;
+  private hasUnreadLog = false;
 
   constructor(
     private readonly state: GameState,
@@ -115,6 +155,55 @@ export class Hud {
       prestige: getButton("prestige"),
     };
 
+    this.quickButtons = {
+      "quick-refill-hay": getButton("quick-refill-hay"),
+      "quick-refill-water": getButton("quick-refill-water"),
+      "quick-event-response": getButton("quick-event-response"),
+    };
+
+    this.launchers = {
+      care: getButton("open-care"),
+      shop: getButton("open-shop"),
+      furniture: getButton("open-furniture"),
+      abilities: getButton("open-abilities"),
+      recipes: getButton("open-recipes"),
+      mythos: getButton("open-mythos"),
+      wisdom: getButton("open-wisdom"),
+      herd: getButton("open-herd"),
+      goals: getButton("open-goals"),
+      log: getButton("open-log"),
+    };
+    this.badges = {
+      care: getBadge("care"),
+      shop: getBadge("shop"),
+      furniture: getBadge("furniture"),
+      abilities: getBadge("abilities"),
+      recipes: getBadge("recipes"),
+      mythos: getBadge("mythos"),
+      wisdom: getBadge("wisdom"),
+      herd: getBadge("herd"),
+      goals: getBadge("goals"),
+      log: getBadge("log"),
+    };
+    this.modal = getDialog("section-modal");
+    this.modalTitle = getElement("section-modal-title");
+    this.modalCloseButton = getButton("close-section-modal");
+    this.panels = {
+      care: getPanel("care"),
+      shop: getPanel("shop"),
+      furniture: getPanel("furniture"),
+      abilities: getPanel("abilities"),
+      recipes: getPanel("recipes"),
+      mythos: getPanel("mythos"),
+      wisdom: getPanel("wisdom"),
+      herd: getPanel("herd"),
+      goals: getPanel("goals"),
+      log: getPanel("log"),
+    };
+    for (const launcher of Object.values(this.launchers)) {
+      launcher.setAttribute("aria-pressed", "false");
+    }
+
     this.buttons["adopt-pig"].addEventListener("click", () => this.runAction(() => buyPig(this.state)));
     this.buttons["better-hay"].addEventListener("click", () =>
       this.runAction(() => buyFeedUpgrade(this.state)),
@@ -133,10 +222,19 @@ export class Hud {
     );
     this.buttons["rare-pig"].addEventListener("click", () => this.runAction(() => buyRarePig(this.state)));
     this.buttons["refill-hay"].addEventListener("click", () => this.runAction(() => refillHay(this.state)));
+    this.quickButtons["quick-refill-hay"].addEventListener("click", () =>
+      this.runAction(() => refillHay(this.state)),
+    );
     this.buttons["refill-water"].addEventListener("click", () =>
       this.runAction(() => refillWater(this.state)),
     );
+    this.quickButtons["quick-refill-water"].addEventListener("click", () =>
+      this.runAction(() => refillWater(this.state)),
+    );
     this.buttons["event-response"].addEventListener("click", () =>
+      this.runAction(() => respondToEvent(this.state)),
+    );
+    this.quickButtons["quick-event-response"].addEventListener("click", () =>
       this.runAction(() => respondToEvent(this.state)),
     );
     this.bindFurnitureButton("hidey-house", "hideyHouse");
@@ -175,6 +273,15 @@ export class Hud {
     this.bindWisdomButton("wisdom-rare-instinct", "rareInstinct");
     this.bindWisdomButton("wisdom-chorus-training", "chorusTraining");
     this.buttons.prestige.addEventListener("click", () => this.runAction(() => prestige(this.state)));
+
+    for (const [section, launcher] of Object.entries(this.launchers) as [SectionId, HTMLButtonElement][]) {
+      launcher.addEventListener("click", () => this.openSection(section, launcher));
+    }
+    this.modalCloseButton.addEventListener("click", () => this.closeModal());
+    this.modal.addEventListener("click", (event) => {
+      if (event.target === this.modal) this.closeModal();
+    });
+    this.modal.addEventListener("close", () => this.onModalClosed());
   }
 
   render(): void {
@@ -192,21 +299,30 @@ export class Hud {
     setText("cavy-wisdom", this.state.cavyWisdom.toString());
     setText("habitat-space", `${habitatUsed}/${habitatCapacity}`);
     setText("hay-value", `${Math.ceil(this.state.needs.hay)}%`);
+    setText("quick-hay-value", `${Math.ceil(this.state.needs.hay)}%`);
     setText("water-value", `${Math.ceil(this.state.needs.water)}%`);
+    setText("quick-water-value", `${Math.ceil(this.state.needs.water)}%`);
     setText("happiness-value", `${Math.ceil(this.state.cage.happiness)}%`);
+    setText("quick-happiness-value", `${Math.ceil(this.state.cage.happiness)}%`);
     setText("objective-title", this.state.objective.title);
+    setText("quick-objective-title", this.state.objective.title);
     setText(
       "objective-progress",
       `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
     );
+    setText(
+      "quick-objective-progress",
+      `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
+    );
     setText("combo-value", getComboText(this.state));
-    setText("adopt-cost", isAtPigCapacity ? "Full - Bigger Cage" : `${costs.pig} Beans`);
-    setText("feed-cost", `${costs.feed} Beans`);
-    setText("scoop-cost", `${costs.scoop} Beans`);
-    setText("robot-cost", this.state.robot ? "Active" : `${costs.robot} Beans`);
+    this.updateComboPulse();
+    setText("adopt-cost", getAdoptPigStatusText(this.state, costs.pig, pigCapacity));
+    setText("feed-cost", getBeanCostStatusText(this.state, costs.feed, `${costs.feed} Beans`));
+    setText("scoop-cost", getBeanCostStatusText(this.state, costs.scoop, `${costs.scoop} Beans`));
+    setText("robot-cost", getRobotStatusText(this.state, costs.robot));
     setText("fuel-automation-status", getAutomationFuelText(this.state));
-    setText("cage-cost", `${costs.cage} Beans - Cap ${pigCapacity + 2}`);
-    setText("rare-pig-cost", isAtPigCapacity ? "Full - Bigger Cage" : `${costs.rarePig} + 1 Gold`);
+    setText("cage-cost", getBiggerCageStatusText(this.state, costs.cage, pigCapacity));
+    setText("rare-pig-cost", getRarePigStatusText(this.state, costs.rarePig, pigCapacity));
     this.renderFurnitureCosts(costs.furniture);
     this.renderAbilityStatuses();
     this.renderRecipeStatuses();
@@ -216,8 +332,11 @@ export class Hud {
     setText("status-line", getStatusLine(this.state));
 
     setMeter("hay-meter", this.state.needs.hay);
+    setMeter("quick-hay-meter", this.state.needs.hay);
     setMeter("water-meter", this.state.needs.water);
+    setMeter("quick-water-meter", this.state.needs.water);
     setMeter("happiness-meter", this.state.cage.happiness);
+    setMeter("quick-happiness-meter", this.state.cage.happiness);
 
     this.buttons["adopt-pig"].disabled = isAtPigCapacity || this.state.beans < costs.pig;
     this.buttons["better-hay"].disabled = this.state.beans < costs.feed;
@@ -228,12 +347,15 @@ export class Hud {
     this.buttons["bigger-cage"].disabled = this.state.beans < costs.cage;
     this.buttons["rare-pig"].disabled = isAtPigCapacity || this.state.beans < costs.rarePig || this.state.goldenBeans < 1;
     this.buttons["event-response"].disabled = !this.state.event.active || !this.state.event.responseReady;
+    this.quickButtons["quick-event-response"].disabled = this.buttons["event-response"].disabled;
     this.updateFurnitureDisabled(costs.furniture);
     this.updateAbilityDisabled();
     this.updateRecipeDisabled();
     this.updateLateGameDisabled();
     this.updateWisdomDisabled();
     this.buttons.prestige.disabled = this.state.stats.lifetimeBeans < costs.prestige;
+    this.updateAvailableNowStyles();
+    this.updateSectionIndicators();
 
     const log = document.querySelector<HTMLOListElement>("#event-log");
     if (log) {
@@ -271,6 +393,158 @@ export class Hud {
     this.render();
   }
 
+  private openSection(section: SectionId, launcher: HTMLButtonElement): void {
+    this.activeSection = section;
+    this.activeLauncher = launcher;
+    this.modalTitle.textContent = SECTION_TITLES[section];
+
+    for (const [panelSection, panel] of Object.entries(this.panels) as [SectionId, HTMLElement][]) {
+      panel.hidden = panelSection !== section;
+    }
+
+    for (const [launcherSection, sectionLauncher] of Object.entries(this.launchers) as [SectionId, HTMLButtonElement][]) {
+      sectionLauncher.setAttribute("aria-pressed", String(launcherSection === section));
+    }
+
+    if (!this.modal.open) {
+      this.modal.showModal();
+    }
+
+    if (section === "goals") {
+      this.hasGoalUpdate = false;
+      this.previousGoalSignature = getGoalSignature(this.state);
+    }
+    if (section === "log") {
+      this.hasUnreadLog = false;
+      this.previousLogSignature = getLogSignature(this.state);
+    }
+    this.updateSectionIndicators();
+    this.modalCloseButton.focus();
+  }
+
+  private closeModal(): void {
+    if (this.modal.open) {
+      this.modal.close();
+    }
+  }
+
+  private onModalClosed(): void {
+    this.activeSection = null;
+    for (const launcher of Object.values(this.launchers)) {
+      launcher.setAttribute("aria-pressed", "false");
+    }
+
+    const launcher = this.activeLauncher;
+    this.activeLauncher = null;
+    launcher?.focus();
+  }
+
+  private updateComboPulse(): void {
+    const comboCount = this.state.combo.timer > 0 ? this.state.combo.count : 0;
+    if (comboCount > this.previousComboCount && comboCount > 1) {
+      pulseElement("combo-value", "stat-pulse");
+    }
+    this.previousComboCount = comboCount;
+  }
+
+  private updateSectionIndicators(): void {
+    this.updateGoalAndLogMarkers();
+
+    const eventReady = Boolean(this.state.event.active && this.state.event.responseReady);
+    const careNeedsAttention = eventReady || this.state.needs.hay < 25 || this.state.needs.water < 25;
+    const careLowCount = Number(this.state.needs.hay < 25) + Number(this.state.needs.water < 25);
+    this.setAttention(this.buttons["event-response"], eventReady);
+    this.setAttention(this.quickButtons["quick-event-response"], eventReady);
+    this.launchers.care.classList.toggle("dock-alert", careNeedsAttention);
+
+    this.setBadge("care", eventReady ? "!" : careLowCount > 0 ? careLowCount.toString() : "");
+    this.setBadge("shop", countEnabled(this.buttons, [
+      "adopt-pig",
+      "better-hay",
+      "better-scoop",
+      "poop-roomba",
+      "fuel-automation",
+      "bigger-cage",
+      "rare-pig",
+    ]));
+    this.setBadge("furniture", countEnabled(this.buttons, [
+      "hidey-house",
+      "tunnel",
+      "litter-tray",
+      "chew-toy",
+      "snuggle-sack",
+      "cardboard-castle",
+      "royal-throne",
+    ]));
+    this.setBadge("abilities", countEnabled(this.buttons, [
+      "wheek-call",
+      "treat-bag",
+      "deep-clean",
+      "fresh-bedding",
+      "snack-time",
+      "zoomie-mode",
+    ]));
+    this.setBadge("recipes", countEnabled(this.buttons, [
+      "recipe-bean-blessing",
+      "recipe-compost-catalyst",
+      "recipe-royal-accord",
+    ]));
+    this.setBadge("mythos", countEnabled(this.buttons, [
+      "hay-dimension",
+      "bean-exchange",
+      "cavy-council",
+      "squeak-choir",
+      "bean-singularity",
+      "prestige",
+    ]));
+    this.setBadge("wisdom", countEnabled(this.buttons, [
+      "wisdom-roomy-start",
+      "wisdom-gentle-automation",
+      "wisdom-rare-instinct",
+      "wisdom-chorus-training",
+    ]));
+    this.setBadge("herd", "");
+    this.setBadge("goals", this.hasGoalUpdate ? "!" : "");
+    this.setBadge("log", this.hasUnreadLog ? "!" : "");
+  }
+
+  private updateGoalAndLogMarkers(): void {
+    const goalSignature = getGoalSignature(this.state);
+    if (this.previousGoalSignature === null) {
+      this.previousGoalSignature = goalSignature;
+    } else if (goalSignature !== this.previousGoalSignature) {
+      this.hasGoalUpdate = this.activeSection !== "goals";
+      this.previousGoalSignature = goalSignature;
+    }
+    if (this.activeSection === "goals") this.hasGoalUpdate = false;
+
+    const logSignature = getLogSignature(this.state);
+    if (this.previousLogSignature === null) {
+      this.previousLogSignature = logSignature;
+    } else if (logSignature !== this.previousLogSignature) {
+      this.hasUnreadLog = this.activeSection !== "log";
+      this.previousLogSignature = logSignature;
+    }
+    if (this.activeSection === "log") this.hasUnreadLog = false;
+  }
+
+  private setBadge(section: SectionId, value: number | string): void {
+    const badge = this.badges[section];
+    const text = typeof value === "number" ? (value > 0 ? value.toString() : "") : value;
+    badge.textContent = text;
+    badge.hidden = text.length === 0;
+  }
+
+  private setAttention(button: HTMLButtonElement, active: boolean): void {
+    button.classList.toggle("attention", active);
+  }
+
+  private updateAvailableNowStyles(): void {
+    for (const button of Object.values(this.buttons)) {
+      button.classList.toggle("available-now", !button.disabled);
+    }
+  }
+
   private bindFurnitureButton(buttonId: ButtonId, furnitureId: FurnitureId): void {
     this.buttons[buttonId].addEventListener("click", () =>
       this.runAction(() => buyFurniture(this.state, furnitureId)),
@@ -296,13 +570,13 @@ export class Hud {
   }
 
   private renderFurnitureCosts(costs: Record<FurnitureId, number>): void {
-    setText("hidey-house-cost", `${costs.hideyHouse} Beans - ${getFurnitureSpaceCost("hideyHouse")}H`);
-    setText("tunnel-cost", `${costs.tunnel} Beans - ${getFurnitureSpaceCost("tunnel")}H`);
-    setText("litter-tray-cost", `${costs.litterTray} Beans - ${getFurnitureSpaceCost("litterTray")}H`);
-    setText("chew-toy-cost", `${costs.chewToy} Beans - ${getFurnitureSpaceCost("chewToy")}H`);
-    setText("snuggle-sack-cost", `${costs.snuggleSack} Beans - ${getFurnitureSpaceCost("snuggleSack")}H`);
-    setText("cardboard-castle-cost", `${costs.cardboardCastle} Beans - ${getFurnitureSpaceCost("cardboardCastle")}H`);
-    setText("royal-throne-cost", `${costs.royalThrone} Beans - ${getFurnitureSpaceCost("royalThrone")}H`);
+    setText("hidey-house-cost", getFurnitureStatusText(this.state, costs, "hideyHouse"));
+    setText("tunnel-cost", getFurnitureStatusText(this.state, costs, "tunnel"));
+    setText("litter-tray-cost", getFurnitureStatusText(this.state, costs, "litterTray"));
+    setText("chew-toy-cost", getFurnitureStatusText(this.state, costs, "chewToy"));
+    setText("snuggle-sack-cost", getFurnitureStatusText(this.state, costs, "snuggleSack"));
+    setText("cardboard-castle-cost", getFurnitureStatusText(this.state, costs, "cardboardCastle"));
+    setText("royal-throne-cost", getFurnitureStatusText(this.state, costs, "royalThrone"));
   }
 
   private renderAbilityStatuses(): void {
@@ -315,29 +589,29 @@ export class Hud {
   }
 
   private renderRecipeStatuses(): void {
-    setText("recipe-bean-blessing-status", getBeanRecipeStatus(this.state, "beanBlessing"));
-    setText("recipe-compost-catalyst-status", getBeanRecipeStatus(this.state, "compostCatalyst"));
-    setText("recipe-royal-accord-status", getBeanRecipeStatus(this.state, "royalAccord"));
+    setText("recipe-bean-blessing-status", getRecipeStatusText(this.state, "beanBlessing"));
+    setText("recipe-compost-catalyst-status", getRecipeStatusText(this.state, "compostCatalyst"));
+    setText("recipe-royal-accord-status", getRecipeStatusText(this.state, "royalAccord"));
   }
 
   private renderLateGameStatuses(): void {
-    setText("hay-dimension-status", this.state.lateGame.hayDimension ? "Active" : "750 + 25C");
-    setText("bean-exchange-status", this.state.lateGame.beanExchange ? "Active" : "1200 + 2G");
-    setText("cavy-council-status", this.state.lateGame.cavyCouncil ? "Active" : "8 Pigs + 10S");
-    setText("squeak-choir-status", this.state.lateGame.squeakChoir ? "Active" : "25 Squeaks");
-    setText("bean-singularity-status", this.state.lateGame.beanSingularity ? "Active" : "100C + Rare");
+    setText("hay-dimension-status", getLateGameStatusText(this.state, "hayDimension"));
+    setText("bean-exchange-status", getLateGameStatusText(this.state, "beanExchange"));
+    setText("cavy-council-status", getLateGameStatusText(this.state, "cavyCouncil"));
+    setText("squeak-choir-status", getLateGameStatusText(this.state, "squeakChoir"));
+    setText("bean-singularity-status", getLateGameStatusText(this.state, "beanSingularity"));
   }
 
   private renderWisdomStatuses(): void {
-    setText("wisdom-roomy-start-status", this.state.wisdom.roomyStart ? "Learned" : `${getWisdomCost("roomyStart")} Wisdom`);
+    setText("wisdom-roomy-start-status", getWisdomStatusText(this.state, "roomyStart"));
     setText(
       "wisdom-gentle-automation-status",
-      this.state.wisdom.gentleAutomation ? "Learned" : `${getWisdomCost("gentleAutomation")} Wisdom`,
+      getWisdomStatusText(this.state, "gentleAutomation"),
     );
-    setText("wisdom-rare-instinct-status", this.state.wisdom.rareInstinct ? "Learned" : `${getWisdomCost("rareInstinct")} Wisdom`);
+    setText("wisdom-rare-instinct-status", getWisdomStatusText(this.state, "rareInstinct"));
     setText(
       "wisdom-chorus-training-status",
-      this.state.wisdom.chorusTraining ? "Learned" : `${getWisdomCost("chorusTraining")} Wisdom`,
+      getWisdomStatusText(this.state, "chorusTraining"),
     );
   }
 
@@ -398,12 +672,71 @@ export class Hud {
   }
 }
 
-function getButton(id: ButtonId): HTMLButtonElement {
+function getButton(id: string): HTMLButtonElement {
   const element = document.getElementById(id);
   if (!(element instanceof HTMLButtonElement)) {
     throw new Error(`Missing button #${id}`);
   }
   return element;
+}
+
+function getElement(id: string): HTMLElement {
+  const element = document.getElementById(id);
+  if (!element) {
+    throw new Error(`Missing element #${id}`);
+  }
+  return element;
+}
+
+function getDialog(id: string): HTMLDialogElement {
+  const element = document.getElementById(id);
+  if (!(element instanceof HTMLDialogElement)) {
+    throw new Error(`Missing dialog #${id}`);
+  }
+  return element;
+}
+
+function getPanel(section: SectionId): HTMLElement {
+  const element = document.querySelector<HTMLElement>(`[data-section-panel="${section}"]`);
+  if (!element) {
+    throw new Error(`Missing modal panel for ${section}`);
+  }
+  return element;
+}
+
+function getBadge(section: SectionId): HTMLElement {
+  const element = document.querySelector<HTMLElement>(`[data-dock-badge="${section}"]`);
+  if (!element) {
+    throw new Error(`Missing dock badge for ${section}`);
+  }
+  return element;
+}
+
+function countEnabled(buttons: Record<ButtonId, HTMLButtonElement>, ids: ButtonId[]): number {
+  return ids.reduce((total, id) => total + Number(!buttons[id].disabled), 0);
+}
+
+function pulseElement(id: string, className: string): void {
+  const element = document.getElementById(id);
+  if (!element) return;
+  element.classList.remove(className);
+  void element.offsetWidth;
+  element.classList.add(className);
+}
+
+function getGoalSignature(state: GameState): string {
+  return [
+    state.objective.id,
+    Math.floor(state.objective.progress),
+    state.objective.target,
+    state.stats.objectivesCompleted,
+    state.milestones.quests.join(","),
+    state.milestones.achievements.join(","),
+  ].join("|");
+}
+
+function getLogSignature(state: GameState): string {
+  return state.log.join("|");
 }
 
 function setText(id: string, text: string): void {
@@ -437,14 +770,110 @@ function getStatusLine(state: GameState): string {
 
 function getAutomationFuelText(state: GameState): string {
   if (!state.robot) return "Needs Roomba";
-  if (state.automation.overdrive > 0) return `${Math.ceil(state.automation.overdrive)}s`;
-  return `${getAutomationFuelCost(state)} Compost`;
+  if (state.automation.overdrive > 0) return `${Math.ceil(state.automation.overdrive)}s active`;
+  const cost = getAutomationFuelCost(state);
+  if (state.compost < cost) return formatNeed(state.compost, cost, "Compost", "Compost");
+  return `Fuel ${cost} Compost`;
 }
 
 function getAbilityStatusText(state: GameState, id: AbilityId): string {
-  if (state.abilities[id] > 0) return getCooldownText(state.abilities[id]);
+  if (state.abilities[id] > 0) return `Cooldown ${getCooldownText(state.abilities[id])}`;
   const cost = getAbilityCost(state, id);
-  return cost > 0 ? `${cost} Squeaks` : "Free";
+  if (state.squeaks < cost) return formatNeed(state.squeaks, cost, "Squeak");
+  return cost > 0 ? `Use ${cost} Squeaks` : "Ready";
+}
+
+function getAdoptPigStatusText(state: GameState, cost: number, capacity: number): string {
+  if (state.pigs.length >= capacity) return "Full - buy cage";
+  return getBeanCostStatusText(state, cost, `${cost} Beans`);
+}
+
+function getBiggerCageStatusText(state: GameState, cost: number, capacity: number): string {
+  return getBeanCostStatusText(state, cost, `${cost} Beans - Cap ${capacity + 2}`);
+}
+
+function getRarePigStatusText(state: GameState, cost: number, capacity: number): string {
+  if (state.pigs.length >= capacity) return "Full - buy cage";
+  if (state.beans < cost) return formatNeed(state.beans, cost, "Bean");
+  if (state.goldenBeans < 1) return formatNeed(state.goldenBeans, 1, "Golden Bean");
+  return `${cost} Beans + 1 Gold`;
+}
+
+function getRobotStatusText(state: GameState, cost: number): string {
+  if (state.robot) return "Active";
+  return getBeanCostStatusText(state, cost, `${cost} Beans`);
+}
+
+function getBeanCostStatusText(state: GameState, cost: number, readyText: string): string {
+  if (state.beans < cost) return formatNeed(state.beans, cost, "Bean");
+  return readyText;
+}
+
+function getFurnitureStatusText(state: GameState, costs: Record<FurnitureId, number>, id: FurnitureId): string {
+  const spaceCost = getFurnitureSpaceCost(id);
+  const nextSpace = getFurnitureSpaceUsed(state) + spaceCost;
+  const habitatCapacity = getHabitatCapacity(state);
+  if (nextSpace > habitatCapacity) return formatNeed(getFurnitureSpaceUsed(state), nextSpace, "Habitat");
+  if (state.beans < costs[id]) return formatNeed(state.beans, costs[id], "Bean");
+  return `${costs[id]} Beans - ${spaceCost}H`;
+}
+
+function getRecipeStatusText(state: GameState, id: BeanRecipeId): string {
+  if (state.recipes[id]) return "Active";
+  if (id === "beanBlessing") {
+    if (state.goldenBeans < 2) return formatNeed(state.goldenBeans, 2, "Golden Bean");
+    if (state.squeaks < 8) return formatNeed(state.squeaks, 8, "Squeak");
+    if (state.stats.blessedCleaned < 1) return "Clean Blessed";
+    return "Unlock";
+  }
+  if (id === "compostCatalyst") {
+    if (state.compost < 40) return formatNeed(state.compost, 40, "Compost", "Compost");
+    if (state.stats.compostCleaned < 3) return `Clean ${3 - state.stats.compostCleaned} Compost`;
+    if (state.stats.stinkyCleaned < 2) return `Clean ${2 - state.stats.stinkyCleaned} Stinky`;
+    return "Unlock";
+  }
+  if (state.goldenBeans < 1) return formatNeed(state.goldenBeans, 1, "Golden Bean");
+  if (state.squeaks < 16) return formatNeed(state.squeaks, 16, "Squeak");
+  if (state.stats.royalCleaned < 1 && state.stats.legendaryPigsAdopted < 1) return "Clean Royal";
+  return "Unlock";
+}
+
+function getLateGameStatusText(state: GameState, id: keyof GameState["lateGame"]): string {
+  if (state.lateGame[id]) return "Active";
+  if (id === "hayDimension") {
+    if (state.beans < 750) return formatNeed(state.beans, 750, "Bean");
+    if (state.compost < 25) return formatNeed(state.compost, 25, "Compost", "Compost");
+    return "Unlock";
+  }
+  if (id === "beanExchange") {
+    if (state.beans < 1200) return formatNeed(state.beans, 1200, "Bean");
+    if (state.goldenBeans < 2) return formatNeed(state.goldenBeans, 2, "Golden Bean");
+    return "Unlock";
+  }
+  if (id === "cavyCouncil") {
+    if (state.pigs.length < 8) return formatNeed(state.pigs.length, 8, "Pig");
+    if (state.squeaks < 10) return formatNeed(state.squeaks, 10, "Squeak");
+    return "Unlock";
+  }
+  if (id === "squeakChoir") {
+    if (state.squeaks < 25) return formatNeed(state.squeaks, 25, "Squeak");
+    return "Unlock";
+  }
+  if (state.compost < 100) return formatNeed(state.compost, 100, "Compost", "Compost");
+  if (state.stats.rarePoopsCleaned < 25) return `Clean ${25 - state.stats.rarePoopsCleaned} rare`;
+  return "Unlock";
+}
+
+function getWisdomStatusText(state: GameState, id: WisdomPerkId): string {
+  if (state.wisdom[id]) return "Learned";
+  const cost = getWisdomCost(id);
+  if (state.cavyWisdom < cost) return formatNeed(state.cavyWisdom, cost, "Wisdom", "Wisdom");
+  return `Learn ${cost} Wisdom`;
+}
+
+function formatNeed(current: number, required: number, singular: string, plural = `${singular}s`): string {
+  const missing = Math.max(1, Math.ceil(required - current));
+  return `Need ${missing} ${missing === 1 ? singular : plural}`;
 }
 
 function getFurnitureName(id: FurnitureId): string {

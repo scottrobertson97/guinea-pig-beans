@@ -30,12 +30,107 @@
         </header>
 
         <main class="layout">
-          <div id="canvas-wrap">
-            <div id="game-canvas"></div>
-          </div>
+          <section class="play-area" aria-label="Cage play area">
+            <div id="canvas-wrap">
+              <div id="game-canvas"></div>
+            </div>
 
-          <aside class="panel" aria-label="Cage controls and shop">
-            <section class="meters">
+            <section class="care-strip" aria-label="Cage care status">
+              <div class="quick-meter">
+                <div class="meter-label">
+                  <span>Hay</span>
+                  <strong id="quick-hay-value">100%</strong>
+                </div>
+                <button id="quick-refill-hay" type="button">Refill</button>
+                <div class="meter"><span id="quick-hay-meter"></span></div>
+              </div>
+              <div class="quick-meter">
+                <div class="meter-label">
+                  <span>Water</span>
+                  <strong id="quick-water-value">100%</strong>
+                </div>
+                <button id="quick-refill-water" type="button">Refill</button>
+                <div class="meter"><span id="quick-water-meter"></span></div>
+              </div>
+              <div class="quick-meter">
+                <div class="meter-label">
+                  <span>Happiness</span>
+                  <strong id="quick-happiness-value">86%</strong>
+                </div>
+                <button id="quick-event-response" type="button">Event</button>
+                <div class="meter"><span id="quick-happiness-meter"></span></div>
+              </div>
+              <div class="quick-objective">
+                <span>Objective</span>
+                <strong id="quick-objective-title"></strong>
+                <em id="quick-objective-progress"></em>
+              </div>
+            </section>
+
+            <nav class="section-dock" aria-label="Cage sections">
+              <button id="open-care" class="dock-button" type="button" data-section="care" aria-controls="section-modal">
+                <img src="/assets/sprites/decor/hay_rack_full.png" alt="" />
+                <span>Care</span>
+                <span class="dock-badge" data-dock-badge="care" hidden></span>
+              </button>
+              <button id="open-shop" class="dock-button" type="button" data-section="shop" aria-controls="section-modal">
+                <img src="/assets/sprites/upgrades/roaming_dustpan.png" alt="" />
+                <span>Shop</span>
+                <span class="dock-badge" data-dock-badge="shop" hidden></span>
+              </button>
+              <button id="open-furniture" class="dock-button" type="button" data-section="furniture" aria-controls="section-modal">
+                <img src="/assets/sprites/decor/toy_pile.png" alt="" />
+                <span>Furniture</span>
+                <span class="dock-badge" data-dock-badge="furniture" hidden></span>
+              </button>
+              <button id="open-abilities" class="dock-button" type="button" data-section="abilities" aria-controls="section-modal">
+                <img src="/assets/sprites/beans/bean_golden.png" alt="" />
+                <span>Abilities</span>
+                <span class="dock-badge" data-dock-badge="abilities" hidden></span>
+              </button>
+              <button id="open-recipes" class="dock-button" type="button" data-section="recipes" aria-controls="section-modal">
+                <img src="/assets/sprites/beans/bean_rainbow.png" alt="" />
+                <span>Recipes</span>
+                <span class="dock-badge" data-dock-badge="recipes" hidden></span>
+              </button>
+              <button id="open-mythos" class="dock-button" type="button" data-section="mythos" aria-controls="section-modal">
+                <img src="/assets/sprites/upgrades/compost_bin.png" alt="" />
+                <span>Mythos</span>
+                <span class="dock-badge" data-dock-badge="mythos" hidden></span>
+              </button>
+              <button id="open-wisdom" class="dock-button" type="button" data-section="wisdom" aria-controls="section-modal">
+                <img src="/assets/sprites/upgrades/cavybot_3000.png" alt="" />
+                <span>Wisdom</span>
+                <span class="dock-badge" data-dock-badge="wisdom" hidden></span>
+              </button>
+              <button id="open-herd" class="dock-button" type="button" data-section="herd" aria-controls="section-modal">
+                <img src="/assets/sprites/pigs/pig_cream_brown_idle.png" alt="" />
+                <span>Herd</span>
+                <span class="dock-badge" data-dock-badge="herd" hidden></span>
+              </button>
+              <button id="open-goals" class="dock-button" type="button" data-section="goals" aria-controls="section-modal">
+                <img src="/assets/sprites/decor/litter_tray_clean.png" alt="" />
+                <span>Goals</span>
+                <span class="dock-badge" data-dock-badge="goals" hidden></span>
+              </button>
+              <button id="open-log" class="dock-button" type="button" data-section="log" aria-controls="section-modal">
+                <img src="/assets/sprites/beans/bean_normal.png" alt="" />
+                <span>Log</span>
+                <span class="dock-badge" data-dock-badge="log" hidden></span>
+              </button>
+            </nav>
+          </section>
+        </main>
+
+        <dialog id="section-modal" aria-labelledby="section-modal-title">
+          <div class="modal-shell">
+            <header class="modal-header">
+              <h2 id="section-modal-title">Care</h2>
+              <button id="close-section-modal" class="modal-close" type="button" aria-label="Close section">X</button>
+            </header>
+
+            <div class="modal-body">
+              <section class="meters section-panel" data-section-panel="care">
               <div class="meter-row">
                 <div class="meter-label">
                   <span>Hay</span>
@@ -67,7 +162,7 @@
               </div>
             </section>
 
-            <section class="shop">
+              <section class="shop section-panel" data-section-panel="shop" hidden>
               <h2>Shop</h2>
               <button id="adopt-pig" type="button">
                 <span>Adopt Pig</span>
@@ -99,7 +194,7 @@
               </button>
             </section>
 
-            <section class="shop compact-shop">
+              <section class="shop compact-shop section-panel" data-section-panel="furniture" hidden>
               <h2>Furniture</h2>
               <button id="hidey-house" type="button"><span>Hidey House</span><strong id="hidey-house-cost"></strong></button>
               <button id="tunnel" type="button"><span>Tunnel</span><strong id="tunnel-cost"></strong></button>
@@ -110,7 +205,7 @@
               <button id="royal-throne" type="button"><span>Royal Throne</span><strong id="royal-throne-cost"></strong></button>
             </section>
 
-            <section class="shop compact-shop ability-shop">
+              <section class="shop compact-shop ability-shop section-panel" data-section-panel="abilities" hidden>
               <h2>Abilities</h2>
               <button id="wheek-call" type="button">
                 <span>Wheek Call</span><strong id="wheek-call-status"></strong>
@@ -138,14 +233,14 @@
               </button>
             </section>
 
-            <section class="shop compact-shop">
+              <section class="shop compact-shop section-panel" data-section-panel="recipes" hidden>
               <h2>Bean Recipes</h2>
               <button id="recipe-bean-blessing" type="button"><span>Bean Blessing</span><strong id="recipe-bean-blessing-status"></strong></button>
               <button id="recipe-compost-catalyst" type="button"><span>Compost Catalyst</span><strong id="recipe-compost-catalyst-status"></strong></button>
               <button id="recipe-royal-accord" type="button"><span>Royal Accord</span><strong id="recipe-royal-accord-status"></strong></button>
             </section>
 
-            <section class="shop compact-shop">
+              <section class="shop compact-shop section-panel" data-section-panel="mythos" hidden>
               <h2>Mythos</h2>
               <button id="hay-dimension" type="button"><span>Hay Dimension</span><strong id="hay-dimension-status"></strong></button>
               <button id="bean-exchange" type="button"><span>Bean Exchange</span><strong id="bean-exchange-status"></strong></button>
@@ -155,7 +250,7 @@
               <button id="prestige" type="button"><span>Great Composting</span><strong id="prestige-cost"></strong></button>
             </section>
 
-            <section class="shop compact-shop">
+              <section class="shop compact-shop section-panel" data-section-panel="wisdom" hidden>
               <h2>Wisdom</h2>
               <button id="wisdom-roomy-start" type="button"><span>Roomy Start</span><strong id="wisdom-roomy-start-status"></strong></button>
               <button id="wisdom-gentle-automation" type="button"><span>Gentle Automation</span><strong id="wisdom-gentle-automation-status"></strong></button>
@@ -163,24 +258,25 @@
               <button id="wisdom-chorus-training" type="button"><span>Chorus Training</span><strong id="wisdom-chorus-training-status"></strong></button>
             </section>
 
-            <section class="pig-roster">
+              <section class="pig-roster section-panel" data-section-panel="herd" hidden>
               <h2>Herd</h2>
               <ul id="pig-roster"></ul>
             </section>
 
-            <section class="goals">
+              <section class="goals section-panel" data-section-panel="goals" hidden>
               <h2>Goals</h2>
               <ul id="quest-list"></ul>
               <h2>Achievements</h2>
               <ul id="achievement-list"></ul>
             </section>
 
-            <section class="log">
+              <section class="log section-panel" data-section-panel="log" hidden>
               <h2>Cage Log</h2>
               <ol id="event-log"></ol>
             </section>
-          </aside>
-        </main>
+            </div>
+          </div>
+        </dialog>
       </section>
     </div>
     <script type="module" src="/src/main.ts"></script>

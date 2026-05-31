@@ -1,14 +1,25 @@
 import Phaser from "phaser";
 import { getScoopRadius } from "../simulation/balance";
-import { cleanAt } from "../simulation/actions";
+import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simulation/actions";
 import { placeFurniture } from "../simulation/state";
 import { updateSimulation } from "../simulation/systems";
-import type { FurnitureId, GameState, Pig, Poop, Robot } from "../simulation/types";
+import type { FurnitureId, GameState, Pig, Poop, PoopType, Robot } from "../simulation/types";
 
 interface SceneData {
   state: GameState;
   onStateChanged: () => void;
 }
+
+const CLEANLINESS_PATCHES = [
+  { x: 0.18, y: 0.28, width: 92, height: 36 },
+  { x: 0.78, y: 0.24, width: 74, height: 30 },
+  { x: 0.48, y: 0.42, width: 106, height: 42 },
+  { x: 0.28, y: 0.68, width: 84, height: 34 },
+  { x: 0.72, y: 0.72, width: 96, height: 38 },
+  { x: 0.55, y: 0.82, width: 68, height: 28 },
+  { x: 0.14, y: 0.52, width: 62, height: 26 },
+  { x: 0.87, y: 0.48, width: 58, height: 24 },
+] as const;
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
@@ -17,9 +28,13 @@ export class GameScene extends Phaser.Scene {
   private poopViews = new Map<number, Phaser.GameObjects.Image>();
   private furnitureViews = new Map<number, Phaser.GameObjects.Container>();
   private robotView: Phaser.GameObjects.Image | null = null;
+  private cageFloor!: Phaser.GameObjects.TileSprite;
+  private cleanlinessWash!: Phaser.GameObjects.Rectangle;
+  private dirtPatches!: Phaser.GameObjects.Graphics;
   private hayPile!: Phaser.GameObjects.Image;
   private waterBottle!: Phaser.GameObjects.Image;
   private scoopPreview!: Phaser.GameObjects.Ellipse;
+  private prefersReducedMotion = false;
 
   constructor() {
     super("GameScene");
@@ -52,6 +67,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   create(): void {
+    this.prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
     this.cameras.main.setBackgroundColor("#d8c6a6");
     this.drawCage();
     this.hayPile = this.createHayPile(88, 88);
@@ -75,7 +91,8 @@ export class GameScene extends Phaser.Scene {
         return;
       }
 
-      cleanAt(this.state, pointer.worldX, pointer.worldY);
+      const cleanResult = cleanAtWithResult(this.state, pointer.worldX, pointer.worldY);
+      this.playCleanFeedback(cleanResult, pointer.worldX, pointer.worldY);
       this.onStateChanged();
       this.syncViews();
     });
@@ -106,18 +123,25 @@ export class GameScene extends Phaser.Scene {
     backing.fillStyle(0xcdb58d, 1);
     backing.fillRoundedRect(0, 0, width, height, 22);
 
-    this.add
+    this.cageFloor = this.add
       .tileSprite(width / 2, height / 2, width - 28, height - 28, "cage-floor-fleece")
       .setDepth(1)
       .setAlpha(0.92);
 
+    this.cleanlinessWash = this.add
+      .rectangle(width / 2, height / 2, width - 28, height - 28, 0x6b503a, 0)
+      .setDepth(3);
+    this.dirtPatches = this.add.graphics().setDepth(3.1);
+
     const graphics = this.add.graphics();
-    graphics.setDepth(2);
+    graphics.setDepth(6);
     graphics.lineStyle(14, 0x8a6e4d, 1);
     graphics.strokeRoundedRect(7, 7, width - 14, height - 14, 20);
   }
 
   private syncViews(): void {
+    this.syncCleanlinessVisuals();
+
     const seenPigIds = new Set<number>();
     for (const pig of this.state.pigs) {
       seenPigIds.add(pig.id);
@@ -177,6 +201,40 @@ export class GameScene extends Phaser.Scene {
     this.waterBottle.setAlpha(
       this.state.needs.water <= 0 ? 0.3 : this.state.needs.water < 25 ? 0.6 : 1,
     );
+  }
+
+  private syncCleanlinessVisuals(): void {
+    const dirt = Phaser.Math.Clamp((100 - this.state.cage.cleanliness) / 100, 0, 1);
+    const targetAlpha = dirt <= 0.08 ? 0 : 0.08 + dirt * 0.24;
+    const washColor = this.state.cage.cleanliness < 35 ? 0x5f4937 : 0x7b633f;
+
+    this.cageFloor.setTint(getCleanlinessFloorTint(this.state.cage.cleanliness));
+    this.cleanlinessWash.setFillStyle(washColor, 1);
+    this.cleanlinessWash.setAlpha(Phaser.Math.Linear(this.cleanlinessWash.alpha, targetAlpha, 0.18));
+
+    this.dirtPatches.clear();
+    if (dirt <= 0.08) return;
+
+    const patchAlpha = Phaser.Math.Clamp(this.cleanlinessWash.alpha + 0.04, 0.06, 0.34);
+    const patchCount = this.state.cage.cleanliness < 35 ? 8 : this.state.cage.cleanliness < 70 ? 5 : 2;
+    this.dirtPatches.fillStyle(0x6a513a, patchAlpha);
+
+    for (let index = 0; index < patchCount; index += 1) {
+      const patch = CLEANLINESS_PATCHES[index % CLEANLINESS_PATCHES.length];
+      this.dirtPatches.fillEllipse(
+        this.state.cage.width * patch.x,
+        this.state.cage.height * patch.y,
+        patch.width,
+        patch.height,
+      );
+    }
+
+    for (const poop of this.state.poops) {
+      if (poop.type !== "messPile" && poop.type !== "stinky") continue;
+      const localAlpha = poop.type === "messPile" ? 0.28 : 0.16;
+      this.dirtPatches.fillStyle(poop.type === "stinky" ? 0x56633d : 0x5d4938, localAlpha);
+      this.dirtPatches.fillEllipse(poop.x, poop.y + 7, poop.type === "messPile" ? 74 : 38, poop.type === "messPile" ? 36 : 20);
+    }
   }
 
   private syncFurnitureViews(): void {
@@ -260,6 +318,90 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private playCleanFeedback(result: CleanResult, x: number, y: number): void {
+    if (result.cleaned === 0) return;
+
+    for (const cleaned of result.cleanedPoops) {
+      this.playBeanPop(cleaned);
+    }
+
+    if (result.comboBonus > 0) {
+      this.addFloatingText(x, y - 26, `Streak +${result.comboBonus}`, 0xffd95a, 1.06);
+      if (!this.prefersReducedMotion) this.addBurst(x, y, 0xffd95a, 8);
+    }
+  }
+
+  private playBeanPop(cleaned: CleanedPoop): void {
+    const color = getPoopAccentColor(cleaned.type);
+    if (this.prefersReducedMotion) {
+      this.addFloatingText(cleaned.x, cleaned.y - 18, getCleanRewardText(cleaned), color, 1);
+      return;
+    }
+
+    const sprite = this.add
+      .image(cleaned.x, cleaned.y, this.getPoopFeedbackTextureKey(cleaned))
+      .setDepth(65)
+      .setAlpha(0.95)
+      .setDisplaySize(cleaned.type === "messPile" ? 42 : 22, cleaned.type === "messPile" ? 34 : 18)
+      .setRotation(Math.random() * Math.PI);
+
+    this.tweens.add({
+      targets: sprite,
+      alpha: 0,
+      scale: 1.85,
+      y: cleaned.y - 10,
+      duration: 360,
+      ease: "Cubic.easeOut",
+      onComplete: () => sprite.destroy(),
+    });
+
+    this.addFloatingText(cleaned.x, cleaned.y - 18, getCleanRewardText(cleaned), color, 1);
+    this.addBurst(cleaned.x, cleaned.y, color, cleaned.type === "normal" ? 4 : 7);
+  }
+
+  private addFloatingText(x: number, y: number, text: string, color: number, scale: number): void {
+    const label = this.add
+      .text(x, y, text, {
+        fontFamily: "Inter, Arial, sans-serif",
+        fontSize: "17px",
+        fontStyle: "700",
+        color: `#${color.toString(16).padStart(6, "0")}`,
+        stroke: "#fffaf0",
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(80)
+      .setScale(scale);
+
+    this.tweens.add({
+      targets: label,
+      alpha: 0,
+      y: y - (this.prefersReducedMotion ? 8 : 28),
+      duration: this.prefersReducedMotion ? 280 : 620,
+      ease: "Cubic.easeOut",
+      onComplete: () => label.destroy(),
+    });
+  }
+
+  private addBurst(x: number, y: number, color: number, count: number): void {
+    for (let index = 0; index < count; index += 1) {
+      const angle = (Math.PI * 2 * index) / count + Phaser.Math.FloatBetween(-0.22, 0.22);
+      const distance = Phaser.Math.Between(14, 28);
+      const mote = this.add.circle(x, y, Phaser.Math.Between(2, 4), color, 0.78).setDepth(70);
+
+      this.tweens.add({
+        targets: mote,
+        x: x + Math.cos(angle) * distance,
+        y: y + Math.sin(angle) * distance,
+        alpha: 0,
+        scale: 0.35,
+        duration: 380,
+        ease: "Cubic.easeOut",
+        onComplete: () => mote.destroy(),
+      });
+    }
+  }
+
   private createHayPile(x: number, y: number): Phaser.GameObjects.Image {
     return this.add.image(x, y, "hay-rack-full").setDisplaySize(84, 84).setDepth(4);
   }
@@ -314,11 +456,45 @@ export class GameScene extends Phaser.Scene {
   }
 
   private getPoopTextureKey(poop: Poop): string {
-    if (poop.type === "golden") return "bean-golden";
-    if (poop.type === "compost") return "bean-compost";
-    if (poop.type === "mystery" || poop.type === "royal" || poop.type === "cursed") return "bean-rainbow";
-    if (poop.type === "stinky" || poop.type === "hay") return "bean-compost";
-    if (poop.value > poop.baseValue) return "bean-aged";
-    return "bean-normal";
+    return getPoopTextureKey(poop.type, poop.value > poop.baseValue);
   }
+
+  private getPoopFeedbackTextureKey(poop: CleanedPoop): string {
+    return getPoopTextureKey(poop.type, poop.type === "normal" && poop.value > 1);
+  }
+}
+
+function getPoopTextureKey(type: PoopType, aged: boolean): string {
+  if (type === "golden") return "bean-golden";
+  if (type === "compost") return "bean-compost";
+  if (type === "mystery" || type === "royal" || type === "cursed") return "bean-rainbow";
+  if (type === "stinky" || type === "hay") return "bean-compost";
+  if (aged) return "bean-aged";
+  return "bean-normal";
+}
+
+function getPoopAccentColor(type: PoopType): number {
+  if (type === "golden") return 0xe4b83b;
+  if (type === "compost") return 0x6fa55d;
+  if (type === "blessed") return 0xfff2a6;
+  if (type === "royal") return 0xb965d2;
+  if (type === "cursed") return 0x75608f;
+  if (type === "mystery") return 0x8c75d8;
+  if (type === "stinky") return 0x7a9c52;
+  if (type === "hay") return 0xd7c74b;
+  if (type === "messPile") return 0x8a6e4d;
+  return 0x7db46a;
+}
+
+function getCleanlinessFloorTint(cleanliness: number): number {
+  if (cleanliness < 35) return 0xc2aa88;
+  if (cleanliness < 70) return 0xe0cfae;
+  return 0xffffff;
+}
+
+function getCleanRewardText(cleaned: CleanedPoop): string {
+  if (cleaned.type === "golden") return "+Gold";
+  if (cleaned.type === "compost") return "+Compost";
+  if (cleaned.type === "blessed") return "+Squeak";
+  return `+${cleaned.value}`;
 }

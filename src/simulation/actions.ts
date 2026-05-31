@@ -11,7 +11,7 @@ import {
 } from "./balance";
 import { updateMilestones } from "./milestones";
 import { addLegendaryPig, addLog, addPig } from "./state";
-import type { AbilityId, BeanRecipeId, FurnitureId, GameState, WisdomPerkId } from "./types";
+import type { AbilityId, BeanRecipeId, FurnitureId, GameState, PoopType, WisdomPerkId } from "./types";
 
 export interface CleanResult {
   cleaned: number;
@@ -22,9 +22,22 @@ export interface CleanResult {
   golden: number;
   stinky: number;
   rare: number;
+  cleanedPoops: CleanedPoop[];
+}
+
+export interface CleanedPoop {
+  id: number;
+  type: PoopType;
+  x: number;
+  y: number;
+  value: number;
 }
 
 export function cleanAt(state: GameState, x: number, y: number): number {
+  return cleanAtWithResult(state, x, y).earned;
+}
+
+export function cleanAtWithResult(state: GameState, x: number, y: number): CleanResult {
   const result = cleanPoopsInRadius(state, x, y, getScoopRadius(state));
   if (result.cleaned > 0) {
     advanceObjective(state, "cleanBurst", result.cleaned);
@@ -35,7 +48,7 @@ export function cleanAt(state: GameState, x: number, y: number): number {
     updateMilestones(state);
   }
 
-  return result.earned;
+  return result;
 }
 
 export function cleanPoopsInRadius(state: GameState, x: number, y: number, radius: number): CleanResult {
@@ -48,6 +61,7 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
     golden: 0,
     stinky: 0,
     rare: 0,
+    cleanedPoops: [],
   };
 
   state.poops = state.poops.filter((poop) => {
@@ -63,6 +77,13 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
 
     result.cleaned += 1;
     result.baseEarned += poop.value;
+    result.cleanedPoops.push({
+      id: poop.id,
+      type: poop.type,
+      x: poop.x,
+      y: poop.y,
+      value: poop.value,
+    });
     if (poop.type === "golden") result.golden += 1;
     if (poop.type === "stinky") result.stinky += 1;
     if (poop.type !== "normal" && poop.type !== "stinky") result.rare += 1;
