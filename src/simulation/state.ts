@@ -117,6 +117,20 @@ export function createInitialState(): GameState {
       snackTime: 0,
       zoomieMode: 0,
     },
+    automation: {
+      overdrive: 0,
+    },
+    recipes: {
+      beanBlessing: false,
+      compostCatalyst: false,
+      royalAccord: false,
+    },
+    wisdom: {
+      roomyStart: false,
+      gentleAutomation: false,
+      rareInstinct: false,
+      chorusTraining: false,
+    },
     event: {
       active: null,
       nextTimer: 24,
@@ -163,6 +177,12 @@ export function createInitialState(): GameState {
       prestiges: 0,
       eventResponses: 0,
       objectivesCompleted: 0,
+      compostCleaned: 0,
+      blessedCleaned: 0,
+      royalCleaned: 0,
+      cursedCleaned: 0,
+      recipesUnlocked: 0,
+      wisdomPerks: 0,
     },
     milestones: {
       quests: [],
@@ -387,13 +407,18 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
   const happinessBonus = state.cage.happiness >= 90 ? 0.04 : state.cage.happiness >= 75 ? 0.02 : 0;
   const eventBonus = state.event.active?.id === "greatWheeking" ? 0.08 : 0;
   const abilityBonus = state.abilities.snackTime > 0 ? 0.05 : 0;
-  const goldenChance = (pig.breed === "Teddy" ? 0.1 : 0.075) + enrichmentBonus + eventBonus + happinessBonus;
-  const blessedChance = pig.trait === "Compost Mystic" ? 0.07 + abilityBonus : 0.015 + abilityBonus;
-  const compostChance = state.furniture.cardboardCastle > 0 || state.cage.cleanliness < 55 ? 0.08 : 0.03;
+  const recipeRareBonus = state.recipes.beanBlessing ? 0.025 : 0;
+  const wisdomRareBonus = state.wisdom.rareInstinct ? 0.025 : 0;
+  const goldenChance =
+    (pig.breed === "Teddy" ? 0.1 : 0.075) + enrichmentBonus + eventBonus + happinessBonus + recipeRareBonus + wisdomRareBonus;
+  const blessedChance =
+    pig.trait === "Compost Mystic" ? 0.07 + abilityBonus + recipeRareBonus : 0.015 + abilityBonus + recipeRareBonus;
+  const compostChance =
+    state.furniture.cardboardCastle > 0 || state.cage.cleanliness < 55 || state.recipes.compostCatalyst ? 0.08 : 0.03;
   const megaChance = pig.trait === "Chonker" ? 0.04 : 0.015;
   const mysteryChance = state.squeaks >= 5 ? 0.025 : 0.01;
   const hayChance = state.needs.hay > 70 ? 0.045 : 0.015;
-  const royalChance = pig.trait === "Royal Pig" || state.furniture.royalThrone > 0 ? 0.045 : 0;
+  const royalChance = pig.trait === "Royal Pig" || state.furniture.royalThrone > 0 || state.recipes.royalAccord ? 0.045 : 0;
   const cursedChance = state.lateGame.beanSingularity || state.cage.cleanliness < 20 ? 0.025 : 0.004;
   const stinkyChance =
     pig.trait === "Gremlin" && state.cage.cleanliness < 60

@@ -40,6 +40,8 @@ export type FurnitureId =
   | "cardboardCastle"
   | "royalThrone";
 export type AbilityId = "wheekCall" | "treatBag" | "deepClean" | "freshBedding" | "snackTime" | "zoomieMode";
+export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord";
+export type WisdomPerkId = "roomyStart" | "gentleAutomation" | "rareInstinct" | "chorusTraining";
 export type EventId =
   | "zoomies"
   | "hayFrenzy"
@@ -54,7 +56,10 @@ export type ObjectiveId =
   | "collectRare"
   | "useAbility"
   | "placeFurniture"
-  | "earnBeans";
+  | "earnBeans"
+  | "herdHarmony"
+  | "fuelAutomation"
+  | "unlockRecipe";
 
 export interface Pig {
   id: number;
@@ -153,6 +158,11 @@ export interface GameState {
     pendingFurniture: FurnitureId | null;
   };
   abilities: Record<AbilityId, number>;
+  automation: {
+    overdrive: number;
+  };
+  recipes: Record<BeanRecipeId, boolean>;
+  wisdom: Record<WisdomPerkId, boolean>;
   event: {
     active: ActiveEvent | null;
     nextTimer: number;
@@ -193,6 +203,12 @@ export interface GameState {
     prestiges: number;
     eventResponses: number;
     objectivesCompleted: number;
+    compostCleaned: number;
+    blessedCleaned: number;
+    royalCleaned: number;
+    cursedCleaned: number;
+    recipesUnlocked: number;
+    wisdomPerks: number;
   };
   milestones: {
     quests: string[];

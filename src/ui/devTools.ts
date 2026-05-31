@@ -6,7 +6,7 @@ import {
   setBeans,
   unlockRobot,
 } from "../simulation/actions";
-import { spawnDebugPoop } from "../simulation/state";
+import { addLog, spawnDebugPoop } from "../simulation/state";
 import type { GameState, PoopType } from "../simulation/types";
 
 export class DevTools {
@@ -34,12 +34,18 @@ export class DevTools {
       this.createButton("+100 Beans", () => addBeans(this.state, 100)),
       this.createButton("+1,000 Beans", () => addBeans(this.state, 1000)),
       this.createButton("Set Beans 10k", () => setBeans(this.state, 10000)),
+      this.createButton("+25 Compost", () => this.addResource("compost", 25)),
+      this.createButton("+10 Squeaks", () => this.addResource("squeaks", 10)),
+      this.createButton("+3 Wisdom", () => this.addResource("cavyWisdom", 3)),
       this.createButton("Refill Hay/Water", () => {
         refillHay(this.state);
         refillWater(this.state);
       }),
       this.createButton("Spawn Normal", () => this.spawnPoop("normal")),
       this.createButton("Spawn Golden", () => this.spawnPoop("golden")),
+      this.createButton("Spawn Compost", () => this.spawnPoop("compost")),
+      this.createButton("Spawn Blessed", () => this.spawnPoop("blessed")),
+      this.createButton("Spawn Royal", () => this.spawnPoop("royal")),
       this.createButton("Spawn Stinky", () => this.spawnPoop("stinky")),
       this.createButton("Buy/Unlock Roomba", () => unlockRobot(this.state)),
       this.createButton("Clear Poops", () => clearPoops(this.state)),
@@ -67,5 +73,10 @@ export class DevTools {
 
   private spawnPoop(type: PoopType): void {
     spawnDebugPoop(this.state, type);
+  }
+
+  private addResource(id: "compost" | "squeaks" | "cavyWisdom", amount: number): void {
+    this.state[id] += amount;
+    addLog(this.state, `Dev tools added ${amount} ${id}.`);
   }
 }

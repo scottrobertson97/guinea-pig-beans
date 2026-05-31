@@ -1,9 +1,32 @@
-import type { Costs, FurnitureId, GameState, Pig } from "./types";
+import type { AbilityId, Costs, FurnitureId, GameState, Pig, WisdomPerkId } from "./types";
 
 export const CAGE_PADDING = 34;
 export const BASE_POOP_INTERVAL = 5;
 export const MAX_LOG_ITEMS = 8;
 export const ROBOT_COST = 75;
+const FURNITURE_SPACE_COSTS: Record<FurnitureId, number> = {
+  hideyHouse: 2,
+  tunnel: 2,
+  litterTray: 2,
+  chewToy: 1,
+  snuggleSack: 2,
+  cardboardCastle: 3,
+  royalThrone: 3,
+};
+const ABILITY_SQUEAK_COSTS: Record<AbilityId, number> = {
+  wheekCall: 0,
+  treatBag: 2,
+  deepClean: 5,
+  freshBedding: 3,
+  snackTime: 4,
+  zoomieMode: 3,
+};
+const WISDOM_COSTS: Record<WisdomPerkId, number> = {
+  roomyStart: 1,
+  gentleAutomation: 1,
+  rareInstinct: 2,
+  chorusTraining: 2,
+};
 
 export function getCosts(state: GameState): Costs {
   const furniture = Object.fromEntries(
@@ -16,20 +39,63 @@ export function getCosts(state: GameState): Costs {
     pig: Math.ceil(10 * 1.35 ** Math.max(0, state.pigs.length - 1)),
     feed: Math.ceil(18 * 1.6 ** state.upgrades.feedLevel),
     scoop: Math.ceil(14 * 1.7 ** state.upgrades.scoopLevel),
-    robot: Math.max(55, ROBOT_COST - state.upgrades.scoopLevel * 5),
+    robot: Math.max(45, ROBOT_COST - state.upgrades.scoopLevel * 5 - (state.wisdom.gentleAutomation ? 10 : 0)),
     cage: Math.ceil(60 * 2.1 ** state.upgrades.cageLevel),
     furniture,
-    rarePig: Math.ceil(220 * 1.8 ** state.stats.legendaryPigsAdopted),
+    rarePig: Math.ceil(
+      220 *
+        1.8 ** state.stats.legendaryPigsAdopted *
+        (state.recipes.beanBlessing ? 0.84 : 1) *
+        (state.recipes.royalAccord ? 0.92 : 1),
+    ),
     prestige: 5000,
   };
 }
 
 export function getPigCapacity(state: GameState): number {
-  return 2 + state.upgrades.cageLevel * 2;
+  return 2 + state.upgrades.cageLevel * 2 + (state.wisdom.roomyStart ? 2 : 0) + (state.recipes.royalAccord ? 1 : 0);
 }
 
 export function getScoopRadius(state: GameState): number {
   return 24 + state.upgrades.scoopLevel * 9;
+}
+
+export function getFurnitureSpaceCost(id: FurnitureId): number {
+  return FURNITURE_SPACE_COSTS[id];
+}
+
+export function getHabitatCapacity(state: GameState): number {
+  return 5 + state.upgrades.cageLevel * 3 + (state.wisdom.roomyStart ? 4 : 0) + (state.lateGame.hayDimension ? 2 : 0);
+}
+
+export function getFurnitureSpaceUsed(state: GameState): number {
+  return (Object.keys(FURNITURE_SPACE_COSTS) as FurnitureId[]).reduce(
+    (total, id) => total + state.furniture[id] * FURNITURE_SPACE_COSTS[id],
+    0,
+  );
+}
+
+export function getAbilityCost(state: GameState, id: AbilityId): number {
+  const discount = state.wisdom.chorusTraining ? 1 : 0;
+  return Math.max(0, ABILITY_SQUEAK_COSTS[id] - discount - (state.lateGame.squeakChoir ? 1 : 0));
+}
+
+export function getAutomationFuelCost(state: GameState): number {
+  return Math.max(5, 12 - state.upgrades.scoopLevel - (state.wisdom.gentleAutomation ? 3 : 0) - (state.recipes.compostCatalyst ? 2 : 0));
+}
+
+export function getWisdomCost(id: WisdomPerkId): number {
+  return WISDOM_COSTS[id];
+}
+
+export function getTotalWisdom(state: GameState): number {
+  return (
+    state.cavyWisdom +
+    (Object.keys(state.wisdom) as WisdomPerkId[]).reduce(
+      (total, id) => total + (state.wisdom[id] ? WISDOM_COSTS[id] : 0),
+      0,
+    )
+  );
 }
 
 export function getPigPoopInterval(state: GameState, pig: Pig): number {
@@ -55,7 +121,7 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
         : 1;
   const traitMultiplier = getTraitPoopMultiplier(pig);
   const breedMultiplier = getBreedPoopMultiplier(pig);
-  const wisdomMultiplier = 0.98 ** state.cavyWisdom;
+  const wisdomMultiplier = 0.98 ** getTotalWisdom(state);
   const earlyMultiplier = state.stats.cleanedPoops < 5 ? 0.64 : state.stats.cleanedPoops < 15 ? 0.82 : 1;
   return (
     BASE_POOP_INTERVAL *

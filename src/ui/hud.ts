@@ -2,26 +2,41 @@ import {
   buyFeedUpgrade,
   buyCageUpgrade,
   buyFurniture,
+  buyWisdomPerk,
+  canUnlockBeanRecipe,
   buyPig,
   buyRarePig,
   buyRobot,
   buyScoopUpgrade,
+  fuelAutomation,
+  getBeanRecipeStatus,
   prestige,
   refillHay,
   refillWater,
   respondToEvent,
+  unlockBeanRecipe,
   unlockLateGameSystem,
   useAbility,
 } from "../simulation/actions";
-import { getCosts, getPigCapacity } from "../simulation/balance";
+import {
+  getAbilityCost,
+  getAutomationFuelCost,
+  getCosts,
+  getFurnitureSpaceCost,
+  getFurnitureSpaceUsed,
+  getHabitatCapacity,
+  getPigCapacity,
+  getWisdomCost,
+} from "../simulation/balance";
 import { getAchievementViews, getQuestViews, type MilestoneView } from "../simulation/milestones";
-import type { AbilityId, FurnitureId, GameState } from "../simulation/types";
+import type { AbilityId, BeanRecipeId, FurnitureId, GameState, WisdomPerkId } from "../simulation/types";
 
 type ButtonId =
   | "adopt-pig"
   | "better-hay"
   | "better-scoop"
   | "poop-roomba"
+  | "fuel-automation"
   | "bigger-cage"
   | "rare-pig"
   | "refill-hay"
@@ -40,11 +55,18 @@ type ButtonId =
   | "fresh-bedding"
   | "snack-time"
   | "zoomie-mode"
+  | "recipe-bean-blessing"
+  | "recipe-compost-catalyst"
+  | "recipe-royal-accord"
   | "hay-dimension"
   | "bean-exchange"
   | "cavy-council"
   | "squeak-choir"
   | "bean-singularity"
+  | "wisdom-roomy-start"
+  | "wisdom-gentle-automation"
+  | "wisdom-rare-instinct"
+  | "wisdom-chorus-training"
   | "prestige";
 
 export class Hud {
@@ -59,6 +81,7 @@ export class Hud {
       "better-hay": getButton("better-hay"),
       "better-scoop": getButton("better-scoop"),
       "poop-roomba": getButton("poop-roomba"),
+      "fuel-automation": getButton("fuel-automation"),
       "bigger-cage": getButton("bigger-cage"),
       "rare-pig": getButton("rare-pig"),
       "refill-hay": getButton("refill-hay"),
@@ -77,11 +100,18 @@ export class Hud {
       "fresh-bedding": getButton("fresh-bedding"),
       "snack-time": getButton("snack-time"),
       "zoomie-mode": getButton("zoomie-mode"),
+      "recipe-bean-blessing": getButton("recipe-bean-blessing"),
+      "recipe-compost-catalyst": getButton("recipe-compost-catalyst"),
+      "recipe-royal-accord": getButton("recipe-royal-accord"),
       "hay-dimension": getButton("hay-dimension"),
       "bean-exchange": getButton("bean-exchange"),
       "cavy-council": getButton("cavy-council"),
       "squeak-choir": getButton("squeak-choir"),
       "bean-singularity": getButton("bean-singularity"),
+      "wisdom-roomy-start": getButton("wisdom-roomy-start"),
+      "wisdom-gentle-automation": getButton("wisdom-gentle-automation"),
+      "wisdom-rare-instinct": getButton("wisdom-rare-instinct"),
+      "wisdom-chorus-training": getButton("wisdom-chorus-training"),
       prestige: getButton("prestige"),
     };
 
@@ -94,6 +124,9 @@ export class Hud {
     );
     this.buttons["poop-roomba"].addEventListener("click", () =>
       this.runAction(() => buyRobot(this.state)),
+    );
+    this.buttons["fuel-automation"].addEventListener("click", () =>
+      this.runAction(() => fuelAutomation(this.state)),
     );
     this.buttons["bigger-cage"].addEventListener("click", () =>
       this.runAction(() => buyCageUpgrade(this.state)),
@@ -119,6 +152,9 @@ export class Hud {
     this.bindAbilityButton("fresh-bedding", "freshBedding");
     this.bindAbilityButton("snack-time", "snackTime");
     this.bindAbilityButton("zoomie-mode", "zoomieMode");
+    this.bindRecipeButton("recipe-bean-blessing", "beanBlessing");
+    this.bindRecipeButton("recipe-compost-catalyst", "compostCatalyst");
+    this.bindRecipeButton("recipe-royal-accord", "royalAccord");
     this.buttons["hay-dimension"].addEventListener("click", () =>
       this.runAction(() => unlockLateGameSystem(this.state, "hayDimension")),
     );
@@ -134,6 +170,10 @@ export class Hud {
     this.buttons["bean-singularity"].addEventListener("click", () =>
       this.runAction(() => unlockLateGameSystem(this.state, "beanSingularity")),
     );
+    this.bindWisdomButton("wisdom-roomy-start", "roomyStart");
+    this.bindWisdomButton("wisdom-gentle-automation", "gentleAutomation");
+    this.bindWisdomButton("wisdom-rare-instinct", "rareInstinct");
+    this.bindWisdomButton("wisdom-chorus-training", "chorusTraining");
     this.buttons.prestige.addEventListener("click", () => this.runAction(() => prestige(this.state)));
   }
 
@@ -141,6 +181,8 @@ export class Hud {
     const costs = getCosts(this.state);
     const pigCapacity = getPigCapacity(this.state);
     const isAtPigCapacity = this.state.pigs.length >= pigCapacity;
+    const habitatUsed = getFurnitureSpaceUsed(this.state);
+    const habitatCapacity = getHabitatCapacity(this.state);
     setText("beans", Math.floor(this.state.beans).toString());
     setText("pig-count", `${this.state.pigs.length}/${pigCapacity}`);
     setText("cleanliness", `${this.state.cage.cleanliness}%`);
@@ -148,6 +190,7 @@ export class Hud {
     setText("squeaks", Math.floor(this.state.squeaks).toString());
     setText("golden-beans", this.state.goldenBeans.toString());
     setText("cavy-wisdom", this.state.cavyWisdom.toString());
+    setText("habitat-space", `${habitatUsed}/${habitatCapacity}`);
     setText("hay-value", `${Math.ceil(this.state.needs.hay)}%`);
     setText("water-value", `${Math.ceil(this.state.needs.water)}%`);
     setText("happiness-value", `${Math.ceil(this.state.cage.happiness)}%`);
@@ -161,11 +204,14 @@ export class Hud {
     setText("feed-cost", `${costs.feed} Beans`);
     setText("scoop-cost", `${costs.scoop} Beans`);
     setText("robot-cost", this.state.robot ? "Active" : `${costs.robot} Beans`);
+    setText("fuel-automation-status", getAutomationFuelText(this.state));
     setText("cage-cost", `${costs.cage} Beans - Cap ${pigCapacity + 2}`);
     setText("rare-pig-cost", isAtPigCapacity ? "Full - Bigger Cage" : `${costs.rarePig} + 1 Gold`);
     this.renderFurnitureCosts(costs.furniture);
     this.renderAbilityStatuses();
+    this.renderRecipeStatuses();
     this.renderLateGameStatuses();
+    this.renderWisdomStatuses();
     setText("prestige-cost", `${costs.prestige} Lifetime`);
     setText("status-line", getStatusLine(this.state));
 
@@ -177,12 +223,16 @@ export class Hud {
     this.buttons["better-hay"].disabled = this.state.beans < costs.feed;
     this.buttons["better-scoop"].disabled = this.state.beans < costs.scoop;
     this.buttons["poop-roomba"].disabled = Boolean(this.state.robot) || this.state.beans < costs.robot;
+    this.buttons["fuel-automation"].disabled =
+      !this.state.robot || this.state.compost < getAutomationFuelCost(this.state);
     this.buttons["bigger-cage"].disabled = this.state.beans < costs.cage;
     this.buttons["rare-pig"].disabled = isAtPigCapacity || this.state.beans < costs.rarePig || this.state.goldenBeans < 1;
     this.buttons["event-response"].disabled = !this.state.event.active || !this.state.event.responseReady;
     this.updateFurnitureDisabled(costs.furniture);
     this.updateAbilityDisabled();
+    this.updateRecipeDisabled();
     this.updateLateGameDisabled();
+    this.updateWisdomDisabled();
     this.buttons.prestige.disabled = this.state.stats.lifetimeBeans < costs.prestige;
 
     const log = document.querySelector<HTMLOListElement>("#event-log");
@@ -233,23 +283,41 @@ export class Hud {
     );
   }
 
+  private bindRecipeButton(buttonId: ButtonId, recipeId: BeanRecipeId): void {
+    this.buttons[buttonId].addEventListener("click", () =>
+      this.runAction(() => unlockBeanRecipe(this.state, recipeId)),
+    );
+  }
+
+  private bindWisdomButton(buttonId: ButtonId, wisdomId: WisdomPerkId): void {
+    this.buttons[buttonId].addEventListener("click", () =>
+      this.runAction(() => buyWisdomPerk(this.state, wisdomId)),
+    );
+  }
+
   private renderFurnitureCosts(costs: Record<FurnitureId, number>): void {
-    setText("hidey-house-cost", `${costs.hideyHouse} Beans`);
-    setText("tunnel-cost", `${costs.tunnel} Beans`);
-    setText("litter-tray-cost", `${costs.litterTray} Beans`);
-    setText("chew-toy-cost", `${costs.chewToy} Beans`);
-    setText("snuggle-sack-cost", `${costs.snuggleSack} Beans`);
-    setText("cardboard-castle-cost", `${costs.cardboardCastle} Beans`);
-    setText("royal-throne-cost", `${costs.royalThrone} Beans`);
+    setText("hidey-house-cost", `${costs.hideyHouse} Beans - ${getFurnitureSpaceCost("hideyHouse")}H`);
+    setText("tunnel-cost", `${costs.tunnel} Beans - ${getFurnitureSpaceCost("tunnel")}H`);
+    setText("litter-tray-cost", `${costs.litterTray} Beans - ${getFurnitureSpaceCost("litterTray")}H`);
+    setText("chew-toy-cost", `${costs.chewToy} Beans - ${getFurnitureSpaceCost("chewToy")}H`);
+    setText("snuggle-sack-cost", `${costs.snuggleSack} Beans - ${getFurnitureSpaceCost("snuggleSack")}H`);
+    setText("cardboard-castle-cost", `${costs.cardboardCastle} Beans - ${getFurnitureSpaceCost("cardboardCastle")}H`);
+    setText("royal-throne-cost", `${costs.royalThrone} Beans - ${getFurnitureSpaceCost("royalThrone")}H`);
   }
 
   private renderAbilityStatuses(): void {
-    setText("wheek-call-status", getCooldownText(this.state.abilities.wheekCall));
-    setText("treat-bag-status", getCooldownText(this.state.abilities.treatBag));
-    setText("deep-clean-status", getCooldownText(this.state.abilities.deepClean));
-    setText("fresh-bedding-status", getCooldownText(this.state.abilities.freshBedding));
-    setText("snack-time-status", getCooldownText(this.state.abilities.snackTime));
-    setText("zoomie-mode-status", getCooldownText(this.state.abilities.zoomieMode));
+    setText("wheek-call-status", getAbilityStatusText(this.state, "wheekCall"));
+    setText("treat-bag-status", getAbilityStatusText(this.state, "treatBag"));
+    setText("deep-clean-status", getAbilityStatusText(this.state, "deepClean"));
+    setText("fresh-bedding-status", getAbilityStatusText(this.state, "freshBedding"));
+    setText("snack-time-status", getAbilityStatusText(this.state, "snackTime"));
+    setText("zoomie-mode-status", getAbilityStatusText(this.state, "zoomieMode"));
+  }
+
+  private renderRecipeStatuses(): void {
+    setText("recipe-bean-blessing-status", getBeanRecipeStatus(this.state, "beanBlessing"));
+    setText("recipe-compost-catalyst-status", getBeanRecipeStatus(this.state, "compostCatalyst"));
+    setText("recipe-royal-accord-status", getBeanRecipeStatus(this.state, "royalAccord"));
   }
 
   private renderLateGameStatuses(): void {
@@ -260,23 +328,42 @@ export class Hud {
     setText("bean-singularity-status", this.state.lateGame.beanSingularity ? "Active" : "100C + Rare");
   }
 
+  private renderWisdomStatuses(): void {
+    setText("wisdom-roomy-start-status", this.state.wisdom.roomyStart ? "Learned" : `${getWisdomCost("roomyStart")} Wisdom`);
+    setText(
+      "wisdom-gentle-automation-status",
+      this.state.wisdom.gentleAutomation ? "Learned" : `${getWisdomCost("gentleAutomation")} Wisdom`,
+    );
+    setText("wisdom-rare-instinct-status", this.state.wisdom.rareInstinct ? "Learned" : `${getWisdomCost("rareInstinct")} Wisdom`);
+    setText(
+      "wisdom-chorus-training-status",
+      this.state.wisdom.chorusTraining ? "Learned" : `${getWisdomCost("chorusTraining")} Wisdom`,
+    );
+  }
+
   private updateFurnitureDisabled(costs: Record<FurnitureId, number>): void {
-    this.buttons["hidey-house"].disabled = this.state.beans < costs.hideyHouse;
-    this.buttons.tunnel.disabled = this.state.beans < costs.tunnel;
-    this.buttons["litter-tray"].disabled = this.state.beans < costs.litterTray;
-    this.buttons["chew-toy"].disabled = this.state.beans < costs.chewToy;
-    this.buttons["snuggle-sack"].disabled = this.state.beans < costs.snuggleSack;
-    this.buttons["cardboard-castle"].disabled = this.state.beans < costs.cardboardCastle;
-    this.buttons["royal-throne"].disabled = this.state.beans < costs.royalThrone;
+    this.buttons["hidey-house"].disabled = !this.canBuyFurniture(costs, "hideyHouse");
+    this.buttons.tunnel.disabled = !this.canBuyFurniture(costs, "tunnel");
+    this.buttons["litter-tray"].disabled = !this.canBuyFurniture(costs, "litterTray");
+    this.buttons["chew-toy"].disabled = !this.canBuyFurniture(costs, "chewToy");
+    this.buttons["snuggle-sack"].disabled = !this.canBuyFurniture(costs, "snuggleSack");
+    this.buttons["cardboard-castle"].disabled = !this.canBuyFurniture(costs, "cardboardCastle");
+    this.buttons["royal-throne"].disabled = !this.canBuyFurniture(costs, "royalThrone");
   }
 
   private updateAbilityDisabled(): void {
-    this.buttons["wheek-call"].disabled = this.state.abilities.wheekCall > 0;
-    this.buttons["treat-bag"].disabled = this.state.abilities.treatBag > 0;
-    this.buttons["deep-clean"].disabled = this.state.abilities.deepClean > 0;
-    this.buttons["fresh-bedding"].disabled = this.state.abilities.freshBedding > 0;
-    this.buttons["snack-time"].disabled = this.state.abilities.snackTime > 0;
-    this.buttons["zoomie-mode"].disabled = this.state.abilities.zoomieMode > 0;
+    this.buttons["wheek-call"].disabled = !this.canUseAbility("wheekCall");
+    this.buttons["treat-bag"].disabled = !this.canUseAbility("treatBag");
+    this.buttons["deep-clean"].disabled = !this.canUseAbility("deepClean");
+    this.buttons["fresh-bedding"].disabled = !this.canUseAbility("freshBedding");
+    this.buttons["snack-time"].disabled = !this.canUseAbility("snackTime");
+    this.buttons["zoomie-mode"].disabled = !this.canUseAbility("zoomieMode");
+  }
+
+  private updateRecipeDisabled(): void {
+    this.buttons["recipe-bean-blessing"].disabled = !canUnlockBeanRecipe(this.state, "beanBlessing");
+    this.buttons["recipe-compost-catalyst"].disabled = !canUnlockBeanRecipe(this.state, "compostCatalyst");
+    this.buttons["recipe-royal-accord"].disabled = !canUnlockBeanRecipe(this.state, "royalAccord");
   }
 
   private updateLateGameDisabled(): void {
@@ -286,6 +373,28 @@ export class Hud {
     this.buttons["squeak-choir"].disabled = this.state.lateGame.squeakChoir || this.state.squeaks < 25;
     this.buttons["bean-singularity"].disabled =
       this.state.lateGame.beanSingularity || this.state.compost < 100 || this.state.stats.rarePoopsCleaned < 25;
+  }
+
+  private updateWisdomDisabled(): void {
+    this.buttons["wisdom-roomy-start"].disabled =
+      this.state.wisdom.roomyStart || this.state.cavyWisdom < getWisdomCost("roomyStart");
+    this.buttons["wisdom-gentle-automation"].disabled =
+      this.state.wisdom.gentleAutomation || this.state.cavyWisdom < getWisdomCost("gentleAutomation");
+    this.buttons["wisdom-rare-instinct"].disabled =
+      this.state.wisdom.rareInstinct || this.state.cavyWisdom < getWisdomCost("rareInstinct");
+    this.buttons["wisdom-chorus-training"].disabled =
+      this.state.wisdom.chorusTraining || this.state.cavyWisdom < getWisdomCost("chorusTraining");
+  }
+
+  private canBuyFurniture(costs: Record<FurnitureId, number>, id: FurnitureId): boolean {
+    return (
+      this.state.beans >= costs[id] &&
+      getFurnitureSpaceUsed(this.state) + getFurnitureSpaceCost(id) <= getHabitatCapacity(this.state)
+    );
+  }
+
+  private canUseAbility(id: AbilityId): boolean {
+    return this.state.abilities[id] <= 0 && this.state.squeaks >= getAbilityCost(this.state, id);
   }
 }
 
@@ -309,6 +418,7 @@ function setMeter(id: string, value: number): void {
 
 function getStatusLine(state: GameState): string {
   if (state.placement.pendingFurniture) return `Place ${getFurnitureName(state.placement.pendingFurniture)} in the cage.`;
+  if (state.automation.overdrive > 0) return `Automation overdrive is sweeping faster for ${Math.ceil(state.automation.overdrive)}s.`;
   if (state.event.active && state.event.responseReady)
     return `${state.event.active.name} is active. Use Event to respond.`;
   if (state.event.active) return `${state.event.active.name} is active for ${Math.ceil(state.event.active.timer)}s.`;
@@ -323,6 +433,18 @@ function getStatusLine(state: GameState): string {
   const pig = state.pigs[0];
   if (pig) return `${pig.name} the ${pig.trait} is considering a bean.`;
   return "A pig is considering a bean.";
+}
+
+function getAutomationFuelText(state: GameState): string {
+  if (!state.robot) return "Needs Roomba";
+  if (state.automation.overdrive > 0) return `${Math.ceil(state.automation.overdrive)}s`;
+  return `${getAutomationFuelCost(state)} Compost`;
+}
+
+function getAbilityStatusText(state: GameState, id: AbilityId): string {
+  if (state.abilities[id] > 0) return getCooldownText(state.abilities[id]);
+  const cost = getAbilityCost(state, id);
+  return cost > 0 ? `${cost} Squeaks` : "Free";
 }
 
 function getFurnitureName(id: FurnitureId): string {

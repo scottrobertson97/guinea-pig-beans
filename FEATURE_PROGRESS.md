@@ -19,6 +19,7 @@
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
 - Prestige: The Great Composting resets the run and grants Cavy Wisdom.
 - Late-game mythos: Hay Dimension, Bean Exchange, Cavy Council, Squeak Choir, and Bean Singularity have first-pass unlocks.
+- Interop pass: Habitat space now limits furniture, herd support affects socialization and space, stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom can be spent on permanent perks.
 
 ## Current Early Goals
 
@@ -54,8 +55,7 @@
 - Cage zones are fixed regions, not yet player-placeable tiles.
 - Furniture is purchased as passive cage objects, not yet freely placed with footprints.
 - Random events are timer-based, not yet driven by quest chains or event decks.
-- Active abilities use cooldowns only; they do not yet cost Squeaks or Beans.
-- Prestige grants Wisdom and resets the run, but permanent upgrade choices are not yet a full tree.
+- Wisdom perks are first-pass buttons, not yet a full branching tree with prerequisites.
 - Late-game systems unlock passive effects, but they need deeper dedicated interfaces and decisions.
 - Minigames are still intentionally deferred until the main loop has more tuning data.
 
@@ -63,8 +63,8 @@
 
 - Whether the next cage-zone step should be drag-and-drop furniture placement or tile painting.
 - Whether special poop aging should reward waiting more aggressively or mostly punish mess.
-- Whether active abilities should remain cooldown-only or spend Squeaks.
-- Whether Cavy Wisdom should become a permanent upgrade tree or stay as a global multiplier for the next pass.
+- Whether current Squeak ability costs should scale with repeated use or stay flat.
+- Whether Cavy Wisdom should expand into a branching tree with mutually exclusive choices.
 
 ## Core Loop Improvement Queue
 
@@ -76,6 +76,7 @@
 - [x] Add rotating short-term objectives beyond static quests.
 - [x] Make random events interactive instead of purely timed modifiers.
 - [x] Tune early pacing around first poop, first special poop, first upgrade, second pig, first mess moment, and first automation.
+- [x] Make upgrades and resources depend on each other through habitat budget, Squeak ability costs, Compost automation fuel, bean recipes, weighted events, and Wisdom perks.
 
 ## Active Core Loop Pass
 

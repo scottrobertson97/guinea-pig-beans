@@ -250,6 +250,14 @@ export class GameScene extends Phaser.Scene {
     view.setPosition(robot.x, robot.y);
     view.setFlipX(dx < 0);
     view.setRotation(robot.state === "sweeping" ? Math.sin(this.time.now / 85) * 0.05 : 0);
+    if (this.state.automation.overdrive > 0) {
+      view.setTint(0xf0d56b);
+      const size = 52 + Math.sin(this.time.now / 120) * 2;
+      view.setDisplaySize(size, size);
+    } else {
+      view.clearTint();
+      view.setDisplaySize(48, 48);
+    }
   }
 
   private createHayPile(x: number, y: number): Phaser.GameObjects.Image {

@@ -1,7 +1,17 @@
-import { getCosts, getPigCapacity, getScoopRadius } from "./balance";
+import {
+  getAbilityCost,
+  getAutomationFuelCost,
+  getCosts,
+  getFurnitureSpaceCost,
+  getFurnitureSpaceUsed,
+  getHabitatCapacity,
+  getPigCapacity,
+  getScoopRadius,
+  getWisdomCost,
+} from "./balance";
 import { updateMilestones } from "./milestones";
 import { addLegendaryPig, addLog, addPig } from "./state";
-import type { AbilityId, FurnitureId, GameState } from "./types";
+import type { AbilityId, BeanRecipeId, FurnitureId, GameState, WisdomPerkId } from "./types";
 
 export interface CleanResult {
   cleaned: number;
@@ -60,6 +70,10 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
     if (poop.type === "golden") state.goldenBeans += 1;
     if (poop.type === "blessed") state.squeaks += 1;
     if (poop.type === "mystery") applyMysteryBean(state);
+    if (poop.type === "compost") state.stats.compostCleaned += 1;
+    if (poop.type === "blessed") state.stats.blessedCleaned += 1;
+    if (poop.type === "royal") state.stats.royalCleaned += 1;
+    if (poop.type === "cursed") state.stats.cursedCleaned += 1;
     return false;
   });
 
@@ -158,6 +172,13 @@ export function buyCageUpgrade(state: GameState): boolean {
 }
 
 export function buyFurniture(state: GameState, id: FurnitureId): boolean {
+  const usedSpace = getFurnitureSpaceUsed(state);
+  const nextSpace = usedSpace + getFurnitureSpaceCost(id);
+  const habitatCapacity = getHabitatCapacity(state);
+  if (nextSpace > habitatCapacity) {
+    addLog(state, `No habitat space for ${getFurnitureName(id)}. Expand the cage first.`);
+    return false;
+  }
   const cost = getCosts(state).furniture[id];
   if (state.beans < cost) return false;
   state.beans -= cost;
@@ -252,15 +273,20 @@ export function clearPoops(state: GameState): void {
 
 export function useAbility(state: GameState, id: AbilityId): boolean {
   if (state.abilities[id] > 0) return false;
+  const squeakCost = getAbilityCost(state, id);
+  if (state.squeaks < squeakCost) {
+    addLog(state, `${getAbilityName(id)} needs ${squeakCost} Squeak${squeakCost === 1 ? "" : "s"}.`);
+    return false;
+  }
+  state.squeaks -= squeakCost;
 
   if (id === "wheekCall") {
     state.abilities.wheekCall = 10;
-    state.squeaks += 1;
+    state.squeaks += state.wisdom.chorusTraining ? 2 : 1;
     addLog(state, "Wheek call issued. Pigs are converging on snacks.");
   } else if (id === "treatBag") {
     state.abilities.treatBag = 15;
-    state.squeaks += 2;
-    addLog(state, "Treat bag shaken. Production has become emotionally complicated.");
+    addLog(state, `Treat bag shaken for ${squeakCost} Squeaks. Production has become emotionally complicated.`);
   } else if (id === "deepClean") {
     const result = cleanPoopsInRadius(state, state.cage.width / 2, state.cage.height / 2, Math.max(state.cage.width, state.cage.height));
     state.abilities.deepClean = 45;
@@ -271,16 +297,80 @@ export function useAbility(state: GameState, id: AbilityId): boolean {
     addLog(state, "Fresh bedding restored the cage to suspicious respectability.");
   } else if (id === "snackTime") {
     state.abilities.snackTime = 20;
-    state.squeaks += 3;
-    addLog(state, "Snack Time boosted herd happiness and rare bean odds.");
+    addLog(state, `Snack Time spent ${squeakCost} Squeaks to boost happiness and rare bean odds.`);
   } else {
     state.abilities.zoomieMode = 12;
-    state.squeaks += 1;
-    addLog(state, "Zoomie Mode engaged. The cage is now a traffic study.");
+    addLog(state, `Zoomie Mode spent ${squeakCost} Squeaks. The cage is now a traffic study.`);
   }
 
   state.stats.abilitiesUsed += 1;
   advanceObjective(state, "useAbility", 1);
+  updateMilestones(state);
+  return true;
+}
+
+export function fuelAutomation(state: GameState): boolean {
+  if (!state.robot) {
+    addLog(state, "Automation fuel needs a Poop Roomba first.");
+    return false;
+  }
+  const cost = getAutomationFuelCost(state);
+  if (state.compost < cost) return false;
+
+  state.compost -= cost;
+  const fuelSeconds = 18 + (state.recipes.compostCatalyst ? 8 : 0) + (state.wisdom.gentleAutomation ? 5 : 0);
+  state.automation.overdrive = Math.min(60, state.automation.overdrive + fuelSeconds);
+  advanceObjective(state, "fuelAutomation", 1);
+  addLog(state, `Compost fuel spent. Automation overdrive active for ${Math.ceil(state.automation.overdrive)}s.`);
+  updateMilestones(state);
+  return true;
+}
+
+export function unlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
+  if (state.recipes[id]) return false;
+  if (!canUnlockBeanRecipe(state, id)) return false;
+
+  if (id === "beanBlessing") {
+    state.goldenBeans -= 2;
+    state.squeaks -= 8;
+  } else if (id === "compostCatalyst") {
+    state.compost -= 40;
+  } else {
+    state.goldenBeans -= 1;
+    state.squeaks -= 16;
+  }
+
+  state.recipes[id] = true;
+  state.stats.recipesUnlocked += 1;
+  advanceObjective(state, "unlockRecipe", 1);
+  addLog(state, `${getBeanRecipeName(id)} unlocked. Bean chemistry now has consequences.`);
+  updateMilestones(state);
+  return true;
+}
+
+export function canUnlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
+  if (state.recipes[id]) return false;
+  if (id === "beanBlessing") return state.goldenBeans >= 2 && state.squeaks >= 8 && state.stats.blessedCleaned >= 1;
+  if (id === "compostCatalyst") return state.compost >= 40 && state.stats.compostCleaned >= 3 && state.stats.stinkyCleaned >= 2;
+  return state.goldenBeans >= 1 && state.squeaks >= 16 && (state.stats.royalCleaned >= 1 || state.stats.legendaryPigsAdopted >= 1);
+}
+
+export function getBeanRecipeStatus(state: GameState, id: BeanRecipeId): string {
+  if (state.recipes[id]) return "Active";
+  if (id === "beanBlessing") return "2G + 8S + Blessed";
+  if (id === "compostCatalyst") return "40C + Compost/Stinky";
+  return "1G + 16S + Royal";
+}
+
+export function buyWisdomPerk(state: GameState, id: WisdomPerkId): boolean {
+  if (state.wisdom[id]) return false;
+  const cost = getWisdomCost(id);
+  if (state.cavyWisdom < cost) return false;
+
+  state.cavyWisdom -= cost;
+  state.wisdom[id] = true;
+  state.stats.wisdomPerks += 1;
+  addLog(state, `${getWisdomPerkName(id)} learned. Future cages will be less improvised.`);
   updateMilestones(state);
   return true;
 }
@@ -334,6 +424,7 @@ export function prestige(state: GameState): boolean {
   state.goldenBeans = 0;
   state.poops = [];
   state.robot = null;
+  state.automation.overdrive = 0;
   state.pigs.splice(2);
   while (state.pigs.length < 2) addPig(state);
   state.upgrades.feedLevel = 0;
@@ -346,6 +437,9 @@ export function prestige(state: GameState): boolean {
   state.cage.socialization = 0;
   state.cage.space = 100;
   for (const id of Object.keys(state.furniture) as FurnitureId[]) state.furniture[id] = 0;
+  state.recipes.beanBlessing = false;
+  state.recipes.compostCatalyst = false;
+  state.recipes.royalAccord = false;
   state.event.active = null;
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;
@@ -393,6 +487,37 @@ function getCleanLog(
   if (golden > 0) return `Cleaned ${cleaned} beans, including ${golden} golden, for +${earned}.${combo}`;
   if (stinky > 0) return `Removed ${stinky} stinky bean${stinky === 1 ? "" : "s"} and earned +${earned}.${combo}`;
   return `Cleaned ${cleaned} bean${cleaned === 1 ? "" : "s"} for +${earned}.${combo}`;
+}
+
+function getAbilityName(id: AbilityId): string {
+  const names: Record<AbilityId, string> = {
+    wheekCall: "Wheek Call",
+    treatBag: "Treat Bag",
+    deepClean: "Deep Clean",
+    freshBedding: "Fresh Bedding",
+    snackTime: "Snack Time",
+    zoomieMode: "Zoomie Mode",
+  };
+  return names[id];
+}
+
+function getBeanRecipeName(id: BeanRecipeId): string {
+  const names: Record<BeanRecipeId, string> = {
+    beanBlessing: "Bean Blessing",
+    compostCatalyst: "Compost Catalyst",
+    royalAccord: "Royal Accord",
+  };
+  return names[id];
+}
+
+function getWisdomPerkName(id: WisdomPerkId): string {
+  const names: Record<WisdomPerkId, string> = {
+    roomyStart: "Roomy Start",
+    gentleAutomation: "Gentle Automation",
+    rareInstinct: "Rare Instinct",
+    chorusTraining: "Chorus Training",
+  };
+  return names[id];
 }
 
 function applyMysteryBean(state: GameState): void {

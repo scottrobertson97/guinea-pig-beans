@@ -1,4 +1,5 @@
 import { addLog } from "./state";
+import { getFurnitureSpaceUsed } from "./balance";
 import type { GameState } from "./types";
 
 export interface MilestoneView {
@@ -67,6 +68,13 @@ const questDefinitions: MilestoneDefinition[] = [
     log: "Quest complete: the cage has furniture now.",
   },
   {
+    id: "fill-habitat",
+    title: "Use 5 Habitat space",
+    complete: (state) => getFurnitureSpaceUsed(state) >= 5,
+    progress: (state) => `${Math.min(getFurnitureSpaceUsed(state), 5)}/5`,
+    log: "Quest complete: the habitat plan has become a real system.",
+  },
+  {
     id: "clean-rare",
     title: "Clean 5 rare beans",
     complete: (state) => state.stats.rarePoopsCleaned >= 5,
@@ -81,11 +89,32 @@ const questDefinitions: MilestoneDefinition[] = [
     log: "Quest complete: direct intervention has begun.",
   },
   {
+    id: "fuel-automation",
+    title: "Fuel automation",
+    complete: (state) => state.automation.overdrive > 0,
+    progress: (state) => (state.automation.overdrive > 0 ? "1/1" : "0/1"),
+    log: "Quest complete: compost is now powering the cleanup economy.",
+  },
+  {
+    id: "unlock-recipe",
+    title: "Unlock a bean recipe",
+    complete: (state) => state.stats.recipesUnlocked >= 1,
+    progress: (state) => `${Math.min(state.stats.recipesUnlocked, 1)}/1`,
+    log: "Quest complete: bean recipes have entered the loop.",
+  },
+  {
     id: "adopt-legend",
     title: "Adopt a legendary pig",
     complete: (state) => state.stats.legendaryPigsAdopted >= 1,
     progress: (state) => `${Math.min(state.stats.legendaryPigsAdopted, 1)}/1`,
     log: "Quest complete: a legendary pig has entered the story.",
+  },
+  {
+    id: "learn-wisdom",
+    title: "Learn Cavy Wisdom",
+    complete: (state) => state.stats.wisdomPerks >= 1,
+    progress: (state) => `${Math.min(state.stats.wisdomPerks, 1)}/1`,
+    log: "Quest complete: wisdom is now a choice, not just a number.",
   },
   {
     id: "prestige",
@@ -159,6 +188,20 @@ const achievementDefinitions: MilestoneDefinition[] = [
     complete: (state) => state.stats.furnitureBought >= 5,
     progress: (state) => `${Math.min(state.stats.furnitureBought, 5)}/5`,
     log: "Achievement unlocked: Interior Designer.",
+  },
+  {
+    id: "habitat-planner",
+    title: "Habitat Planner",
+    complete: (state) => state.cage.space >= 85 && state.pigs.length >= 4,
+    progress: (state) => `${Math.min(state.pigs.length, 4)}/4`,
+    log: "Achievement unlocked: Habitat Planner.",
+  },
+  {
+    id: "recipe-book",
+    title: "Recipe Book",
+    complete: (state) => state.stats.recipesUnlocked >= 3,
+    progress: (state) => `${Math.min(state.stats.recipesUnlocked, 3)}/3`,
+    log: "Achievement unlocked: Recipe Book.",
   },
   {
     id: "eventful",
