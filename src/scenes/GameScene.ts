@@ -14,11 +14,11 @@ export class GameScene extends Phaser.Scene {
   private state!: GameState;
   private onStateChanged!: () => void;
   private pigViews = new Map<number, Phaser.GameObjects.Container>();
-  private poopViews = new Map<number, Phaser.GameObjects.Ellipse>();
+  private poopViews = new Map<number, Phaser.GameObjects.Image>();
   private furnitureViews = new Map<number, Phaser.GameObjects.Container>();
-  private robotView: Phaser.GameObjects.Container | null = null;
-  private hayPile!: Phaser.GameObjects.Container;
-  private waterBottle!: Phaser.GameObjects.Container;
+  private robotView: Phaser.GameObjects.Image | null = null;
+  private hayPile!: Phaser.GameObjects.Image;
+  private waterBottle!: Phaser.GameObjects.Image;
   private scoopPreview!: Phaser.GameObjects.Ellipse;
 
   constructor() {
@@ -28,6 +28,27 @@ export class GameScene extends Phaser.Scene {
   init(data: SceneData): void {
     this.state = data.state;
     this.onStateChanged = data.onStateChanged;
+  }
+
+  preload(): void {
+    this.load.image("cage-floor-fleece", "/assets/backgrounds/cage_floor_fleece.png");
+    this.load.image("pig-cream-brown", "/assets/sprites/pigs/pig_cream_brown_idle.png");
+    this.load.image("pig-white-black", "/assets/sprites/pigs/pig_white_black_idle.png");
+    this.load.image("pig-russet", "/assets/sprites/pigs/pig_russet_idle.png");
+    this.load.image("pig-gray-white", "/assets/sprites/pigs/pig_gray_white_idle.png");
+    this.load.image("pig-tricolor", "/assets/sprites/pigs/pig_tricolor_idle.png");
+    this.load.image("bean-normal", "/assets/sprites/beans/bean_normal.png");
+    this.load.image("bean-aged", "/assets/sprites/beans/bean_aged.png");
+    this.load.image("bean-golden", "/assets/sprites/beans/bean_golden.png");
+    this.load.image("bean-rainbow", "/assets/sprites/beans/bean_rainbow.png");
+    this.load.image("bean-compost", "/assets/sprites/beans/bean_compost.png");
+    this.load.image("hay-rack-full", "/assets/sprites/decor/hay_rack_full.png");
+    this.load.image("water-bottle-full", "/assets/sprites/decor/water_bottle_full.png");
+    this.load.image("litter-tray-clean", "/assets/sprites/decor/litter_tray_clean.png");
+    this.load.image("toy-pile", "/assets/sprites/decor/toy_pile.png");
+    this.load.image("roaming-dustpan", "/assets/sprites/upgrades/roaming_dustpan.png");
+    this.load.image("compost-bin", "/assets/sprites/upgrades/compost_bin.png");
+    this.load.image("cavybot-3000", "/assets/sprites/upgrades/cavybot_3000.png");
   }
 
   create(): void {
@@ -80,37 +101,20 @@ export class GameScene extends Phaser.Scene {
 
   private drawCage(): void {
     const { width, height } = this.state.cage;
+    const backing = this.add.graphics();
+    backing.setDepth(0);
+    backing.fillStyle(0xcdb58d, 1);
+    backing.fillRoundedRect(0, 0, width, height, 22);
+
+    this.add
+      .tileSprite(width / 2, height / 2, width - 28, height - 28, "cage-floor-fleece")
+      .setDepth(1)
+      .setAlpha(0.92);
+
     const graphics = this.add.graphics();
-    graphics.fillStyle(0xcdb58d, 1);
-    graphics.fillRoundedRect(0, 0, width, height, 22);
+    graphics.setDepth(2);
     graphics.lineStyle(14, 0x8a6e4d, 1);
     graphics.strokeRoundedRect(7, 7, width - 14, height - 14, 20);
-
-    graphics.lineStyle(2, 0xb69a73, 0.45);
-    for (let x = 40; x < width; x += 42) {
-      graphics.lineBetween(x, 12, x, height - 12);
-    }
-    for (let y = 42; y < height; y += 38) {
-      graphics.lineBetween(12, y, width - 12, y);
-    }
-
-    graphics.fillStyle(0xc9d6a0, 0.38);
-    graphics.fillRoundedRect(38, 38, 132, 86, 12);
-    graphics.fillStyle(0xa8c7c9, 0.28);
-    graphics.fillRoundedRect(width / 2 - 86, 28, 172, 70, 12);
-    graphics.fillStyle(0x8c7658, 0.26);
-    graphics.fillRoundedRect(width - 176, height - 128, 112, 72, 14);
-    graphics.fillStyle(0x9c835f, 0.24);
-    graphics.fillRoundedRect(46, height - 164, 150, 104, 14);
-    graphics.fillStyle(0x7fa878, 0.22);
-    graphics.fillRoundedRect(width / 2 - 118, height - 118, 236, 66, 14);
-
-    graphics.fillStyle(0xbca47c, 1);
-    graphics.fillRoundedRect(width - 176, height - 128, 112, 72, 14);
-    graphics.fillStyle(0x7a5736, 1);
-    graphics.fillRoundedRect(width - 154, height - 108, 68, 42, 10);
-    graphics.fillStyle(0x3d2c20, 1);
-    graphics.fillRoundedRect(width - 132, height - 92, 24, 26, 8);
   }
 
   private syncViews(): void {
@@ -196,167 +200,64 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPigView(pig: Pig): Phaser.GameObjects.Container {
-    const body = this.add.ellipse(0, 0, 58, 34, pig.bodyTint).setStrokeStyle(2, 0x6a4b34, 0.42);
-    const spot = this.add.ellipse(-12, -2, 22, 20, pig.spotTint, 0.92);
-    const earA = this.add.ellipse(-20, -16, 13, 11, pig.bodyTint);
-    const earB = this.add.ellipse(18, -14, 12, 10, pig.bodyTint);
-    const nose = this.add.ellipse(27, 2, 8, 7, 0x6d4225);
-    const eye = this.add.circle(15, -8, 2.5, 0x17120e);
     const shadow = this.add.ellipse(0, 13, 52, 12, 0x000000, 0.14);
-    const view = this.add.container(pig.x, pig.y, [shadow, earA, earB, body, spot, nose, eye]);
+    const sprite = this.add.image(0, -2, this.getPigTextureKey(pig)).setDisplaySize(68, 52);
+    const view = this.add.container(pig.x, pig.y, [shadow, sprite]);
     view.setDepth(20);
     return view;
   }
 
   private applyPigMood(view: Phaser.GameObjects.Container, pig: Pig): void {
-    const body = view.list[3] as Phaser.GameObjects.Ellipse;
-    const spot = view.list[4] as Phaser.GameObjects.Ellipse;
-    body.setFillStyle(pig.bodyTint);
-    spot.setFillStyle(pig.spotTint);
-    if (pig.mood === "hungry") body.setAlpha(0.78);
-    else if (pig.mood === "thirsty") body.setAlpha(0.86);
-    else if (pig.mood === "messy") body.setAlpha(0.7);
-    else body.setAlpha(1);
+    const sprite = view.list[1] as Phaser.GameObjects.Image;
+    sprite.setTexture(this.getPigTextureKey(pig));
+    if (pig.mood === "hungry") sprite.setAlpha(0.78);
+    else if (pig.mood === "thirsty") sprite.setAlpha(0.86);
+    else if (pig.mood === "messy") sprite.setAlpha(0.7);
+    else sprite.setAlpha(1);
   }
 
-  private createPoopView(poop: Poop): Phaser.GameObjects.Ellipse {
-    const view = this.add
-      .ellipse(poop.x, poop.y, 14, 9, 0x47301d)
-      .setStrokeStyle(1, 0x2a1c12, 0.45)
-      .setDepth(10);
+  private createPoopView(poop: Poop): Phaser.GameObjects.Image {
+    const view = this.add.image(poop.x, poop.y, this.getPoopTextureKey(poop)).setDepth(10);
     view.setRotation(Math.random() * Math.PI);
     return view;
   }
 
-  private applyPoopStyle(view: Phaser.GameObjects.Ellipse, poop: Poop): void {
-    if (poop.type === "golden") {
-      view.setSize(17, 11);
-      view.setFillStyle(0xe4b83b, 1);
-      view.setStrokeStyle(2, 0xffef9a, 0.8);
-      return;
-    }
-
-    if (poop.type === "compost") {
-      view.setSize(16, 10);
-      view.setFillStyle(0x6f5b2f, 1);
-      view.setStrokeStyle(2, 0xa58c4c, 0.7);
-      return;
-    }
-
-    if (poop.type === "stinky") {
-      view.setSize(16, 10);
-      view.setFillStyle(0x395f2a, 1);
-      view.setStrokeStyle(2, 0x223819, 0.62);
-      return;
-    }
-
-    if (poop.type === "blessed") {
-      view.setSize(16, 10);
-      view.setFillStyle(0xf1e7a2, 1);
-      view.setStrokeStyle(2, 0xffffff, 0.85);
-      return;
-    }
-
-    if (poop.type === "mega") {
-      view.setSize(24, 15);
-      view.setFillStyle(0x5b351d, 1);
-      view.setStrokeStyle(2, 0x2a1c12, 0.65);
-      return;
-    }
-
-    if (poop.type === "messPile") {
-      view.setSize(34, 22);
-      view.setFillStyle(0x4b3020, 1);
-      view.setStrokeStyle(3, 0x1f140d, 0.8);
-      view.setAlpha(0.86 + Math.sin(this.time.now / 160) * 0.08);
-      return;
-    }
-
-    if (poop.type === "mystery") {
-      view.setSize(17, 11);
-      view.setFillStyle(0x7c65a9, 1);
-      view.setStrokeStyle(2, 0xe4d7ff, 0.75);
-      return;
-    }
-
-    if (poop.type === "hay") {
-      view.setSize(16, 10);
-      view.setFillStyle(0xc9b94e, 1);
-      view.setStrokeStyle(2, 0xefe28a, 0.72);
-      return;
-    }
-
-    if (poop.type === "royal") {
-      view.setSize(18, 12);
-      view.setFillStyle(0x9b5ab6, 1);
-      view.setStrokeStyle(2, 0xe4b83b, 0.9);
-      return;
-    }
-
-    if (poop.type === "cursed") {
-      view.setSize(19, 12);
-      view.setFillStyle(0x22202b, 1);
-      view.setStrokeStyle(2, 0x87cfe0, 0.78);
-      return;
-    }
-
-    view.setSize(14, 9);
+  private applyPoopStyle(view: Phaser.GameObjects.Image, poop: Poop): void {
+    view.setTexture(this.getPoopTextureKey(poop));
+    view.clearTint();
     view.setAlpha(1);
-    view.setFillStyle(poop.value > poop.baseValue ? 0x6e4827 : 0x47301d, 1);
-    view.setStrokeStyle(1, 0x2a1c12, 0.45);
+
+    const size = poop.type === "mega" ? [25, 21] : poop.type === "messPile" ? [40, 32] : [18, 15];
+    view.setDisplaySize(size[0], size[1]);
+
+    if (poop.type === "stinky") view.setTint(0x6f8f47);
+    else if (poop.type === "blessed") view.setTint(0xfff6bf);
+    else if (poop.type === "mystery") view.setTint(0xa98be4);
+    else if (poop.type === "hay") view.setTint(0xd8cb58);
+    else if (poop.type === "royal") view.setTint(0xb965d2);
+    else if (poop.type === "cursed") view.setTint(0x3a3348);
+    else if (poop.value > poop.baseValue && poop.type === "normal") view.setTexture("bean-aged");
+
+    if (poop.type === "messPile") view.setAlpha(0.86 + Math.sin(this.time.now / 160) * 0.08);
   }
 
-  private createRobotView(robot: Robot): Phaser.GameObjects.Container {
-    const shadow = this.add.ellipse(0, 13, 38, 12, 0x000000, 0.16);
-    const body = this.add.graphics();
-    body.fillStyle(0xb8c0c6, 1);
-    body.fillRoundedRect(-19, -14, 38, 28, 8);
-    body.lineStyle(3, 0x54616a, 0.78);
-    body.strokeRoundedRect(-19, -14, 38, 28, 8);
-    const face = this.add.rectangle(8, -1, 14, 10, 0x2e3a42).setStrokeStyle(1, 0x172027, 0.7);
-    const eyeA = this.add.circle(4, -2, 1.7, 0x92e6ff);
-    const eyeB = this.add.circle(12, -2, 1.7, 0x92e6ff);
-    const brush = this.add.rectangle(-15, 10, 18, 5, 0x7a5736).setRotation(-0.24);
-    const antenna = this.add.rectangle(-10, -18, 3, 14, 0x54616a).setRotation(-0.32);
-    const light = this.add.circle(-15, -24, 4, 0xe4b83b);
-    const view = this.add.container(robot.x, robot.y, [
-      shadow,
-      antenna,
-      light,
-      body,
-      face,
-      eyeA,
-      eyeB,
-      brush,
-    ]);
-    view.setDepth(15);
-    return view;
+  private createRobotView(robot: Robot): Phaser.GameObjects.Image {
+    return this.add.image(robot.x, robot.y, "roaming-dustpan").setDisplaySize(48, 48).setDepth(15);
   }
 
-  private syncRobotView(view: Phaser.GameObjects.Container, robot: Robot): void {
+  private syncRobotView(view: Phaser.GameObjects.Image, robot: Robot): void {
     const dx = robot.targetX - robot.x;
     view.setPosition(robot.x, robot.y);
-    view.setScale(dx < 0 ? -1 : 1, 1);
+    view.setFlipX(dx < 0);
     view.setRotation(robot.state === "sweeping" ? Math.sin(this.time.now / 85) * 0.05 : 0);
   }
 
-  private createHayPile(x: number, y: number): Phaser.GameObjects.Container {
-    const base = this.add.rectangle(0, 0, 72, 40, 0x7a5736).setStrokeStyle(2, 0x5d4129, 0.55);
-    const strands = this.add.graphics();
-    strands.lineStyle(4, 0xd7c652, 1);
-    for (let i = 0; i < 14; i += 1) {
-      strands.lineBetween(-28 + i * 4, 10, -18 + i * 5, -12 - (i % 3) * 3);
-    }
-    return this.add.container(x, y, [base, strands]).setDepth(4);
+  private createHayPile(x: number, y: number): Phaser.GameObjects.Image {
+    return this.add.image(x, y, "hay-rack-full").setDisplaySize(84, 84).setDepth(4);
   }
 
-  private createWaterBottle(x: number, y: number): Phaser.GameObjects.Container {
-    const bottle = this.add
-      .rectangle(0, 0, 30, 70, 0x87cfe0, 0.88)
-      .setStrokeStyle(3, 0x3b7b8b, 0.8);
-    const cap = this.add.rectangle(0, -42, 34, 12, 0xd55c4a);
-    const spout = this.add.rectangle(-18, 42, 30, 5, 0xaeb5b3).setRotation(0.46);
-    return this.add.container(x, y, [bottle, cap, spout]).setDepth(4);
+  private createWaterBottle(x: number, y: number): Phaser.GameObjects.Image {
+    return this.add.image(x, y, "water-bottle-full").setDisplaySize(76, 76).setDepth(4);
   }
 
   private createFurnitureView(id: FurnitureId, x: number, y: number): Phaser.GameObjects.Container {
@@ -365,16 +266,19 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createFurnitureParts(id: FurnitureId): Phaser.GameObjects.GameObject[] {
+    if (id === "litterTray") {
+      return [this.add.image(0, 0, "litter-tray-clean").setDisplaySize(90, 76)];
+    }
+    if (id === "chewToy") {
+      return [this.add.image(0, 0, "toy-pile").setDisplaySize(80, 70)];
+    }
+    if (id === "cardboardCastle") {
+      return [this.add.image(0, 0, "compost-bin").setDisplaySize(74, 76)];
+    }
     if (id === "tunnel") {
       return [
         this.add.ellipse(0, 0, 96, 36, 0x7a5736).setStrokeStyle(3, 0x51351f, 0.72),
         this.add.ellipse(0, 6, 68, 22, 0x3d2c20),
-      ];
-    }
-    if (id === "litterTray") {
-      return [
-        this.add.rectangle(0, 0, 82, 48, 0x6d7f84).setStrokeStyle(3, 0x33484e, 0.72),
-        this.add.rectangle(0, 6, 66, 28, 0xbfae91, 0.9),
       ];
     }
     if (id === "royalThrone") {
@@ -384,28 +288,29 @@ export class GameScene extends Phaser.Scene {
         this.add.circle(0, -40, 8, 0xe4b83b),
       ];
     }
-    if (id === "chewToy") {
-      return [
-        this.add.circle(-10, 0, 13, 0xd55c4a).setStrokeStyle(2, 0x8e352d, 0.7),
-        this.add.circle(12, 0, 13, 0xdfc84f).setStrokeStyle(2, 0x998326, 0.7),
-      ];
-    }
     if (id === "snuggleSack") {
       return [
         this.add.ellipse(0, 0, 78, 42, 0xd6d1c4).setStrokeStyle(3, 0x8f8a80, 0.7),
         this.add.ellipse(0, 4, 48, 20, 0x6a5f54),
       ];
     }
-    if (id === "cardboardCastle") {
-      return [
-        this.add.rectangle(0, 8, 72, 54, 0xa66a3f).setStrokeStyle(3, 0x6d4225, 0.72),
-        this.add.rectangle(-22, -24, 18, 22, 0xa66a3f),
-        this.add.rectangle(22, -24, 18, 22, 0xa66a3f),
-      ];
-    }
     return [
       this.add.rectangle(0, 12, 76, 48, 0x8a6e4d).setStrokeStyle(3, 0x5d4129, 0.7),
       this.add.ellipse(0, 28, 38, 24, 0x3d2c20),
     ];
+  }
+
+  private getPigTextureKey(pig: Pig): string {
+    const keys = ["pig-cream-brown", "pig-white-black", "pig-russet", "pig-gray-white", "pig-tricolor"];
+    return keys[(pig.id - 1) % keys.length];
+  }
+
+  private getPoopTextureKey(poop: Poop): string {
+    if (poop.type === "golden") return "bean-golden";
+    if (poop.type === "compost") return "bean-compost";
+    if (poop.type === "mystery" || poop.type === "royal" || poop.type === "cursed") return "bean-rainbow";
+    if (poop.type === "stinky" || poop.type === "hay") return "bean-compost";
+    if (poop.value > poop.baseValue) return "bean-aged";
+    return "bean-normal";
   }
 }

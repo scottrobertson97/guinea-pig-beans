@@ -151,7 +151,7 @@ export function createInitialState(): GameState {
       cleanedPoops: 0,
       goldenCleaned: 0,
       stinkyCleaned: 0,
-      pigsAdopted: 1,
+      pigsAdopted: 2,
       feedUpgrades: 0,
       scoopUpgrades: 0,
       roombaPurchased: false,
@@ -172,7 +172,8 @@ export function createInitialState(): GameState {
   };
 
   addPig(state);
-  addLog(state, `${state.pigs[0].name} moved in and immediately inspected the bedding.`);
+  addPig(state);
+  addLog(state, `${state.pigs[0].name} and ${state.pigs[1].name} moved in as a bonded pair.`);
   return state;
 }
 

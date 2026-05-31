@@ -13,7 +13,7 @@ import {
   unlockLateGameSystem,
   useAbility,
 } from "../simulation/actions";
-import { getCosts } from "../simulation/balance";
+import { getCosts, getPigCapacity } from "../simulation/balance";
 import { getAchievementViews, getQuestViews, type MilestoneView } from "../simulation/milestones";
 import type { AbilityId, FurnitureId, GameState } from "../simulation/types";
 
@@ -139,8 +139,10 @@ export class Hud {
 
   render(): void {
     const costs = getCosts(this.state);
+    const pigCapacity = getPigCapacity(this.state);
+    const isAtPigCapacity = this.state.pigs.length >= pigCapacity;
     setText("beans", Math.floor(this.state.beans).toString());
-    setText("pig-count", this.state.pigs.length.toString());
+    setText("pig-count", `${this.state.pigs.length}/${pigCapacity}`);
     setText("cleanliness", `${this.state.cage.cleanliness}%`);
     setText("compost", Math.floor(this.state.compost).toString());
     setText("squeaks", Math.floor(this.state.squeaks).toString());
@@ -155,12 +157,12 @@ export class Hud {
       `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
     );
     setText("combo-value", getComboText(this.state));
-    setText("adopt-cost", `${costs.pig} Beans`);
+    setText("adopt-cost", isAtPigCapacity ? "Full - Bigger Cage" : `${costs.pig} Beans`);
     setText("feed-cost", `${costs.feed} Beans`);
     setText("scoop-cost", `${costs.scoop} Beans`);
     setText("robot-cost", this.state.robot ? "Active" : `${costs.robot} Beans`);
-    setText("cage-cost", `${costs.cage} Beans`);
-    setText("rare-pig-cost", `${costs.rarePig} + 1 Gold`);
+    setText("cage-cost", `${costs.cage} Beans - Cap ${pigCapacity + 2}`);
+    setText("rare-pig-cost", isAtPigCapacity ? "Full - Bigger Cage" : `${costs.rarePig} + 1 Gold`);
     this.renderFurnitureCosts(costs.furniture);
     this.renderAbilityStatuses();
     this.renderLateGameStatuses();
@@ -171,12 +173,12 @@ export class Hud {
     setMeter("water-meter", this.state.needs.water);
     setMeter("happiness-meter", this.state.cage.happiness);
 
-    this.buttons["adopt-pig"].disabled = this.state.beans < costs.pig;
+    this.buttons["adopt-pig"].disabled = isAtPigCapacity || this.state.beans < costs.pig;
     this.buttons["better-hay"].disabled = this.state.beans < costs.feed;
     this.buttons["better-scoop"].disabled = this.state.beans < costs.scoop;
     this.buttons["poop-roomba"].disabled = Boolean(this.state.robot) || this.state.beans < costs.robot;
     this.buttons["bigger-cage"].disabled = this.state.beans < costs.cage;
-    this.buttons["rare-pig"].disabled = this.state.beans < costs.rarePig || this.state.goldenBeans < 1;
+    this.buttons["rare-pig"].disabled = isAtPigCapacity || this.state.beans < costs.rarePig || this.state.goldenBeans < 1;
     this.buttons["event-response"].disabled = !this.state.event.active || !this.state.event.responseReady;
     this.updateFurnitureDisabled(costs.furniture);
     this.updateAbilityDisabled();

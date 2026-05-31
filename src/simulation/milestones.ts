@@ -32,11 +32,11 @@ const questDefinitions: MilestoneDefinition[] = [
     log: "Quest complete: 100 Beans. The economy has begun.",
   },
   {
-    id: "adopt-second-pig",
-    title: "Adopt a second pig",
-    complete: (state) => state.pigs.length >= 2,
-    progress: (state) => `${Math.min(state.pigs.length, 2)}/2`,
-    log: "Quest complete: the herd is officially plural.",
+    id: "expand-for-herd",
+    title: "Expand for a bigger herd",
+    complete: (state) => state.upgrades.cageLevel >= 1 || state.pigs.length >= 3,
+    progress: (state) => `${Math.min(state.upgrades.cageLevel, 1)}/1`,
+    log: "Quest complete: the cage is ready for a bigger herd.",
   },
   {
     id: "buy-scoop",

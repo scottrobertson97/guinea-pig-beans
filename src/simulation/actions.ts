@@ -1,4 +1,4 @@
-import { getCosts, getScoopRadius } from "./balance";
+import { getCosts, getPigCapacity, getScoopRadius } from "./balance";
 import { updateMilestones } from "./milestones";
 import { addLegendaryPig, addLog, addPig } from "./state";
 import type { AbilityId, FurnitureId, GameState } from "./types";
@@ -111,6 +111,10 @@ export function setBeans(state: GameState, amount: number): void {
 }
 
 export function buyPig(state: GameState): boolean {
+  if (state.pigs.length >= getPigCapacity(state)) {
+    addLog(state, "The cage is full. Buy a Bigger Cage before adopting another pig.");
+    return false;
+  }
   const cost = getCosts(state).pig;
   if (state.beans < cost) return false;
   state.beans -= cost;
@@ -148,8 +152,7 @@ export function buyCageUpgrade(state: GameState): boolean {
   if (state.beans < cost) return false;
   state.beans -= cost;
   state.upgrades.cageLevel += 1;
-  state.cage.space += 25;
-  addLog(state, `Cage expanded to level ${state.upgrades.cageLevel}. The herd has opinions.`);
+  addLog(state, `Cage expanded to level ${state.upgrades.cageLevel}. Capacity is now ${getPigCapacity(state)} pigs.`);
   updateMilestones(state);
   return true;
 }
@@ -168,6 +171,10 @@ export function buyFurniture(state: GameState, id: FurnitureId): boolean {
 }
 
 export function buyRarePig(state: GameState): boolean {
+  if (state.pigs.length >= getPigCapacity(state)) {
+    addLog(state, "The cage is full. Buy a Bigger Cage before adopting another pig.");
+    return false;
+  }
   const cost = getCosts(state).rarePig;
   if (state.beans < cost || state.goldenBeans < 1) return false;
   state.beans -= cost;
@@ -327,7 +334,8 @@ export function prestige(state: GameState): boolean {
   state.goldenBeans = 0;
   state.poops = [];
   state.robot = null;
-  state.pigs.splice(1);
+  state.pigs.splice(2);
+  while (state.pigs.length < 2) addPig(state);
   state.upgrades.feedLevel = 0;
   state.upgrades.scoopLevel = 0;
   state.upgrades.cageLevel = 0;

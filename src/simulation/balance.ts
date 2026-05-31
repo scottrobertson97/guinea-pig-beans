@@ -24,6 +24,10 @@ export function getCosts(state: GameState): Costs {
   };
 }
 
+export function getPigCapacity(state: GameState): number {
+  return 2 + state.upgrades.cageLevel * 2;
+}
+
 export function getScoopRadius(state: GameState): number {
   return 24 + state.upgrades.scoopLevel * 9;
 }

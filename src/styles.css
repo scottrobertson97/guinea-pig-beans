@@ -304,6 +304,22 @@ h1 {
   font-size: 0.82rem;
 }
 
+.ability-shop button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  min-height: 58px;
+}
+
+.ability-shop button em {
+  grid-column: 1 / -1;
+  color: #4f594f;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
 .compact-shop h2 + button {
   margin-top: 2px;
 }
