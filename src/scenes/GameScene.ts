@@ -74,6 +74,8 @@ const PIG_SHADOW_HEIGHT = 8;
 const PIG_SHADOW_Y = 9;
 const PIG_SPRITE_Y = -1;
 const PIG_THOUGHT_Y = -32;
+const BEAN_POP_SCALE = 1.3;
+const MESS_PILE_POP_SCALE = 1.16;
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
@@ -446,8 +448,8 @@ export class GameScene extends Phaser.Scene {
     view.clearTint();
     view.setAlpha(1);
 
-    const size = poop.type === "mega" ? [25, 21] : poop.type === "messPile" ? [40, 32] : [18, 15];
-    view.setDisplaySize(size[0], size[1]);
+    const size = getPoopDisplaySize(poop.type);
+    view.setDisplaySize(size.width, size.height);
 
     if (poop.type === "stinky") view.setTint(0x6f8f47);
     else if (poop.type === "blessed") view.setTint(0xfff6bf);
@@ -739,17 +741,22 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const size = getPoopDisplaySize(cleaned.type);
+    const popScale = cleaned.type === "messPile" ? MESS_PILE_POP_SCALE : BEAN_POP_SCALE;
     const sprite = this.add
       .image(cleaned.x, cleaned.y, this.getPoopFeedbackTextureKey(cleaned))
       .setDepth(65)
       .setAlpha(0.95)
-      .setDisplaySize(cleaned.type === "messPile" ? 42 : 22, cleaned.type === "messPile" ? 34 : 18)
+      .setDisplaySize(size.width, size.height)
       .setRotation(Math.random() * Math.PI);
+    const targetScaleX = sprite.scaleX * popScale;
+    const targetScaleY = sprite.scaleY * popScale;
 
     this.tweens.add({
       targets: sprite,
       alpha: 0,
-      scale: 1.85,
+      scaleX: targetScaleX,
+      scaleY: targetScaleY,
       y: cleaned.y - 10,
       duration: 360,
       ease: "Cubic.easeOut",
@@ -958,6 +965,12 @@ function getPoopTextureKey(type: PoopType, aged: boolean): string {
   if (type === "stinky" || type === "hay") return "bean-compost";
   if (aged) return "bean-aged";
   return "bean-normal";
+}
+
+function getPoopDisplaySize(type: PoopType): { width: number; height: number } {
+  if (type === "mega") return { width: 25, height: 21 };
+  if (type === "messPile") return { width: 40, height: 32 };
+  return { width: 18, height: 15 };
 }
 
 function getPoopAccentColor(type: PoopType): number {
