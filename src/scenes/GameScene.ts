@@ -128,6 +128,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image("water-bottle-full", "/assets/sprites/decor/water_bottle_full.png");
     this.load.image("litter-tray-clean", "/assets/sprites/decor/litter_tray_clean.png");
     this.load.image("toy-pile", "/assets/sprites/decor/toy_pile.png");
+    this.load.image("royal-throne", "/assets/sprites/decor/royal_throne.png");
     this.load.image("roaming-dustpan", "/assets/sprites/upgrades/roaming_dustpan.png");
     this.load.image("compost-bin", "/assets/sprites/upgrades/compost_bin.png");
     this.load.image("cavybot-3000", "/assets/sprites/upgrades/cavybot_3000.png");
@@ -926,11 +927,7 @@ export class GameScene extends Phaser.Scene {
       ];
     }
     if (id === "royalThrone") {
-      return [
-        this.add.rectangle(0, 10, 52, 38, 0x7c65a9).setStrokeStyle(3, 0x4e376b, 0.8),
-        this.add.rectangle(0, -18, 44, 44, 0x9b5ab6),
-        this.add.circle(0, -40, 8, 0xe4b83b),
-      ];
+      return [this.add.image(0, -22, "royal-throne").setDisplaySize(118, 142)];
     }
     if (id === "snuggleSack") {
       return [
@@ -997,7 +994,7 @@ function getFurnitureShadowSize(id: FurnitureId): { width: number; height: numbe
   if (id === "chewToy") return { width: 64, height: 20, y: 24 };
   if (id === "cardboardCastle") return { width: 68, height: 22, y: 28 };
   if (id === "tunnel") return { width: 92, height: 22, y: 18 };
-  if (id === "royalThrone") return { width: 62, height: 20, y: 20 };
+  if (id === "royalThrone") return { width: 94, height: 28, y: 42 };
   if (id === "snuggleSack") return { width: 74, height: 22, y: 18 };
   return { width: 74, height: 22, y: 26 };
 }
