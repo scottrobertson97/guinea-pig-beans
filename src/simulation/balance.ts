@@ -21,12 +21,168 @@ const ABILITY_SQUEAK_COSTS: Record<AbilityId, number> = {
   snackTime: 4,
   zoomieMode: 3,
 };
-const WISDOM_COSTS: Record<WisdomPerkId, number> = {
-  roomyStart: 1,
-  gentleAutomation: 1,
-  rareInstinct: 2,
-  chorusTraining: 2,
-};
+export type WisdomBranch = "Care" | "Herd" | "Automation" | "Rare Beans";
+export type FurnitureSynergyId = "cozyCorner" | "zoomiePlayground" | "cleanupCircuit" | "royalCompostCourt";
+
+export interface WisdomPerkDefinition {
+  id: WisdomPerkId;
+  branch: WisdomBranch;
+  tier: number;
+  label: string;
+  description: string;
+  cost: number;
+  prerequisite?: WisdomPerkId;
+}
+
+export interface FurnitureSynergyDefinition {
+  id: FurnitureSynergyId;
+  name: string;
+  furniture: [FurnitureId, FurnitureId];
+  description: string;
+}
+
+export const FURNITURE_SYNERGIES: FurnitureSynergyDefinition[] = [
+  {
+    id: "cozyCorner",
+    name: "Cozy Corner",
+    furniture: ["hideyHouse", "snuggleSack"],
+    description: "+8 socialization and +4 happiness from a dedicated quiet nest.",
+  },
+  {
+    id: "zoomiePlayground",
+    name: "Zoomie Playground",
+    furniture: ["tunnel", "chewToy"],
+    description: "Zoomies last longer, move pigs faster, and add extra enrichment.",
+  },
+  {
+    id: "cleanupCircuit",
+    name: "Cleanup Circuit",
+    furniture: ["litterTray", "chewToy"],
+    description: "The tray cleans more often and the Roomba senses and sweeps farther.",
+  },
+  {
+    id: "royalCompostCourt",
+    name: "Royal Compost Court",
+    furniture: ["cardboardCastle", "royalThrone"],
+    description: "Improves royal and compost bean odds and discounts legendary pigs.",
+  },
+];
+
+const FURNITURE_SYNERGY_MAP = Object.fromEntries(
+  FURNITURE_SYNERGIES.map((synergy) => [synergy.id, synergy]),
+) as Record<FurnitureSynergyId, FurnitureSynergyDefinition>;
+
+export const WISDOM_PERKS: WisdomPerkDefinition[] = [
+  {
+    id: "roomyStart",
+    branch: "Care",
+    tier: 1,
+    label: "Roomy Start",
+    description: "+2 pig capacity and more cage space.",
+    cost: 1,
+  },
+  {
+    id: "steadySupplies",
+    branch: "Care",
+    tier: 2,
+    label: "Steady Supplies",
+    description: "Hay and water drain 10% slower.",
+    cost: 2,
+    prerequisite: "roomyStart",
+  },
+  {
+    id: "freshStart",
+    branch: "Care",
+    tier: 3,
+    label: "Fresh Start",
+    description: "Cleanliness gets a permanent +3 cushion.",
+    cost: 3,
+    prerequisite: "steadySupplies",
+  },
+  {
+    id: "bondedBeginnings",
+    branch: "Herd",
+    tier: 1,
+    label: "Bonded Beginnings",
+    description: "Bonded pigs add more socialization.",
+    cost: 1,
+  },
+  {
+    id: "socialMemory",
+    branch: "Herd",
+    tier: 2,
+    label: "Social Memory",
+    description: "Every bonded pig adds extra socialization.",
+    cost: 2,
+    prerequisite: "bondedBeginnings",
+  },
+  {
+    id: "chorusTraining",
+    branch: "Herd",
+    tier: 3,
+    label: "Chorus Training",
+    description: "Ability Squeak costs drop and Wheek Call gives more Squeaks.",
+    cost: 3,
+    prerequisite: "socialMemory",
+  },
+  {
+    id: "gentleAutomation",
+    branch: "Automation",
+    tier: 1,
+    label: "Gentle Automation",
+    description: "Roomba and Compost fuel are cheaper.",
+    cost: 1,
+  },
+  {
+    id: "compostEngine",
+    branch: "Automation",
+    tier: 2,
+    label: "Compost Engine",
+    description: "Compost fuel is cheaper and compost beans age better.",
+    cost: 2,
+    prerequisite: "gentleAutomation",
+  },
+  {
+    id: "trayAffinity",
+    branch: "Automation",
+    tier: 3,
+    label: "Tray Affinity",
+    description: "Litter Tray cleans farther and more often.",
+    cost: 3,
+    prerequisite: "compostEngine",
+  },
+  {
+    id: "rareInstinct",
+    branch: "Rare Beans",
+    tier: 1,
+    label: "Rare Instinct",
+    description: "Rare bean odds and enrichment improve.",
+    cost: 1,
+  },
+  {
+    id: "goldenNose",
+    branch: "Rare Beans",
+    tier: 2,
+    label: "Golden Nose",
+    description: "Golden beans are more likely and worth more.",
+    cost: 2,
+    prerequisite: "rareInstinct",
+  },
+  {
+    id: "royalMemory",
+    branch: "Rare Beans",
+    tier: 3,
+    label: "Royal Memory",
+    description: "Legendary pigs cost less and royal bean odds improve.",
+    cost: 3,
+    prerequisite: "goldenNose",
+  },
+];
+
+const WISDOM_PERK_MAP = Object.fromEntries(WISDOM_PERKS.map((perk) => [perk.id, perk])) as Record<
+  WisdomPerkId,
+  WisdomPerkDefinition
+>;
 
 export function getCosts(state: GameState): Costs {
   const furniture = Object.fromEntries(
@@ -46,10 +202,26 @@ export function getCosts(state: GameState): Costs {
       220 *
         1.8 ** state.stats.legendaryPigsAdopted *
         (state.recipes.beanBlessing ? 0.84 : 1) *
-        (state.recipes.royalAccord ? 0.92 : 1),
+        (state.recipes.royalAccord ? 0.92 : 1) *
+        (state.wisdom.royalMemory ? 0.9 : 1) *
+        (hasFurnitureSynergy(state, "royalCompostCourt") ? 0.94 : 1),
     ),
-    prestige: 5000,
+    prestige: getPrestigeCost(),
   };
+}
+
+export function getPrestigeCost(): number {
+  return 5000;
+}
+
+export function getPrestigeProgress(state: GameState): number {
+  return Math.max(0, state.stats.lifetimeBeans - state.prestige.lifetimeBeansClaimed);
+}
+
+export function getPrestigeWisdomGain(state: GameState): number {
+  const progress = getPrestigeProgress(state);
+  if (progress < getPrestigeCost()) return 0;
+  return Math.max(1, Math.floor(Math.sqrt(progress / getPrestigeCost())));
 }
 
 export function getPigCapacity(state: GameState): number {
@@ -70,7 +242,14 @@ export function getHabitatCapacity(state: GameState): number {
 
 export function getFurnitureSpaceUsed(state: GameState): number {
   return (Object.keys(FURNITURE_SPACE_COSTS) as FurnitureId[]).reduce(
-    (total, id) => total + state.furniture[id] * FURNITURE_SPACE_COSTS[id],
+    (total, id) => total + (state.furniture[id] ? FURNITURE_SPACE_COSTS[id] : 0),
+    0,
+  );
+}
+
+export function getUnlockedFurnitureCount(state: GameState): number {
+  return (Object.keys(FURNITURE_SPACE_COSTS) as FurnitureId[]).reduce(
+    (total, id) => total + Number(state.furniture[id]),
     0,
   );
 }
@@ -81,20 +260,58 @@ export function getAbilityCost(state: GameState, id: AbilityId): number {
 }
 
 export function getAutomationFuelCost(state: GameState): number {
-  return Math.max(5, 12 - state.upgrades.scoopLevel - (state.wisdom.gentleAutomation ? 3 : 0) - (state.recipes.compostCatalyst ? 2 : 0));
+  return Math.max(
+    3,
+    12 -
+      state.upgrades.scoopLevel -
+      (state.wisdom.gentleAutomation ? 3 : 0) -
+      (state.wisdom.compostEngine ? 2 : 0) -
+      (state.recipes.compostCatalyst ? 2 : 0),
+  );
 }
 
 export function getWisdomCost(id: WisdomPerkId): number {
-  return WISDOM_COSTS[id];
+  return getWisdomPerk(id).cost;
+}
+
+export function getWisdomPerk(id: WisdomPerkId): WisdomPerkDefinition {
+  return WISDOM_PERK_MAP[id];
+}
+
+export function getWisdomPerks(): WisdomPerkDefinition[] {
+  return WISDOM_PERKS;
+}
+
+export function getFurnitureSynergies(): FurnitureSynergyDefinition[] {
+  return FURNITURE_SYNERGIES;
+}
+
+export function getFurnitureSynergy(id: FurnitureSynergyId): FurnitureSynergyDefinition {
+  return FURNITURE_SYNERGY_MAP[id];
+}
+
+export function hasFurnitureSynergy(state: GameState, id: FurnitureSynergyId): boolean {
+  const synergy = getFurnitureSynergy(id);
+  return synergy.furniture.every((furnitureId) => state.furniture[furnitureId]);
+}
+
+export function getActiveFurnitureSynergies(state: GameState): FurnitureSynergyDefinition[] {
+  return FURNITURE_SYNERGIES.filter((synergy) => hasFurnitureSynergy(state, synergy.id));
+}
+
+export function canBuyWisdomPerk(state: GameState, id: WisdomPerkId): boolean {
+  const perk = getWisdomPerk(id);
+  return (
+    !state.wisdom[id] &&
+    state.cavyWisdom >= perk.cost &&
+    (!perk.prerequisite || state.wisdom[perk.prerequisite])
+  );
 }
 
 export function getTotalWisdom(state: GameState): number {
   return (
     state.cavyWisdom +
-    (Object.keys(state.wisdom) as WisdomPerkId[]).reduce(
-      (total, id) => total + (state.wisdom[id] ? WISDOM_COSTS[id] : 0),
-      0,
-    )
+    getWisdomPerks().reduce((total, perk) => total + (state.wisdom[perk.id] ? perk.cost : 0), 0)
   );
 }
 
@@ -151,7 +368,7 @@ function getFurnitureCost(state: GameState, id: FurnitureId): number {
     cardboardCastle: 130,
     royalThrone: 300,
   };
-  return Math.ceil(baseCosts[id] * 1.75 ** state.furniture[id]);
+  return baseCosts[id];
 }
 
 function getTraitPoopMultiplier(pig: Pig): number {

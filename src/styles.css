@@ -75,10 +75,12 @@ button:disabled {
 }
 
 .topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 28rem) auto minmax(0, 1fr);
+  grid-template-areas: "brand actions stats";
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
+  min-height: 86px;
   padding: 14px 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -87,9 +89,14 @@ button:disabled {
 }
 
 .brand {
+  grid-area: brand;
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+.brand > div {
   min-width: 0;
 }
 
@@ -112,13 +119,31 @@ p {
 }
 
 h1 {
+  overflow: hidden;
   font-size: clamp(1.05rem, 2vw, 1.45rem);
   letter-spacing: 0;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 #status-line {
+  display: -webkit-box;
+  min-height: 2.52em;
+  max-height: 2.52em;
+  overflow: hidden;
   color: #5b665c;
   font-size: 0.9rem;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.topbar-actions {
+  grid-area: actions;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 156px;
 }
 
 .sound-toggle {
@@ -138,10 +163,35 @@ h1 {
   background: #eee8da;
 }
 
+.save-status-slot {
+  flex: 0 0 78px;
+  min-width: 78px;
+  min-height: 30px;
+}
+
+.save-status {
+  display: block;
+  min-width: 78px;
+  padding: 6px 9px;
+  border: 1px solid rgba(23, 32, 26, 0.12);
+  border-radius: 999px;
+  color: #4f594f;
+  background: rgba(255, 255, 255, 0.78);
+  font-size: 0.74rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.save-status[hidden] {
+  display: none;
+}
+
 .stats {
+  grid-area: stats;
   display: grid;
-  grid-template-columns: repeat(9, minmax(70px, 1fr));
+  grid-template-columns: repeat(9, minmax(74px, 1fr));
   gap: 8px;
+  min-width: 0;
 }
 
 .stats div {
@@ -501,6 +551,116 @@ button.action-success {
   font-style: normal;
 }
 
+.event-choice-panel {
+  display: grid;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid rgba(126, 168, 109, 0.32);
+  border-radius: 8px;
+  background: rgba(245, 251, 238, 0.82);
+}
+
+.event-choice-panel[hidden] {
+  display: none;
+}
+
+.event-choice-panel > span {
+  color: #667064;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.event-choice-panel > strong {
+  font-size: 0.9rem;
+}
+
+.event-choice-panel > em {
+  color: #5f6a5e;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.event-choice-list {
+  display: grid;
+  gap: 7px;
+}
+
+.event-choice-list button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  text-align: left;
+}
+
+.event-choice-list button.available-now:not(:disabled) {
+  border: 1px solid rgba(126, 168, 109, 0.42);
+  background: linear-gradient(180deg, #eef8e9 0%, #dbeecf 100%);
+}
+
+.event-choice-list button strong {
+  color: #314033;
+  font-size: 0.8rem;
+  text-align: right;
+}
+
+.event-choice-list button em {
+  grid-column: 1 / -1;
+  color: #4f594f;
+  font-size: 0.74rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.pig-request-panel {
+  display: grid;
+  gap: 6px;
+  padding: 9px 10px;
+  border: 1px solid rgba(206, 164, 74, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 247, 221, 0.82);
+}
+
+.pig-request-panel[hidden] {
+  display: none;
+}
+
+.pig-request-panel > span,
+.pig-request-panel div span {
+  color: #667064;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pig-request-panel > strong {
+  font-size: 0.9rem;
+}
+
+.pig-request-panel > em {
+  color: #5f6a5e;
+  font-size: 0.78rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.pig-request-panel div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pig-request-panel div strong {
+  color: #5c4a1f;
+  font-size: 0.78rem;
+  text-align: right;
+}
+
 .shop {
   display: grid;
   gap: 10px;
@@ -583,6 +743,57 @@ button.action-success {
 
 .compact-shop h2 + button {
   margin-top: 2px;
+}
+
+.synergy-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.synergy-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.synergy-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  padding: 7px 9px;
+  border: 1px solid rgba(23, 32, 26, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #4f594f;
+  font-size: 0.78rem;
+}
+
+.synergy-list li.complete {
+  border-color: rgba(126, 168, 109, 0.3);
+  background: rgba(217, 234, 208, 0.58);
+}
+
+.synergy-list li span {
+  font-weight: 800;
+}
+
+.synergy-list li strong {
+  max-width: 14rem;
+  overflow-wrap: anywhere;
+  color: #314033;
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+.synergy-list li em {
+  grid-column: 1 / -1;
+  color: #5f6a5e;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
 }
 
 .pig-roster ul {
@@ -687,6 +898,21 @@ button.action-success {
   padding: 8px 10px;
   border-radius: 8px;
   list-style: none;
+}
+
+.danger-action {
+  align-self: start;
+  margin-top: 10px;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(130, 55, 43, 0.24);
+  color: #74372d;
+  background: rgba(248, 230, 224, 0.78);
+  font-size: 0.78rem;
+}
+
+.danger-action:hover:not(:disabled) {
+  background: #f0d6ce;
 }
 
 #section-modal {
@@ -907,6 +1133,26 @@ button.action-success {
   }
 }
 
+@media (max-width: 1180px) {
+  .topbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "brand actions"
+      "stats stats";
+    min-height: 130px;
+  }
+
+  .stats {
+    overflow-x: auto;
+    padding-bottom: 4px;
+    scrollbar-gutter: stable;
+  }
+
+  .stats div {
+    min-width: 74px;
+  }
+}
+
 @media (max-width: 900px) {
   #app {
     padding: 10px;
@@ -917,16 +1163,17 @@ button.action-success {
   }
 
   .topbar {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    grid-template-columns: minmax(0, 1fr) auto;
+    min-height: 128px;
   }
 
-  .sound-toggle {
-    align-self: flex-start;
+  .topbar-actions {
+    justify-content: flex-end;
   }
 
   .stats {
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(9, minmax(74px, 1fr));
   }
 
   #canvas-wrap {
@@ -964,7 +1211,34 @@ button.action-success {
 
   .topbar {
     gap: 10px;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "brand"
+      "actions"
+      "stats";
+    min-height: 172px;
     padding: 10px;
+  }
+
+  .brand {
+    align-items: flex-start;
+  }
+
+  .brand-mark {
+    margin-top: 2px;
+  }
+
+  h1 {
+    font-size: 1.05rem;
+  }
+
+  #status-line {
+    font-size: 0.82rem;
+  }
+
+  .topbar-actions {
+    justify-content: flex-start;
+    min-width: 0;
   }
 
   .stats {

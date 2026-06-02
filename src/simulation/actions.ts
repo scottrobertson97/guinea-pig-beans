@@ -1,17 +1,20 @@
 import {
+  canBuyWisdomPerk,
   getAbilityCost,
   getAutomationFuelCost,
   getCosts,
-  getFurnitureSpaceCost,
-  getFurnitureSpaceUsed,
-  getHabitatCapacity,
   getPigCapacity,
+  getPrestigeCost,
+  getPrestigeProgress,
+  getPrestigeWisdomGain,
   getScoopRadius,
   getWisdomCost,
+  getWisdomPerk,
 } from "./balance";
 import { updateMilestones } from "./milestones";
-import { addLegendaryPig, addLog, addPig } from "./state";
-import type { AbilityId, BeanRecipeId, FurnitureId, GameState, PoopType, WisdomPerkId } from "./types";
+import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
+import { addLegendaryPig, addLog, addPig, spawnEventPoop } from "./state";
+import type { AbilityId, BeanRecipeId, EventChoiceId, EventId, FurnitureId, GameState, PoopType, WisdomPerkId } from "./types";
 
 export interface CleanResult {
   cleaned: number;
@@ -32,6 +35,55 @@ export interface CleanedPoop {
   y: number;
   value: number;
 }
+
+export interface EventChoiceView {
+  id: EventChoiceId;
+  eventId: EventId;
+  label: string;
+  description: string;
+}
+
+const EVENT_CHOICES: Record<EventId, EventChoiceView[]> = {
+  zoomies: [
+    { id: "zoomiesGuide", eventId: "zoomies", label: "Guide the Zoomies", description: "Start a clean streak and steady the chaos." },
+    { id: "zoomiesChaos", eventId: "zoomies", label: "Ride the Chaos", description: "Gain Beans, but a few new beans appear." },
+    { id: "zoomiesMomentum", eventId: "zoomies", label: "Channel Momentum", description: "Spend Squeaks to push automation or combo energy." },
+  ],
+  hayFrenzy: [
+    { id: "hayEmergency", eventId: "hayFrenzy", label: "Emergency Timothy", description: "Restore hay with no downside." },
+    { id: "hayFeast", eventId: "hayFrenzy", label: "Let Them Feast", description: "Trade hay for Beans and a small happiness bump." },
+    { id: "hayBundles", eventId: "hayFrenzy", label: "Pack Hay Bundles", description: "Spend Beans to fully restock hay and earn a Squeak." },
+  ],
+  napTime: [
+    { id: "napProtect", eventId: "napTime", label: "Protect the Nap", description: "Raise happiness while the herd rests." },
+    { id: "napQuietClean", eventId: "napTime", label: "Quiet Cleaning", description: "Clean the cage center, but drop the current combo." },
+    { id: "napDreamSqueaks", eventId: "napTime", label: "Dream Squeaks", description: "Spend Beans to gain Squeaks." },
+  ],
+  bottleJam: [
+    { id: "bottleFix", eventId: "bottleJam", label: "Fix the Bottle", description: "Clear the jam and restore water." },
+    { id: "bottleTap", eventId: "bottleJam", label: "Tap the Nozzle", description: "Gain Beans and some water, with a tiny mood hit." },
+    { id: "bottleSpare", eventId: "bottleJam", label: "Use Spare Bottle", description: "Spend Beans to fully restore water." },
+  ],
+  cageInspection: [
+    { id: "inspectionTidy", eventId: "cageInspection", label: "Tidy the Evidence", description: "Clean a wide area using normal cleanup rewards." },
+    { id: "inspectionPresent", eventId: "cageInspection", label: "Present the Cage", description: "Cash in a clean cage for Beans." },
+    { id: "inspectionSqueaks", eventId: "cageInspection", label: "Offer Squeaks", description: "Spend Squeaks to earn a bigger Bean reward." },
+  ],
+  compostBloom: [
+    { id: "compostHarvest", eventId: "compostBloom", label: "Harvest Bloom", description: "Collect Compost immediately." },
+    { id: "compostRipen", eventId: "compostBloom", label: "Let It Ripen", description: "Spawn compost beans for later cleanup." },
+    { id: "compostFuel", eventId: "compostBloom", label: "Fuel the System", description: "Spend Compost for overdrive, or Beans without Roomba." },
+  ],
+  greatWheeking: [
+    { id: "wheekingAnswer", eventId: "greatWheeking", label: "Answer the Chorus", description: "Gain Squeaks immediately." },
+    { id: "wheekingConduct", eventId: "greatWheeking", label: "Conduct the Herd", description: "Spend Beans for happiness and Squeaks." },
+    { id: "wheekingEcho", eventId: "greatWheeking", label: "Echo Into Mythos", description: "Spend Squeaks to gain a Golden Bean." },
+  ],
+};
+
+const EVENT_CHOICE_MAP = Object.fromEntries(
+  Object.values(EVENT_CHOICES).flat().map((choice) => [choice.id, choice]),
+) as Record<EventChoiceId, EventChoiceView>;
 
 export function cleanAt(state: GameState, x: number, y: number): number {
   return cleanAtWithResult(state, x, y).earned;
@@ -114,12 +166,16 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
     state.stats.goldenCleaned += result.golden;
     state.stats.stinkyCleaned += result.stinky;
     state.stats.rarePoopsCleaned += result.rare;
+    advancePigRequest(state, "clean", result.cleaned);
+    advancePigRequest(state, "combo", comboCount);
+    updateHeldPigRequestProgress(state);
   }
   return result;
 }
 
 export function refillHay(state: GameState): void {
   state.needs.hay = 100;
+  advancePigRequest(state, "hayRefill", 1);
   addLog(state, "Hay rack refilled. The room has been judged acceptable.");
 }
 
@@ -129,6 +185,7 @@ export function refillWater(state: GameState): void {
     addLog(state, "Bottle jam fixed. The water bottle has resumed its duties.");
   }
   state.needs.water = 100;
+  advancePigRequest(state, "waterRefill", 1);
   addLog(state, "Water bottle topped up with dramatic precision.");
 }
 
@@ -193,21 +250,15 @@ export function buyCageUpgrade(state: GameState): boolean {
 }
 
 export function buyFurniture(state: GameState, id: FurnitureId): boolean {
-  const usedSpace = getFurnitureSpaceUsed(state);
-  const nextSpace = usedSpace + getFurnitureSpaceCost(id);
-  const habitatCapacity = getHabitatCapacity(state);
-  if (nextSpace > habitatCapacity) {
-    addLog(state, `No habitat space for ${getFurnitureName(id)}. Expand the cage first.`);
-    return false;
-  }
+  if (state.furniture[id]) return false;
   const cost = getCosts(state).furniture[id];
   if (state.beans < cost) return false;
   state.beans -= cost;
-  state.furniture[id] += 1;
+  state.furniture[id] = true;
   state.stats.furnitureBought += 1;
-  state.placement.pendingFurniture = id;
-  advanceObjective(state, "placeFurniture", 1);
-  addLog(state, `${getFurnitureName(id)} purchased. Click the cage to place it.`);
+  advanceObjective(state, "unlockFurniture", 1);
+  advancePigRequest(state, "furniture", 1);
+  addLog(state, `${getFurnitureName(id)} unlocked and placed in the cage.`);
   updateMilestones(state);
   return true;
 }
@@ -326,6 +377,7 @@ export function useAbility(state: GameState, id: AbilityId): boolean {
 
   state.stats.abilitiesUsed += 1;
   advanceObjective(state, "useAbility", 1);
+  advancePigRequest(state, "ability", 1);
   updateMilestones(state);
   return true;
 }
@@ -339,7 +391,8 @@ export function fuelAutomation(state: GameState): boolean {
   if (state.compost < cost) return false;
 
   state.compost -= cost;
-  const fuelSeconds = 18 + (state.recipes.compostCatalyst ? 8 : 0) + (state.wisdom.gentleAutomation ? 5 : 0);
+  const fuelSeconds =
+    18 + (state.recipes.compostCatalyst ? 8 : 0) + (state.wisdom.gentleAutomation ? 5 : 0) + (state.wisdom.compostEngine ? 4 : 0);
   state.automation.overdrive = Math.min(60, state.automation.overdrive + fuelSeconds);
   advanceObjective(state, "fuelAutomation", 1);
   addLog(state, `Compost fuel spent. Automation overdrive active for ${Math.ceil(state.automation.overdrive)}s.`);
@@ -384,9 +437,8 @@ export function getBeanRecipeStatus(state: GameState, id: BeanRecipeId): string 
 }
 
 export function buyWisdomPerk(state: GameState, id: WisdomPerkId): boolean {
-  if (state.wisdom[id]) return false;
+  if (!canBuyWisdomPerk(state, id)) return false;
   const cost = getWisdomCost(id);
-  if (state.cavyWisdom < cost) return false;
 
   state.cavyWisdom -= cost;
   state.wisdom[id] = true;
@@ -396,35 +448,131 @@ export function buyWisdomPerk(state: GameState, id: WisdomPerkId): boolean {
   return true;
 }
 
-export function respondToEvent(state: GameState): boolean {
+export function getEventChoices(state: GameState): EventChoiceView[] {
   const event = state.event.active;
-  if (!event || !state.event.responseReady) return false;
+  if (!event || !state.event.responseReady) return [];
+  return EVENT_CHOICES[event.id];
+}
 
-  if (event.id === "bottleJam") {
+export function canUseEventChoice(state: GameState, id: EventChoiceId): boolean {
+  return getEventChoiceStatus(state, id) === "";
+}
+
+export function getEventChoiceStatus(state: GameState, id: EventChoiceId): string {
+  const event = state.event.active;
+  const choice = EVENT_CHOICE_MAP[id];
+  if (!event || !state.event.responseReady || choice.eventId !== event.id) return "Unavailable";
+  if (id === "zoomiesMomentum" && state.squeaks < 2) return formatNeed(state.squeaks, 2, "Squeak");
+  if (id === "hayBundles" && state.beans < 25) return formatNeed(state.beans, 25, "Bean");
+  if (id === "napDreamSqueaks" && state.beans < 20) return formatNeed(state.beans, 20, "Bean");
+  if (id === "bottleSpare" && state.beans < 25) return formatNeed(state.beans, 25, "Bean");
+  if (id === "inspectionPresent" && state.cage.cleanliness < 75) return "Need 75% Clean";
+  if (id === "inspectionSqueaks" && state.squeaks < 3) return formatNeed(state.squeaks, 3, "Squeak");
+  if (id === "compostFuel" && state.compost < 8) return formatNeed(state.compost, 8, "Compost", "Compost");
+  if (id === "wheekingConduct" && state.beans < 30) return formatNeed(state.beans, 30, "Bean");
+  if (id === "wheekingEcho" && state.squeaks < 5) return formatNeed(state.squeaks, 5, "Squeak");
+  return "";
+}
+
+export function respondToEventChoice(state: GameState, id: EventChoiceId): boolean {
+  const event = state.event.active;
+  const choice = EVENT_CHOICE_MAP[id];
+  if (!event || !state.event.responseReady || choice.eventId !== event.id || !canUseEventChoice(state, id)) return false;
+
+  if (id === "zoomiesGuide") {
+    state.combo.timer = Math.max(state.combo.timer, 4);
+    state.combo.count = Math.max(state.combo.count, 2);
+    addLog(state, "Zoomies guided into a clean streak. The herd accepts this routing.");
+  } else if (id === "zoomiesChaos") {
+    awardBeans(state, 35);
+    spawnBeansNearPigs(state, "normal", 2);
+    addLog(state, "Zoomies ridden for +35 Beans. Two fresh beans joined the traffic pattern.");
+  } else if (id === "zoomiesMomentum") {
+    state.squeaks -= 2;
+    if (state.robot) {
+      state.automation.overdrive = Math.min(60, state.automation.overdrive + 10);
+      addLog(state, "Zoomie momentum spent 2 Squeaks to boost Roomba overdrive.");
+    } else {
+      state.combo.timer = Math.max(state.combo.timer, 4);
+      state.combo.count += 2;
+      addLog(state, "Zoomie momentum spent 2 Squeaks to raise the clean streak.");
+    }
+  } else if (id === "hayEmergency") {
+    state.needs.hay = Math.min(100, state.needs.hay + 30);
+    addLog(state, "Emergency Timothy restored +30 Hay.");
+  } else if (id === "hayFeast") {
+    awardBeans(state, 20);
+    state.needs.hay = Math.max(0, state.needs.hay - 15);
+    state.cage.happiness = Math.min(100, state.cage.happiness + 5);
+    addLog(state, "The herd feasted for +20 Beans. Hay suffered a little.");
+  } else if (id === "hayBundles") {
+    state.beans -= 25;
+    state.needs.hay = 100;
+    state.squeaks += 1;
+    addLog(state, "Hay bundles packed for 25 Beans. Hay is full and the herd gave +1 Squeak.");
+  } else if (id === "napProtect") {
+    state.cage.happiness = Math.min(100, state.cage.happiness + 12);
+    addLog(state, "Nap Time protected. Happiness rose by 12.");
+  } else if (id === "napQuietClean") {
+    const result = cleanPoopsInRadius(state, state.cage.width / 2, state.cage.height / 2, 160);
+    state.combo.timer = 0;
+    state.combo.count = 0;
+    addLog(state, `Quiet Cleaning handled ${result.cleaned} beans for +${result.earned}. The combo went quiet too.`);
+  } else if (id === "napDreamSqueaks") {
+    state.beans -= 20;
+    state.squeaks += 3;
+    addLog(state, "Dream Squeaks traded 20 Beans for +3 Squeaks.");
+  } else if (id === "bottleFix") {
     state.event.bottleJammed = false;
     state.needs.water = Math.min(100, state.needs.water + 35);
-    addLog(state, "Bottle Jam handled before the herd could draft a complaint.");
-  } else if (event.id === "cageInspection") {
-    const reward = state.cage.cleanliness >= 85 ? 40 : 12;
-    state.beans += reward;
-    state.stats.lifetimeBeans += reward;
-    addLog(state, `Cage Inspection response earned +${reward} Beans.`);
-  } else if (event.id === "compostBloom") {
+    addLog(state, "Bottle Jam fixed before the herd could draft a complaint.");
+  } else if (id === "bottleTap") {
+    awardBeans(state, 15);
+    state.needs.water = Math.min(100, state.needs.water + 15);
+    state.cage.happiness = Math.max(0, state.cage.happiness - 3);
+    addLog(state, "Bottle tapped for +15 Beans and +15 Water. The herd noticed the technique.");
+  } else if (id === "bottleSpare") {
+    state.beans -= 25;
+    state.event.bottleJammed = false;
+    state.needs.water = 100;
+    addLog(state, "Spare bottle installed for 25 Beans. Water is full.");
+  } else if (id === "inspectionTidy") {
+    const result = cleanPoopsInRadius(state, state.cage.width / 2, state.cage.height / 2, Math.max(state.cage.width, state.cage.height) * 0.72);
+    addLog(state, `Inspection tidy cleaned ${result.cleaned} beans for +${result.earned}.`);
+  } else if (id === "inspectionPresent") {
+    awardBeans(state, 45);
+    addLog(state, "The cage was presented with dignity. Inspection awarded +45 Beans.");
+  } else if (id === "inspectionSqueaks") {
+    state.squeaks -= 3;
+    awardBeans(state, 70);
+    addLog(state, "Three Squeaks persuaded the inspector. +70 Beans.");
+  } else if (id === "compostHarvest") {
     state.compost += 10;
     addLog(state, "Compost Bloom harvested for +10 Compost.");
-  } else if (event.id === "greatWheeking") {
+  } else if (id === "compostRipen") {
+    spawnBeansNearPigs(state, "compost", 2);
+    addLog(state, "Compost Bloom left to ripen. Two compost beans appeared.");
+  } else if (id === "compostFuel") {
+    state.compost -= 8;
+    if (state.robot) {
+      state.automation.overdrive = Math.min(60, state.automation.overdrive + 18);
+      addLog(state, "Compost Bloom fueled Roomba overdrive for 18 seconds.");
+    } else {
+      awardBeans(state, 35);
+      addLog(state, "Compost Bloom converted 8 Compost into +35 Beans.");
+    }
+  } else if (id === "wheekingAnswer") {
     state.squeaks += 8;
     addLog(state, "The Great Wheeking was answered with alarming unity.");
-  } else if (event.id === "hayFrenzy") {
-    state.needs.hay = Math.min(100, state.needs.hay + 25);
-    addLog(state, "Hay Frenzy stabilized with emergency timothy.");
-  } else if (event.id === "zoomies") {
-    state.combo.timer = Math.max(state.combo.timer, 3);
-    state.combo.count = Math.max(state.combo.count, 2);
-    addLog(state, "Zoomies redirected into cleaning momentum.");
+  } else if (id === "wheekingConduct") {
+    state.beans -= 30;
+    state.cage.happiness = Math.min(100, state.cage.happiness + 10);
+    state.squeaks += 4;
+    addLog(state, "The herd was conducted for 30 Beans. Happiness rose and +4 Squeaks rang out.");
   } else {
-    state.cage.happiness = Math.min(100, state.cage.happiness + 12);
-    addLog(state, "Nap Time protected. The pigs respect this.");
+    state.squeaks -= 5;
+    state.goldenBeans += 1;
+    addLog(state, "The Great Wheeking echoed into mythos. +1 Golden Bean.");
   }
 
   state.event.responseReady = false;
@@ -434,11 +582,12 @@ export function respondToEvent(state: GameState): boolean {
 }
 
 export function prestige(state: GameState): boolean {
-  const cost = getCosts(state).prestige;
-  if (state.stats.lifetimeBeans < cost) return false;
+  const cost = getPrestigeCost();
+  if (getPrestigeProgress(state) < cost) return false;
 
-  const wisdomGained = Math.max(1, Math.floor(Math.sqrt(state.stats.lifetimeBeans / cost)));
+  const wisdomGained = getPrestigeWisdomGain(state);
   state.cavyWisdom += wisdomGained;
+  state.prestige.lifetimeBeansClaimed = state.stats.lifetimeBeans;
   state.beans = 0;
   state.compost = 0;
   state.squeaks = 0;
@@ -457,7 +606,7 @@ export function prestige(state: GameState): boolean {
   state.cage.enrichment = 0;
   state.cage.socialization = 0;
   state.cage.space = 100;
-  for (const id of Object.keys(state.furniture) as FurnitureId[]) state.furniture[id] = 0;
+  for (const id of Object.keys(state.furniture) as FurnitureId[]) state.furniture[id] = false;
   state.recipes.beanBlessing = false;
   state.recipes.compostCatalyst = false;
   state.recipes.royalAccord = false;
@@ -466,8 +615,6 @@ export function prestige(state: GameState): boolean {
   state.event.bottleJammed = false;
   state.event.responseReady = false;
   state.stats.prestiges += 1;
-  state.furniturePlacements = [];
-  state.placement.pendingFurniture = null;
   state.objective = {
     id: "cleanBurst",
     title: "Clean 3 beans quickly",
@@ -532,13 +679,7 @@ function getBeanRecipeName(id: BeanRecipeId): string {
 }
 
 function getWisdomPerkName(id: WisdomPerkId): string {
-  const names: Record<WisdomPerkId, string> = {
-    roomyStart: "Roomy Start",
-    gentleAutomation: "Gentle Automation",
-    rareInstinct: "Rare Instinct",
-    chorusTraining: "Chorus Training",
-  };
-  return names[id];
+  return getWisdomPerk(id).label;
 }
 
 function applyMysteryBean(state: GameState): void {
@@ -553,6 +694,29 @@ function applyMysteryBean(state: GameState): void {
     state.needs.hay = Math.min(100, state.needs.hay + 20);
     addLog(state, "Mystery bean somehow improved the hay situation.");
   }
+}
+
+function awardBeans(state: GameState, amount: number): void {
+  state.beans += amount;
+  state.stats.lifetimeBeans += amount;
+}
+
+function spawnBeansNearPigs(state: GameState, type: PoopType, count: number): void {
+  for (let index = 0; index < count; index += 1) {
+    const pig = state.pigs[index % Math.max(1, state.pigs.length)];
+    const x = (pig?.x ?? state.cage.width / 2) + randomBetween(-28, 28);
+    const y = (pig?.y ?? state.cage.height / 2) + randomBetween(-24, 24);
+    spawnEventPoop(state, type, x, y);
+  }
+}
+
+function randomBetween(min: number, max: number): number {
+  return min + Math.random() * (max - min);
+}
+
+function formatNeed(current: number, required: number, singular: string, plural = `${singular}s`): string {
+  const missing = Math.max(1, Math.ceil(required - current));
+  return `Need ${missing} ${missing === 1 ? singular : plural}`;
 }
 
 function advanceObjective(state: GameState, id: GameState["objective"]["id"], amount: number): void {

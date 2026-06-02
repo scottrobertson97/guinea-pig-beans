@@ -1,13 +1,13 @@
 import Phaser from "phaser";
 import "./styles.css";
 import { GameScene } from "./scenes/GameScene";
-import { createInitialState } from "./simulation/state";
-import { AudioManager } from "./ui/audioManager";
+import { loadGameState, requestSave, resetSavedGame } from "./simulation/persistence";
+import { AudioManager, clearAudioPersistence } from "./ui/audioManager";
 import { DevTools } from "./ui/devTools";
 import { Hud } from "./ui/hud";
-import { TutorialController } from "./ui/tutorialController";
+import { clearTutorialPersistence, TutorialController } from "./ui/tutorialController";
 
-const state = createInitialState();
+const { state } = loadGameState();
 let hud: Hud;
 new AudioManager();
 new TutorialController();
@@ -29,15 +29,27 @@ const game = new Phaser.Game({
 });
 
 hud = new Hud(state, () => {
+  requestSave(state);
   hud.render();
+}, () => {
+  resetSavedGame();
+  clearTutorialPersistence();
+  clearAudioPersistence();
+  window.location.reload();
 });
 hud.render();
 
 if (import.meta.env.DEV) {
-  new DevTools(state, () => hud.render());
+  new DevTools(state, () => {
+    requestSave(state);
+    hud.render();
+  });
 }
 
 game.scene.start("GameScene", {
   state,
-  onStateChanged: () => hud.render(),
+  onStateChanged: () => {
+    requestSave(state);
+    hud.render();
+  },
 });

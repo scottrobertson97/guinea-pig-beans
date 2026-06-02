@@ -63,9 +63,18 @@ export class TutorialController {
   }
 }
 
+export function clearTutorialPersistence(): void {
+  try {
+    localStorage.removeItem(TUTORIAL_COMPLETE_KEY);
+    localStorage.removeItem(TUTORIAL_DISMISSED_KEY);
+  } catch {
+    // Tutorial persistence is optional.
+  }
+}
+
 function readSessionFlag(key: string): boolean {
   try {
-    return sessionStorage.getItem(key) === "true";
+    return localStorage.getItem(key) === "true";
   } catch {
     return false;
   }
@@ -73,8 +82,8 @@ function readSessionFlag(key: string): boolean {
 
 function writeSessionFlag(key: string): void {
   try {
-    sessionStorage.setItem(key, "true");
+    localStorage.setItem(key, "true");
   } catch {
-    // Session storage is a convenience only; the tutorial should still run without it.
+    // Tutorial persistence is a convenience only; the tutorial should still run without it.
   }
 }

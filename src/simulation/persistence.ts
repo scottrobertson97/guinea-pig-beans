@@ -1,0 +1,149 @@
+import { addLog, createInitialState, syncEntityIdCounters } from "./state";
+import type { GameState } from "./types";
+
+export const SAVE_KEY = "gpb-save-v1";
+export const SAVE_STATUS_EVENT = "guinea-pig-save-status";
+
+const SAVE_VERSION = 1;
+const SAVE_THROTTLE_MS = 900;
+
+type SaveStatus = "idle" | "saving" | "saved" | "unavailable";
+
+interface SaveEnvelope {
+  version: number;
+  savedAt: string;
+  state: GameState;
+}
+
+export interface SaveStatusDetail {
+  status: SaveStatus;
+  savedAt?: string;
+}
+
+export interface LoadGameStateResult {
+  state: GameState;
+  recovered: boolean;
+}
+
+let pendingState: GameState | null = null;
+let saveTimer: number | null = null;
+let lastSerializedState = "";
+
+export function loadGameState(): LoadGameStateResult {
+  const freshState = createInitialState();
+
+  try {
+    const rawSave = localStorage.getItem(SAVE_KEY);
+    if (!rawSave) {
+      syncEntityIdCounters(freshState);
+      lastSerializedState = serializeState(freshState);
+      return { state: freshState, recovered: false };
+    }
+
+    const parsed = JSON.parse(rawSave) as Partial<SaveEnvelope>;
+    if (parsed.version !== SAVE_VERSION || !isObject(parsed.state)) {
+      removeUnreadableSave();
+      addLog(freshState, "Saved run could not be read, so a fresh cage moved in.");
+      syncEntityIdCounters(freshState);
+      lastSerializedState = serializeState(freshState);
+      return { state: freshState, recovered: true };
+    }
+
+    const hydratedState = hydrateState(freshState, parsed.state as Partial<GameState>);
+    syncEntityIdCounters(hydratedState);
+    lastSerializedState = serializeState(hydratedState);
+    return { state: hydratedState, recovered: false };
+  } catch {
+    removeUnreadableSave();
+    addLog(freshState, "Saved run could not be read, so a fresh cage moved in.");
+    syncEntityIdCounters(freshState);
+    lastSerializedState = serializeState(freshState);
+    return { state: freshState, recovered: true };
+  }
+}
+
+export function requestSave(state: GameState): void {
+  pendingState = state;
+  if (saveTimer !== null) return;
+
+  saveTimer = window.setTimeout(() => {
+    saveTimer = null;
+    flushSave();
+  }, SAVE_THROTTLE_MS);
+}
+
+export function resetSavedGame(): void {
+  if (saveTimer !== null) {
+    window.clearTimeout(saveTimer);
+    saveTimer = null;
+  }
+  pendingState = null;
+  lastSerializedState = "";
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    emitSaveStatus({ status: "unavailable" });
+  }
+}
+
+function flushSave(): void {
+  if (!pendingState) return;
+
+  try {
+    const serializedState = serializeState(pendingState);
+    if (serializedState === lastSerializedState) {
+      pendingState = null;
+      return;
+    }
+
+    emitSaveStatus({ status: "saving" });
+    const savedAt = new Date().toISOString();
+    const envelope: SaveEnvelope = {
+      version: SAVE_VERSION,
+      savedAt,
+      state: pendingState,
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(envelope));
+    lastSerializedState = serializedState;
+    pendingState = null;
+    emitSaveStatus({ status: "saved", savedAt });
+  } catch {
+    emitSaveStatus({ status: "unavailable" });
+  }
+}
+
+function removeUnreadableSave(): void {
+  try {
+    localStorage.removeItem(SAVE_KEY);
+  } catch {
+    // If storage cannot be written, the fresh recovered run still needs to load.
+  }
+}
+
+function hydrateState(defaultState: GameState, savedState: Partial<GameState>): GameState {
+  return mergeDefaults(defaultState, savedState) as GameState;
+}
+
+function mergeDefaults(defaultValue: unknown, savedValue: unknown): unknown {
+  if (Array.isArray(defaultValue)) return Array.isArray(savedValue) ? savedValue : defaultValue;
+  if (!isObject(defaultValue)) return savedValue ?? defaultValue;
+  if (!isObject(savedValue)) return defaultValue;
+
+  const merged: Record<string, unknown> = { ...defaultValue };
+  for (const [key, value] of Object.entries(savedValue)) {
+    merged[key] = key in merged ? mergeDefaults(merged[key], value) : value;
+  }
+  return merged;
+}
+
+function serializeState(state: GameState): string {
+  return JSON.stringify(state);
+}
+
+function isObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function emitSaveStatus(detail: SaveStatusDetail): void {
+  window.dispatchEvent(new CustomEvent<SaveStatusDetail>(SAVE_STATUS_EVENT, { detail }));
+}

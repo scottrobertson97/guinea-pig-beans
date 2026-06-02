@@ -1,5 +1,5 @@
 import { addLog } from "./state";
-import { getFurnitureSpaceUsed } from "./balance";
+import { getUnlockedFurnitureCount } from "./balance";
 import type { GameState } from "./types";
 
 export interface MilestoneView {
@@ -68,11 +68,11 @@ const questDefinitions: MilestoneDefinition[] = [
     log: "Quest complete: the cage has furniture now.",
   },
   {
-    id: "fill-habitat",
-    title: "Use 5 Habitat space",
-    complete: (state) => getFurnitureSpaceUsed(state) >= 5,
-    progress: (state) => `${Math.min(getFurnitureSpaceUsed(state), 5)}/5`,
-    log: "Quest complete: the habitat plan has become a real system.",
+    id: "unlock-furniture-set",
+    title: "Unlock 3 furniture pieces",
+    complete: (state) => getUnlockedFurnitureCount(state) >= 3,
+    progress: (state) => `${Math.min(getUnlockedFurnitureCount(state), 3)}/3`,
+    log: "Quest complete: the furniture plan has become a real system.",
   },
   {
     id: "clean-rare",

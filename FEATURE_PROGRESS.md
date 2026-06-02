@@ -11,15 +11,17 @@
 - Funny cage log: milestone, cleanup, pig, resource, and automation messages surface game personality.
 - Expanded breeds and traits: Skinny Pig, Silkie, Crested, Royal Pig, Shy Beaner, Hay Goblin, Drama Pig, and Compost Mystic are now in the pig generator.
 - Cage zones: fixed Hay Area, Tunnel Zone, Litter Tray corner, Hidey Zone, and Play/Compost areas now influence targeting, movement, cleanliness, and aging.
-- Cage furniture: Hidey House, Tunnel, Litter Tray, Chew Toy, Snuggle Sack, Cardboard Castle, and Royal Throne can be purchased as passive objects.
+- Cage furniture: Hidey House, Tunnel, Litter Tray, Chew Toy, Snuggle Sack, Cardboard Castle, and Royal Throne are one-time static unlocks with distinct buffs.
+- Furniture synergies: matching static furniture pairs now unlock combo bonuses for comfort, Zoomies, cleanup automation, and royal/compost strategy.
 - Additional needs/resources: Enrichment, Socialization, Space, Compost, Squeaks, Golden Beans, and Cavy Wisdom are tracked.
-- Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger.
+- Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger with three response choices each.
+- Pig requests: one pig at a time can ask for a short-lived favor tied to care, cleanup, abilities, furniture, combo, or Compost.
 - Pig social mechanics: bonded pairs are assigned as pigs join, and herd size contributes socialization.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode are available with cooldowns.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
-- Prestige: The Great Composting resets the run and grants Cavy Wisdom.
+- Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds a branching Wisdom tree.
 - Late-game mythos: Hay Dimension, Bean Exchange, Cavy Council, Squeak Choir, and Bean Singularity have first-pass unlocks.
-- Interop pass: Habitat space now limits furniture, herd support affects socialization and space, stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom can be spent on permanent perks.
+- Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent perks.
 
 ## Current Early Goals
 
@@ -53,48 +55,48 @@
 ## First-Pass Implemented, Needs Depth
 
 - Cage zones are fixed regions, not yet player-placeable tiles.
-- Furniture is purchased as passive cage objects, not yet freely placed with footprints.
+- Furniture is auto-placed at fixed locations as one-time unlocks, not freely placed with footprints.
 - Random events are timer-based, not yet driven by quest chains or event decks.
-- Wisdom perks are first-pass buttons, not yet a full branching tree with prerequisites.
+- Wisdom perks now use a first-pass branching tree with prerequisites; the next step is deeper presentation and tuning.
 - Late-game systems unlock passive effects, but they need deeper dedicated interfaces and decisions.
 - Minigames are still intentionally deferred until the main loop has more tuning data.
 
 ## Design Decisions Needed Later
 
-- Whether the next cage-zone step should be drag-and-drop furniture placement or tile painting.
+- Whether cage zones should remain fixed regions or eventually support tile painting.
 - Whether special poop aging should reward waiting more aggressively or mostly punish mess.
 - Whether current Squeak ability costs should scale with repeated use or stay flat.
-- Whether Cavy Wisdom should expand into a branching tree with mutually exclusive choices.
+- Whether Cavy Wisdom should add mutually exclusive choices after the current non-exclusive tree is tuned.
 
 ## Core Loop Improvement Queue
 
 - [x] Make poop placement matter more through stronger zone effects, litter tray auto-cleaning, compost aging, and clustered mess.
-- [x] Add real furniture placement for purchased cage objects.
+- [x] Convert furniture into static one-time unlocks with fixed cage locations.
 - [x] Make pig personalities visibly drive behavior and preferred targets.
 - [x] Add mess piles that form from clustered poops and require multiple cleans.
 - [x] Add a visible happiness meter connected to cleanliness, needs, enrichment, socialization, and space.
 - [x] Add rotating short-term objectives beyond static quests.
 - [x] Make random events interactive instead of purely timed modifiers.
 - [x] Tune early pacing around first poop, first special poop, first upgrade, second pig, first mess moment, and first automation.
-- [x] Make upgrades and resources depend on each other through habitat budget, Squeak ability costs, Compost automation fuel, bean recipes, weighted events, and Wisdom perks.
+- [x] Make upgrades and resources depend on each other through static furniture buffs, Squeak ability costs, Compost automation fuel, bean recipes, weighted events, and Wisdom perks.
 
 ## Active Core Loop Pass
 
 - [x] Queued the core-loop improvements as a tracked checklist.
-- [x] Convert furniture from passive-only purchases into placeable cage objects.
+- [x] Convert furniture from passive-only purchases into static auto-placed unlocks.
 - [x] Strengthen trait targeting so pigs make predictable, exploitable messes.
 - [x] Add mess pile formation and multi-clean rewards.
 - [x] Verify build and browser smoke test.
 
 ## Core Loop Pass Notes
 
-- Furniture purchases now arm placement mode; the next cage click places that object instead of cleaning.
-- Neat Freak, Shy Beaner, Hay Goblin, Gremlin, and Royal Pig targeting now prefers relevant placed objects or messy areas.
+- Furniture purchases now unlock one static object immediately at a fixed cage location.
+- Neat Freak, Shy Beaner, Hay Goblin, Gremlin, and Royal Pig targeting now prefers relevant static objects or messy areas.
 - Litter trays can auto-clean nearby beans.
 - Clusters of four or more beans can merge into a mess pile with multiple clean hits and higher value.
 - Happiness is now visible and affects production speed plus rare poop chance.
 - Rotating objectives provide timed short-term tasks with Bean rewards.
-- Active events expose an Event response button for direct player interaction.
+- Active events expose three Care-modal response choices with light resource tradeoffs.
 - Early costs and initial poop timing were lowered to hit the first upgrades and second pig sooner.
 
 ## Polish Backlog Tickets
@@ -179,7 +181,7 @@ Description: Disabled modal buttons should explain why they cannot be used. This
 Acceptance criteria:
 
 - Shop buttons explain missing Beans, capacity, Golden Beans, Compost, or prerequisite state.
-- Furniture buttons explain missing Beans or habitat space.
+- Furniture buttons explain missing Beans or unlocked state.
 - Ability buttons explain cooldowns or missing Squeaks.
 - Recipe, Mythos, Wisdom, and Prestige buttons explain missing resources or already-active state.
 - Reason text fits inside modal buttons on desktop and mobile.

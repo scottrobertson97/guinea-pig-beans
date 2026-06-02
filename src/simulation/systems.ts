@@ -1,7 +1,8 @@
 import { cleanPoopsInRadius } from "./actions";
-import { CAGE_PADDING, getFurnitureSpaceUsed, getHabitatCapacity, getPigCapacity, getTotalWisdom } from "./balance";
+import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } from "./balance";
 import { updateMilestones } from "./milestones";
-import { addLog, chooseTarget, createMessPile, spawnPoop } from "./state";
+import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
+import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, spawnPoop } from "./state";
 import type { GameState, PigMood, Poop, Robot } from "./types";
 
 export function updateSimulation(state: GameState, deltaSeconds: number): void {
@@ -9,6 +10,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateAbilities(state, deltaSeconds);
   updateAutomation(state, deltaSeconds);
   updateEvent(state, deltaSeconds);
+  updatePigRequests(state, deltaSeconds);
   updateDerivedCageStats(state);
   updateHappiness(state);
   updateObjective(state, deltaSeconds);
@@ -19,6 +21,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateLitterTrays(state, deltaSeconds);
   updateRobot(state, deltaSeconds);
   updateCleanliness(state);
+  updateHeldPigRequestProgress(state);
   updateMilestones(state);
 }
 
@@ -66,7 +69,8 @@ function startRandomEvent(state: GameState): void {
     { event: { id: "greatWheeking", name: "The Great Wheeking", timer: 16 }, weight: state.squeaks > 8 || state.wisdom.chorusTraining ? 2 : 1 },
   ];
   const event = pickWeighted(events);
-  state.event.active = { ...event };
+  const timerBonus = event.id === "zoomies" && hasFurnitureSynergy(state, "zoomiePlayground") ? 4 : 0;
+  state.event.active = { ...event, timer: event.timer + timerBonus };
   state.event.responseReady = true;
   if (event.id === "bottleJam") state.event.bottleJammed = true;
   if (event.id === "greatWheeking") state.squeaks += 5;
@@ -75,28 +79,31 @@ function startRandomEvent(state: GameState): void {
 
 function updateDerivedCageStats(state: GameState): void {
   const pigCapacity = getPigCapacity(state);
-  const furnitureSpaceUsed = getFurnitureSpaceUsed(state);
-  const habitatCapacity = getHabitatCapacity(state);
   const supportScore =
-    state.furniture.hideyHouse * 2 +
-    state.furniture.tunnel +
-    state.furniture.snuggleSack +
-    state.furniture.cardboardCastle * 2 +
+    Number(state.furniture.hideyHouse) * 2 +
+    Number(state.furniture.tunnel) +
+    Number(state.furniture.snuggleSack) +
+    Number(state.furniture.cardboardCastle) * 2 +
     (state.recipes.royalAccord ? 2 : 0);
   const unsupportedPigs = Math.max(0, state.pigs.length - 2 - supportScore);
-  const bondBonus = state.pigs.filter((pig) => pig.bondedPigId !== null).length * 2;
+  const bondedPigCount = state.pigs.filter((pig) => pig.bondedPigId !== null).length;
+  const bondBonus =
+    bondedPigCount * (2 + (state.wisdom.socialMemory ? 1 : 0)) +
+    (state.wisdom.bondedBeginnings && bondedPigCount > 0 ? 4 : 0);
   state.cage.enrichment =
-    state.furniture.chewToy * 18 +
-    state.furniture.snuggleSack * 22 +
-    state.furniture.cardboardCastle * 16 +
-    state.furniture.tunnel * 10 +
-    state.furniturePlacements.length * 3 +
+    Number(state.furniture.chewToy) * 22 +
+    Number(state.furniture.snuggleSack) * 24 +
+    Number(state.furniture.cardboardCastle) * 18 +
+    Number(state.furniture.tunnel) * 12 +
+    (hasFurnitureSynergy(state, "zoomiePlayground") ? 6 : 0) +
     (state.wisdom.rareInstinct ? 5 : 0);
   state.cage.socialization = Math.max(
     0,
     Math.max(0, state.pigs.length - 1) * 10 +
-      state.furniture.hideyHouse * 7 +
-      state.furniture.tunnel * 4 +
+      Number(state.furniture.hideyHouse) * 8 +
+      Number(state.furniture.tunnel) * 4 +
+      Number(state.furniture.snuggleSack) * 3 +
+      (hasFurnitureSynergy(state, "cozyCorner") ? 8 : 0) +
       bondBonus -
       unsupportedPigs * 9,
   );
@@ -107,8 +114,7 @@ function updateDerivedCageStats(state: GameState): void {
       108 +
         state.upgrades.cageLevel * 8 +
         (state.wisdom.roomyStart ? 8 : 0) -
-        Math.max(0, state.pigs.length - Math.max(2, pigCapacity - 2)) * 10 -
-        Math.max(0, furnitureSpaceUsed - Math.floor(habitatCapacity * 0.7)) * 5,
+        Math.max(0, state.pigs.length - Math.max(2, pigCapacity - 2)) * 10,
     ),
   );
 }
@@ -121,6 +127,7 @@ function updateHappiness(state: GameState): void {
   const spaceScore = Math.max(0, Math.min(100, state.cage.space));
   const eventBonus = state.event.active?.id === "napTime" ? 10 : state.event.active?.id === "greatWheeking" ? 8 : 0;
   const abilityBonus = state.abilities.snackTime > 0 ? 12 : 0;
+  const synergyBonus = hasFurnitureSynergy(state, "cozyCorner") ? 4 : 0;
   const dramaPenalty =
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
   state.cage.happiness = Math.max(
@@ -135,7 +142,8 @@ function updateHappiness(state: GameState): void {
           spaceScore * 0.12 +
           eventBonus +
           abilityBonus -
-          dramaPenalty,
+          dramaPenalty +
+          synergyBonus,
       ),
     ),
   );
@@ -179,7 +187,7 @@ function createNextObjective(state: GameState): GameState["objective"] {
     { id: "keepClean", title: "Keep clean above 80%", progress: 0, target: 20, timer: 45 },
     { id: "collectRare", title: "Clean 2 more rare beans", progress: 0, target: state.stats.rarePoopsCleaned + 2, timer: 70 },
     { id: "useAbility", title: "Use an active ability", progress: 0, target: 1, timer: 60 },
-    { id: "placeFurniture", title: "Buy and place furniture", progress: 0, target: 1, timer: 90 },
+    { id: "unlockFurniture", title: "Unlock furniture", progress: 0, target: 1, timer: 90 },
     { id: "earnBeans", title: "Hold 75 Beans", progress: Math.min(state.beans, 75), target: 75, timer: 90 },
     { id: "herdHarmony", title: "Keep a larger herd happy", progress: 0, target: 18, timer: 60 },
     { id: "fuelAutomation", title: "Fuel automation with Compost", progress: 0, target: 1, timer: 80 },
@@ -193,10 +201,12 @@ function updateNeeds(state: GameState, deltaSeconds: number): void {
   const hayDrainMultiplier =
     (state.event.active?.id === "hayFrenzy" ? 1.7 : 1) *
     (state.pigs.some((pig) => pig.trait === "Hay Goblin") ? 1.16 : 1) *
-    (state.furniture.chewToy > 0 ? 0.9 : 1) *
-    (state.lateGame.hayDimension ? 0.82 : 1);
+    (state.furniture.chewToy ? 0.9 : 1) *
+    (state.lateGame.hayDimension ? 0.82 : 1) *
+    (state.wisdom.steadySupplies ? 0.9 : 1);
   const totalWisdom = getTotalWisdom(state);
-  const waterDrainMultiplier = state.event.bottleJammed ? 0 : totalWisdom > 0 ? 0.98 ** totalWisdom : 1;
+  const waterDrainMultiplier =
+    state.event.bottleJammed ? 0 : (totalWisdom > 0 ? 0.98 ** totalWisdom : 1) * (state.wisdom.steadySupplies ? 0.9 : 1);
   state.needs.hay = Math.max(0, state.needs.hay - 0.5 * pigCount * hayDrainMultiplier * deltaSeconds);
   state.needs.water = Math.max(0, state.needs.water - 0.25 * pigCount * waterDrainMultiplier * deltaSeconds);
   if (state.lateGame.squeakChoir) state.squeaks += (state.wisdom.chorusTraining ? 0.035 : 0.02) * deltaSeconds;
@@ -214,8 +224,15 @@ function updatePigs(state: GameState, deltaSeconds: number): void {
     if (distance < 6) {
       chooseTarget(state, pig);
     } else {
-      const eventSpeed = state.event.active?.id === "zoomies" ? 2 : state.abilities.zoomieMode > 0 ? 1.8 : 1;
-      const tunnelSpeed = state.furniture.tunnel > 0 ? 1.1 : 1;
+      const eventSpeed =
+        state.event.active?.id === "zoomies"
+          ? hasFurnitureSynergy(state, "zoomiePlayground")
+            ? 2.15
+            : 2
+          : state.abilities.zoomieMode > 0
+            ? 1.8
+            : 1;
+      const tunnelSpeed = state.furniture.tunnel ? 1.1 : 1;
       const speedMultiplier = (mood === "content" ? 1 : mood === "messy" ? 0.82 : 0.9) * eventSpeed * tunnelSpeed;
       const travel = Math.min(distance, pig.speed * speedMultiplier * deltaSeconds);
       pig.x += (dx / distance) * travel;
@@ -237,7 +254,8 @@ function updatePoops(state: GameState, deltaSeconds: number): void {
     } else if (poop.type === "stinky") {
       poop.value = poop.baseValue;
     } else if (poop.type === "compost") {
-      const bloom = state.event.active?.id === "compostBloom" ? 3 : state.recipes.compostCatalyst ? 2 : 1;
+      const bloom =
+        state.event.active?.id === "compostBloom" ? 3 : state.recipes.compostCatalyst || state.wisdom.compostEngine ? 2 : 1;
       poop.value = poop.baseValue + Math.floor(poop.age / 8) * bloom;
     } else if (poop.type === "cursed") {
       poop.value = poop.baseValue + Math.floor(poop.age / 15);
@@ -268,17 +286,18 @@ function updateMessPiles(state: GameState): void {
 }
 
 function updateLitterTrays(state: GameState, deltaSeconds: number): void {
-  const trays = state.furniturePlacements.filter((placement) => placement.furnitureId === "litterTray");
-  if (trays.length === 0) return;
+  if (!state.furniture.litterTray) return;
 
-  for (const tray of trays) {
-    const overdriveBonus = state.automation.overdrive > 0 ? 0.14 : 0;
-    if (Math.random() > (0.18 + overdriveBonus) * deltaSeconds) continue;
-    const poop = state.poops.find((candidate) => Math.hypot(candidate.x - tray.x, candidate.y - tray.y) <= 42);
-    if (!poop) continue;
-    const result = cleanPoopsInRadius(state, poop.x, poop.y, 18);
-    if (result.cleaned > 0) addLog(state, `Litter Tray auto-cleaned ${result.cleaned} bean for +${result.earned}.`);
-  }
+  const tray = getStaticFurniturePlacement(state, "litterTray");
+  const overdriveBonus = state.automation.overdrive > 0 ? 0.14 : 0;
+  const wisdomBonus = state.wisdom.trayAffinity ? 0.12 : 0;
+  const synergyBonus = hasFurnitureSynergy(state, "cleanupCircuit") ? 0.08 : 0;
+  if (Math.random() > (0.18 + overdriveBonus + wisdomBonus + synergyBonus) * deltaSeconds) return;
+  const trayRadius = (state.wisdom.trayAffinity ? 56 : 42) + (hasFurnitureSynergy(state, "cleanupCircuit") ? 8 : 0);
+  const poop = state.poops.find((candidate) => Math.hypot(candidate.x - tray.x, candidate.y - tray.y) <= trayRadius);
+  if (!poop) return;
+  const result = cleanPoopsInRadius(state, poop.x, poop.y, 18);
+  if (result.cleaned > 0) addLog(state, `Litter Tray auto-cleaned ${result.cleaned} bean for +${result.earned}.`);
 }
 
 function updateRobot(state: GameState, deltaSeconds: number): void {
@@ -302,7 +321,8 @@ function updateRobot(state: GameState, deltaSeconds: number): void {
 
   moveRobot(robot, deltaSeconds, state.automation.overdrive > 0 ? 1.55 : 1);
 
-  const result = cleanPoopsInRadius(state, robot.x, robot.y, robot.sweepRadius);
+  const sweepRadius = robot.sweepRadius + (hasFurnitureSynergy(state, "cleanupCircuit") ? 6 : 0);
+  const result = cleanPoopsInRadius(state, robot.x, robot.y, sweepRadius);
   if (result.cleaned > 0 && robot.cleanLogCooldown <= 0) {
     robot.cleanLogCooldown = state.automation.overdrive > 0 ? 1.8 : 3;
     const noun = result.cleaned === 1 ? "bean" : "beans";
@@ -313,7 +333,10 @@ function updateRobot(state: GameState, deltaSeconds: number): void {
 
 function getNearestPoopInRange(state: GameState, robot: Robot): Poop | null {
   let nearestPoop: Poop | null = null;
-  let nearestDistance = robot.sensorRadius * (state.automation.overdrive > 0 ? 1.45 : 1);
+  let nearestDistance =
+    robot.sensorRadius *
+    (state.automation.overdrive > 0 ? 1.45 : 1) *
+    (hasFurnitureSynergy(state, "cleanupCircuit") ? 1.18 : 1);
 
   for (const poop of state.poops) {
     const distance = Math.hypot(poop.x - robot.x, poop.y - robot.y);
@@ -351,10 +374,10 @@ function updateCleanliness(state: GameState): void {
       if (poop.type === "messPile") return total + 13;
       if (poop.type === "blessed") return total + 3;
       return total + 5.5;
-    }, 0) * (state.furniture.litterTray > 0 ? 0.9 : 1),
+    }, 0) * (state.furniture.litterTray ? 0.9 : 1),
   );
   const inspectionBonus = state.event.active?.id === "cageInspection" && state.cage.cleanliness > 90 ? 5 : 0;
-  const beddingBonus = state.furniture.snuggleSack > 0 ? 2 : 0;
+  const beddingBonus = (state.furniture.snuggleSack ? 2 : 0) + (state.wisdom.freshStart ? 3 : 0);
   state.cage.cleanliness = Math.max(0, Math.min(100, Math.round(100 - mess + inspectionBonus + beddingBonus)));
 }
 

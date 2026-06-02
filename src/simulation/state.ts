@@ -1,4 +1,4 @@
-import { CAGE_PADDING, getPigPoopInterval, MAX_LOG_ITEMS } from "./balance";
+import { CAGE_PADDING, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
 import type { FurnitureId, GameState, Pig, PigBreed, PigTrait, Poop, PoopType } from "./types";
 
 const pigNames = [
@@ -66,8 +66,6 @@ const quirks = [
 
 let nextPigId = 1;
 let nextPoopId = 1;
-let nextFurniturePlacementId = 1;
-
 export function createInitialState(): GameState {
   const state: GameState = {
     beans: 0,
@@ -97,17 +95,13 @@ export function createInitialState(): GameState {
       space: 100,
     },
     furniture: {
-      hideyHouse: 0,
-      tunnel: 0,
-      litterTray: 0,
-      chewToy: 0,
-      snuggleSack: 0,
-      cardboardCastle: 0,
-      royalThrone: 0,
-    },
-    furniturePlacements: [],
-    placement: {
-      pendingFurniture: null,
+      hideyHouse: false,
+      tunnel: false,
+      litterTray: false,
+      chewToy: false,
+      snuggleSack: false,
+      cardboardCastle: false,
+      royalThrone: false,
     },
     abilities: {
       wheekCall: 0,
@@ -127,9 +121,17 @@ export function createInitialState(): GameState {
     },
     wisdom: {
       roomyStart: false,
-      gentleAutomation: false,
-      rareInstinct: false,
+      steadySupplies: false,
+      freshStart: false,
+      bondedBeginnings: false,
+      socialMemory: false,
       chorusTraining: false,
+      gentleAutomation: false,
+      compostEngine: false,
+      trayAffinity: false,
+      rareInstinct: false,
+      goldenNose: false,
+      royalMemory: false,
     },
     event: {
       active: null,
@@ -144,9 +146,17 @@ export function createInitialState(): GameState {
       target: 3,
       timer: 45,
     },
+    pigRequest: {
+      active: null,
+      nextTimer: randomBetween(35, 45),
+      completed: 0,
+      expired: 0,
+      lastResult: null,
+    },
     prestige: {
       ascensions: 0,
       unlocked: [],
+      lifetimeBeansClaimed: 0,
     },
     lateGame: {
       hayDimension: false,
@@ -195,6 +205,13 @@ export function createInitialState(): GameState {
   addPig(state);
   addLog(state, `${state.pigs[0].name} and ${state.pigs[1].name} moved in as a bonded pair.`);
   return state;
+}
+
+export function syncEntityIdCounters(state: GameState): void {
+  const nextSavedPigId = state.pigs.reduce((nextId, pig) => Math.max(nextId, pig.id + 1), 1);
+  const nextSavedPoopId = state.poops.reduce((nextId, poop) => Math.max(nextId, poop.id + 1), 1);
+  nextPigId = Math.max(nextPigId, nextSavedPigId);
+  nextPoopId = Math.max(nextPoopId, nextSavedPoopId);
 }
 
 export function addPig(state: GameState): Pig {
@@ -252,7 +269,7 @@ export function chooseTarget(state: GameState, pig: Pig): void {
     return;
   }
 
-  if (pig.trait === "Shy Beaner" && state.furniture.hideyHouse > 0) {
+  if (pig.trait === "Shy Beaner" && state.furniture.hideyHouse) {
     targetNearFurniture(state, pig, "hideyHouse", 116, state.cage.height - 108, 46);
     return;
   }
@@ -269,7 +286,7 @@ export function chooseTarget(state: GameState, pig: Pig): void {
     return;
   }
 
-  if (pig.trait === "Royal Pig" && state.furniture.royalThrone > 0) {
+  if (pig.trait === "Royal Pig" && state.furniture.royalThrone) {
     targetNearFurniture(state, pig, "royalThrone", state.cage.width - 96, 172, 54);
     return;
   }
@@ -280,7 +297,7 @@ export function chooseTarget(state: GameState, pig: Pig): void {
 
 export function spawnPoop(state: GameState, pig: Pig): Poop {
   const type = choosePoopType(state, pig);
-  const baseValue = getStartingPoopValue(type, pig);
+  const baseValue = getStartingPoopValue(type, pig) + (type === "golden" && state.wisdom.goldenNose ? 2 : 0);
   const poop: Poop = {
     id: nextPoopId++,
     type,
@@ -299,7 +316,7 @@ export function spawnPoop(state: GameState, pig: Pig): Poop {
 }
 
 export function spawnDebugPoop(state: GameState, type: PoopType): Poop {
-  const baseValue = getStartingPoopValue(type, state.pigs[0]);
+  const baseValue = getStartingPoopValue(type, state.pigs[0]) + (type === "golden" && state.wisdom.goldenNose ? 2 : 0);
   const poop: Poop = {
     id: nextPoopId++,
     type,
@@ -313,6 +330,23 @@ export function spawnDebugPoop(state: GameState, type: PoopType): Poop {
 
   state.poops.push(poop);
   addLog(state, `Dev tools spawned a ${type} bean.`);
+  return poop;
+}
+
+export function spawnEventPoop(state: GameState, type: PoopType, x: number, y: number): Poop {
+  const baseValue = getStartingPoopValue(type, state.pigs[0]) + (type === "golden" && state.wisdom.goldenNose ? 2 : 0);
+  const poop: Poop = {
+    id: nextPoopId++,
+    type,
+    x: clamp(x, CAGE_PADDING + 20, state.cage.width - CAGE_PADDING - 20),
+    y: clamp(y, CAGE_PADDING + 20, state.cage.height - CAGE_PADDING - 20),
+    baseValue,
+    value: baseValue,
+    age: 0,
+    hitsRemaining: 1,
+  };
+
+  state.poops.push(poop);
   return poop;
 }
 
@@ -336,19 +370,33 @@ export function createMessPile(state: GameState, poops: Poop[]): Poop {
   return pile;
 }
 
-export function placeFurniture(state: GameState, x: number, y: number): boolean {
-  const pending = state.placement.pendingFurniture;
-  if (!pending) return false;
+export function getStaticFurniturePlacement(
+  state: GameState,
+  furnitureId: FurnitureId,
+): { furnitureId: FurnitureId; x: number; y: number } {
+  const positions: Record<FurnitureId, { x: number; y: number }> = {
+    hideyHouse: { x: 0.17, y: 0.78 },
+    tunnel: { x: 0.33, y: 0.52 },
+    litterTray: { x: 0.83, y: 0.8 },
+    chewToy: { x: 0.52, y: 0.5 },
+    snuggleSack: { x: 0.5, y: 0.76 },
+    cardboardCastle: { x: 0.22, y: 0.28 },
+    royalThrone: { x: 0.82, y: 0.31 },
+  };
+  const position = positions[furnitureId];
+  return {
+    furnitureId,
+    x: clamp(state.cage.width * position.x, CAGE_PADDING + 44, state.cage.width - CAGE_PADDING - 44),
+    y: clamp(state.cage.height * position.y, CAGE_PADDING + 44, state.cage.height - CAGE_PADDING - 44),
+  };
+}
 
-  state.furniturePlacements.push({
-    id: nextFurniturePlacementId++,
-    furnitureId: pending,
-    x: clamp(x, CAGE_PADDING + 24, state.cage.width - CAGE_PADDING - 24),
-    y: clamp(y, CAGE_PADDING + 24, state.cage.height - CAGE_PADDING - 24),
-  });
-  state.placement.pendingFurniture = null;
-  addLog(state, `${getFurnitureName(pending)} placed in the cage.`);
-  return true;
+export function getUnlockedFurniturePlacements(
+  state: GameState,
+): Array<{ furnitureId: FurnitureId; x: number; y: number }> {
+  return (Object.keys(state.furniture) as FurnitureId[])
+    .filter((furnitureId) => state.furniture[furnitureId])
+    .map((furnitureId) => getStaticFurniturePlacement(state, furnitureId));
 }
 
 export function addLog(state: GameState, message: string): void {
@@ -372,11 +420,9 @@ function targetNearFurniture(
   fallbackY: number,
   radius: number,
 ): void {
-  const placements =
-    furnitureId === "hayRack"
-      ? []
-      : state.furniturePlacements.filter((placement) => placement.furnitureId === furnitureId);
-  const placement = placements.length > 0 ? placements[Math.floor(Math.random() * placements.length)] : null;
+  const placement = furnitureId !== "hayRack" && state.furniture[furnitureId]
+    ? getStaticFurniturePlacement(state, furnitureId)
+    : null;
   const centerX = placement?.x ?? fallbackX;
   const centerY = placement?.y ?? fallbackY;
   pig.targetX = clamp(centerX + randomBetween(-radius, radius), CAGE_PADDING, state.cage.width - CAGE_PADDING);
@@ -409,16 +455,30 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
   const abilityBonus = state.abilities.snackTime > 0 ? 0.05 : 0;
   const recipeRareBonus = state.recipes.beanBlessing ? 0.025 : 0;
   const wisdomRareBonus = state.wisdom.rareInstinct ? 0.025 : 0;
+  const goldenNoseBonus = state.wisdom.goldenNose ? 0.025 : 0;
+  const royalCompostCourt = hasFurnitureSynergy(state, "royalCompostCourt");
   const goldenChance =
-    (pig.breed === "Teddy" ? 0.1 : 0.075) + enrichmentBonus + eventBonus + happinessBonus + recipeRareBonus + wisdomRareBonus;
+    (pig.breed === "Teddy" ? 0.1 : 0.075) +
+    enrichmentBonus +
+    eventBonus +
+    happinessBonus +
+    recipeRareBonus +
+    wisdomRareBonus +
+    goldenNoseBonus;
   const blessedChance =
     pig.trait === "Compost Mystic" ? 0.07 + abilityBonus + recipeRareBonus : 0.015 + abilityBonus + recipeRareBonus;
-  const compostChance =
-    state.furniture.cardboardCastle > 0 || state.cage.cleanliness < 55 || state.recipes.compostCatalyst ? 0.08 : 0.03;
+  const compostChance = royalCompostCourt
+    ? 0.1
+    : state.furniture.cardboardCastle || state.cage.cleanliness < 55 || state.recipes.compostCatalyst
+      ? 0.08
+      : 0.03;
   const megaChance = pig.trait === "Chonker" ? 0.04 : 0.015;
   const mysteryChance = state.squeaks >= 5 ? 0.025 : 0.01;
   const hayChance = state.needs.hay > 70 ? 0.045 : 0.015;
-  const royalChance = pig.trait === "Royal Pig" || state.furniture.royalThrone > 0 || state.recipes.royalAccord ? 0.045 : 0;
+  const royalChance =
+    (pig.trait === "Royal Pig" || state.furniture.royalThrone || state.recipes.royalAccord ? 0.045 : 0) +
+    (state.wisdom.royalMemory && state.furniture.royalThrone ? 0.025 : 0) +
+    (royalCompostCourt ? 0.018 : 0);
   const cursedChance = state.lateGame.beanSingularity || state.cage.cleanliness < 20 ? 0.025 : 0.004;
   const stinkyChance =
     pig.trait === "Gremlin" && state.cage.cleanliness < 60

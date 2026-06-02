@@ -166,7 +166,7 @@ function getCooldown(sound: UiSoundId): number {
 
 function readMutedSetting(): boolean {
   try {
-    return sessionStorage.getItem(SFX_MUTED_KEY) === "true";
+    return localStorage.getItem(SFX_MUTED_KEY) === "true";
   } catch {
     return false;
   }
@@ -174,8 +174,16 @@ function readMutedSetting(): boolean {
 
 function writeMutedSetting(muted: boolean): void {
   try {
-    sessionStorage.setItem(SFX_MUTED_KEY, String(muted));
+    localStorage.setItem(SFX_MUTED_KEY, String(muted));
   } catch {
-    // Session storage can be unavailable in private or restricted contexts.
+    // Local storage can be unavailable in private or restricted contexts.
+  }
+}
+
+export function clearAudioPersistence(): void {
+  try {
+    localStorage.removeItem(SFX_MUTED_KEY);
+  } catch {
+    // Local storage can be unavailable in private or restricted contexts.
   }
 }

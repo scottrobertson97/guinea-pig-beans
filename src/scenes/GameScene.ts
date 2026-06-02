@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simulation/actions";
-import { placeFurniture } from "../simulation/state";
+import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
 import { updateSimulation } from "../simulation/systems";
 import type { AbilityId, FurnitureId, GameState, Pig, Poop, PoopType, Robot } from "../simulation/types";
 import { emitPlayerAction, emitUiSound } from "../ui/events";
@@ -16,6 +16,7 @@ type ActionEffectId = "hay" | "scoop" | "robot" | "cage" | "furniture-ready" | "
 interface HudActionEffectDetail {
   effect?: ActionEffectId;
   abilityId?: AbilityId;
+  furnitureId?: FurnitureId;
 }
 
 const HUD_ACTION_EFFECT_EVENT = "guinea-pig-action-effect";
@@ -67,13 +68,14 @@ const RIM_CHEW_MARKS = [
   { x: 0.68, y: -15, width: 24 },
 ] as const;
 
-const PIG_DISPLAY_WIDTH = 40;
-const PIG_DISPLAY_HEIGHT = 30;
-const PIG_SHADOW_WIDTH = 31;
-const PIG_SHADOW_HEIGHT = 8;
-const PIG_SHADOW_Y = 9;
-const PIG_SPRITE_Y = -1;
-const PIG_THOUGHT_Y = -32;
+const PIG_DISPLAY_WIDTH = 80;
+const PIG_DISPLAY_HEIGHT = 60;
+const PIG_SHADOW_WIDTH = 62;
+const PIG_SHADOW_HEIGHT = 16;
+const PIG_SHADOW_Y = 18;
+const PIG_SPRITE_Y = -2;
+const PIG_THOUGHT_Y = -52;
+const POOP_SHADOW_Y = 14;
 const BEAN_POP_SCALE = 1.3;
 const MESS_PILE_POP_SCALE = 1.16;
 
@@ -83,9 +85,11 @@ export class GameScene extends Phaser.Scene {
   private pigViews = new Map<number, Phaser.GameObjects.Container>();
   private poopViews = new Map<number, Phaser.GameObjects.Image>();
   private poopShadowViews = new Map<number, Phaser.GameObjects.Ellipse>();
-  private furnitureViews = new Map<number, Phaser.GameObjects.Container>();
+  private furnitureViews = new Map<FurnitureId, Phaser.GameObjects.Container>();
   private pigThoughtCooldowns = new Map<number, number>();
   private pigActionCooldowns = new Map<number, number>();
+  private seenActivePigRequestToken = 0;
+  private seenPigRequestResultToken = 0;
   private robotView: Phaser.GameObjects.Image | null = null;
   private cageFloor!: Phaser.GameObjects.TileSprite;
   private cleanlinessWash!: Phaser.GameObjects.Rectangle;
@@ -153,13 +157,6 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
-      if (placeFurniture(this.state, pointer.worldX, pointer.worldY)) {
-        this.onStateChanged();
-        this.syncViews();
-        this.playFurniturePlacementEffect(pointer.worldX, pointer.worldY);
-        return;
-      }
-
       const cleanResult = cleanAtWithResult(this.state, pointer.worldX, pointer.worldY);
       this.playCleanFeedback(cleanResult, pointer.worldX, pointer.worldY);
       if (cleanResult.cleaned === 0) {
@@ -285,6 +282,7 @@ export class GameScene extends Phaser.Scene {
         this.pigActionCooldowns.delete(id);
       }
     }
+    this.syncPigRequestFeedback();
 
     const seenPoopIds = new Set<number>();
     for (const poop of this.state.poops) {
@@ -299,7 +297,7 @@ export class GameScene extends Phaser.Scene {
         view = this.createPoopView(poop);
         this.poopViews.set(poop.id, view);
       }
-      shadow.setPosition(poop.x, poop.y + 7);
+      shadow.setPosition(poop.x, poop.y + POOP_SHADOW_Y);
       view.setPosition(poop.x, poop.y);
       this.applyPoopShadowStyle(shadow, poop);
       this.applyPoopStyle(view, poop);
@@ -332,6 +330,26 @@ export class GameScene extends Phaser.Scene {
 
     this.scoopPreview.setSize(getScoopRadius(this.state) * 2, getScoopRadius(this.state) * 2);
     this.syncCareObjectStates();
+  }
+
+  private syncPigRequestFeedback(): void {
+    const active = this.state.pigRequest?.active;
+    if (active && active.token !== this.seenActivePigRequestToken) {
+      this.seenActivePigRequestToken = active.token;
+      const pig = this.state.pigs.find((candidate) => candidate.id === active.pigId);
+      if (pig) this.showPigThought(pig, active.thought, 1900);
+    }
+
+    const result = this.state.pigRequest?.lastResult;
+    if (!result || result.token === this.seenPigRequestResultToken) return;
+    this.seenPigRequestResultToken = result.token;
+
+    const pig = this.state.pigs.find((candidate) => candidate.id === result.pigId);
+    if (!pig) return;
+    const color = result.completed ? 0xf0d56b : 0x9aa094;
+    this.addFloatingText(pig.x, pig.y - 58, result.rewardText, color, result.completed ? 1 : 0.9);
+    this.showPigThought(pig, result.completed ? "Done!" : "Later?", 1500);
+    if (result.completed && !this.prefersReducedMotion) this.addBurst(pig.x, pig.y, color, 6);
   }
 
   private syncCleanlinessVisuals(): void {
@@ -369,13 +387,13 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncFurnitureViews(): void {
-    const seenIds = new Set<number>();
-    for (const placement of this.state.furniturePlacements) {
-      seenIds.add(placement.id);
-      let view = this.furnitureViews.get(placement.id);
+    const seenIds = new Set<FurnitureId>();
+    for (const placement of getUnlockedFurniturePlacements(this.state)) {
+      seenIds.add(placement.furnitureId);
+      let view = this.furnitureViews.get(placement.furnitureId);
       if (!view) {
         view = this.createFurnitureView(placement.furnitureId, placement.x, placement.y);
-        this.furnitureViews.set(placement.id, view);
+        this.furnitureViews.set(placement.furnitureId, view);
       }
       view.setPosition(placement.x, placement.y);
     }
@@ -435,11 +453,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createPoopShadow(poop: Poop): Phaser.GameObjects.Ellipse {
-    return this.add.ellipse(poop.x, poop.y + 7, 20, 8, 0x000000, 0.13).setDepth(8);
+    return this.add.ellipse(poop.x, poop.y + POOP_SHADOW_Y, 40, 16, 0x000000, 0.13).setDepth(8);
   }
 
   private applyPoopShadowStyle(view: Phaser.GameObjects.Ellipse, poop: Poop): void {
-    const size = poop.type === "mega" ? [26, 10] : poop.type === "messPile" ? [44, 18] : [20, 8];
+    const size = poop.type === "mega" ? [52, 20] : poop.type === "messPile" ? [88, 36] : [40, 16];
     view.setSize(size[0], size[1]);
     view.setAlpha(poop.type === "stinky" || poop.type === "messPile" ? 0.18 : 0.12);
   }
@@ -516,7 +534,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.playFurnitureReadyEffect();
+    this.playFurnitureReadyEffect(detail.furnitureId);
   }
 
   private playImageGlow(source: Phaser.GameObjects.Image, text: string, color: number): void {
@@ -615,22 +633,17 @@ export class GameScene extends Phaser.Scene {
     if (!this.prefersReducedMotion) this.addBurst(pig.x, pig.y, 0xf0d56b, 5);
   }
 
-  private playFurnitureReadyEffect(): void {
-    const x = this.state.cage.width / 2;
-    const y = this.state.cage.height / 2;
-    this.addFloatingText(x, y - 24, "Place it", 0xe4b83b, 1);
-    this.reactHerd("New!", 2);
-    if (!this.prefersReducedMotion) this.addBurst(x, y, 0xe4b83b, 5);
-  }
-
-  private playFurniturePlacementEffect(x: number, y: number): void {
-    this.addFloatingText(x, y - 28, "Placed", 0x7db46a, 1);
+  private playFurnitureReadyEffect(furnitureId?: FurnitureId): void {
+    const placement = furnitureId ? getStaticFurniturePlacement(this.state, furnitureId) : null;
+    const x = placement?.x ?? this.state.cage.width / 2;
+    const y = placement?.y ?? this.state.cage.height / 2;
+    this.addFloatingText(x, y - 28, "Unlocked", 0x7db46a, 1);
     this.reactPigsNear(x, y, "New!", 170, 3);
 
     if (this.prefersReducedMotion) return;
 
     this.addBurst(x, y, 0xf0d56b, 8);
-    const view = this.getNearestFurnitureView(x, y);
+    const view = furnitureId ? this.furnitureViews.get(furnitureId) : this.getNearestFurnitureView(x, y);
     if (!view) return;
 
     this.tweens.add({
@@ -965,9 +978,9 @@ function getPoopTextureKey(type: PoopType, aged: boolean): string {
 }
 
 function getPoopDisplaySize(type: PoopType): { width: number; height: number } {
-  if (type === "mega") return { width: 25, height: 21 };
-  if (type === "messPile") return { width: 40, height: 32 };
-  return { width: 18, height: 15 };
+  if (type === "mega") return { width: 50, height: 42 };
+  if (type === "messPile") return { width: 80, height: 64 };
+  return { width: 36, height: 30 };
 }
 
 function getPoopAccentColor(type: PoopType): number {

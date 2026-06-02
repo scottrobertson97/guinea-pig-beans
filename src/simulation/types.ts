@@ -41,7 +41,19 @@ export type FurnitureId =
   | "royalThrone";
 export type AbilityId = "wheekCall" | "treatBag" | "deepClean" | "freshBedding" | "snackTime" | "zoomieMode";
 export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord";
-export type WisdomPerkId = "roomyStart" | "gentleAutomation" | "rareInstinct" | "chorusTraining";
+export type WisdomPerkId =
+  | "roomyStart"
+  | "steadySupplies"
+  | "freshStart"
+  | "bondedBeginnings"
+  | "socialMemory"
+  | "chorusTraining"
+  | "gentleAutomation"
+  | "compostEngine"
+  | "trayAffinity"
+  | "rareInstinct"
+  | "goldenNose"
+  | "royalMemory";
 export type EventId =
   | "zoomies"
   | "hayFrenzy"
@@ -50,16 +62,54 @@ export type EventId =
   | "cageInspection"
   | "compostBloom"
   | "greatWheeking";
+export type EventChoiceId =
+  | "zoomiesGuide"
+  | "zoomiesChaos"
+  | "zoomiesMomentum"
+  | "hayEmergency"
+  | "hayFeast"
+  | "hayBundles"
+  | "napProtect"
+  | "napQuietClean"
+  | "napDreamSqueaks"
+  | "bottleFix"
+  | "bottleTap"
+  | "bottleSpare"
+  | "inspectionTidy"
+  | "inspectionPresent"
+  | "inspectionSqueaks"
+  | "compostHarvest"
+  | "compostRipen"
+  | "compostFuel"
+  | "wheekingAnswer"
+  | "wheekingConduct"
+  | "wheekingEcho";
 export type ObjectiveId =
   | "cleanBurst"
   | "keepClean"
   | "collectRare"
   | "useAbility"
-  | "placeFurniture"
+  | "unlockFurniture"
   | "earnBeans"
   | "herdHarmony"
   | "fuelAutomation"
   | "unlockRecipe";
+export type PigRequestId =
+  | "tidyFavor"
+  | "hayFavor"
+  | "waterFavor"
+  | "zoomieFavor"
+  | "snackFavor"
+  | "furnitureFavor"
+  | "compostFavor";
+export type PigRequestProgressKind =
+  | "clean"
+  | "hayRefill"
+  | "waterRefill"
+  | "combo"
+  | "ability"
+  | "furniture"
+  | "compost";
 
 export interface Pig {
   id: number;
@@ -110,19 +160,33 @@ export interface ActiveEvent {
   timer: number;
 }
 
-export interface FurniturePlacement {
-  id: number;
-  furnitureId: FurnitureId;
-  x: number;
-  y: number;
-}
-
 export interface ActiveObjective {
   id: ObjectiveId;
   title: string;
   progress: number;
   target: number;
   timer: number;
+}
+
+export interface ActivePigRequest {
+  id: PigRequestId;
+  pigId: number;
+  title: string;
+  description: string;
+  progress: number;
+  target: number;
+  timer: number;
+  rewardText: string;
+  thought: string;
+  token: number;
+}
+
+export interface PigRequestResult {
+  pigId: number;
+  title: string;
+  rewardText: string;
+  completed: boolean;
+  token: number;
 }
 
 export interface GameState {
@@ -152,11 +216,7 @@ export interface GameState {
     socialization: number;
     space: number;
   };
-  furniture: Record<FurnitureId, number>;
-  furniturePlacements: FurniturePlacement[];
-  placement: {
-    pendingFurniture: FurnitureId | null;
-  };
+  furniture: Record<FurnitureId, boolean>;
   abilities: Record<AbilityId, number>;
   automation: {
     overdrive: number;
@@ -170,9 +230,17 @@ export interface GameState {
     responseReady: boolean;
   };
   objective: ActiveObjective;
+  pigRequest: {
+    active: ActivePigRequest | null;
+    nextTimer: number;
+    completed: number;
+    expired: number;
+    lastResult: PigRequestResult | null;
+  };
   prestige: {
     ascensions: number;
     unlocked: string[];
+    lifetimeBeansClaimed: number;
   };
   lateGame: {
     hayDimension: boolean;
