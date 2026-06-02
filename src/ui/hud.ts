@@ -25,6 +25,7 @@ import {
   getAbilityCost,
   getAutomationFuelCost,
   canBuyWisdomPerk,
+  getCageDimensions,
   getCosts,
   getFurnitureSynergies,
   getPigCapacity,
@@ -613,7 +614,7 @@ export class Hud {
   }
 
   private resetRun(): void {
-    const confirmed = window.confirm("Reset this run and clear saved progress?");
+    const confirmed = window.confirm("Reset the game? This clears your local save and starts a fresh cage.");
     if (!confirmed) return;
     emitUiSound("button");
     this.onResetRun();
@@ -1186,7 +1187,12 @@ function getAdoptPigStatusText(state: GameState, cost: number, capacity: number)
 }
 
 function getBiggerCageStatusText(state: GameState, cost: number, capacity: number): string {
-  return getBeanCostStatusText(state, cost, `${cost} Beans - Cap ${capacity + 2}`);
+  const currentSize = getCageDimensions(state.upgrades.cageLevel);
+  const nextSize = getCageDimensions(state.upgrades.cageLevel + 1);
+  const widthIncrease = nextSize.width - currentSize.width;
+  const heightIncrease = nextSize.height - currentSize.height;
+  const expansionText = widthIncrease > 0 || heightIncrease > 0 ? `+${widthIncrease}x${heightIncrease}` : "Max size";
+  return getBeanCostStatusText(state, cost, `${cost} Beans - ${expansionText} - Cap ${capacity + 2}`);
 }
 
 function getRarePigStatusText(state: GameState, cost: number, capacity: number): string {

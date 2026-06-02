@@ -91,14 +91,19 @@ export class GameScene extends Phaser.Scene {
   private seenActivePigRequestToken = 0;
   private seenPigRequestResultToken = 0;
   private robotView: Phaser.GameObjects.Image | null = null;
+  private cageBacking!: Phaser.GameObjects.Graphics;
   private cageFloor!: Phaser.GameObjects.TileSprite;
+  private cageDetails!: Phaser.GameObjects.Graphics;
   private cleanlinessWash!: Phaser.GameObjects.Rectangle;
   private dirtPatches!: Phaser.GameObjects.Graphics;
+  private cageRim!: Phaser.GameObjects.Graphics;
   private hayPile!: Phaser.GameObjects.Image;
   private hayShadow!: Phaser.GameObjects.Ellipse;
   private waterBottle!: Phaser.GameObjects.Image;
   private waterShadow!: Phaser.GameObjects.Ellipse;
   private scoopPreview!: Phaser.GameObjects.Ellipse;
+  private lastCageWidth = 0;
+  private lastCageHeight = 0;
   private prefersReducedMotion = false;
   private readonly handleHudActionEffect = (event: Event): void => {
     const detail = (event as CustomEvent<HudActionEffectDetail>).detail ?? {};
@@ -130,8 +135,10 @@ export class GameScene extends Phaser.Scene {
     this.load.image("bean-compost", "/assets/sprites/beans/bean_compost.png");
     this.load.image("hay-rack-full", "/assets/sprites/decor/hay_rack_full.png");
     this.load.image("water-bottle-full", "/assets/sprites/decor/water_bottle_full.png");
+    this.load.image("hidey-house", "/assets/sprites/decor/hidey_house.png");
     this.load.image("litter-tray-clean", "/assets/sprites/decor/litter_tray_clean.png");
     this.load.image("toy-pile", "/assets/sprites/decor/toy_pile.png");
+    this.load.image("toy-tunnel-blue", "/assets/sprites/decor/toy_tunnel_blue.png");
     this.load.image("royal-throne", "/assets/sprites/decor/royal_throne.png");
     this.load.image("roaming-dustpan", "/assets/sprites/upgrades/roaming_dustpan.png");
     this.load.image("compost-bin", "/assets/sprites/upgrades/compost_bin.png");
@@ -191,30 +198,50 @@ export class GameScene extends Phaser.Scene {
 
   private drawCage(): void {
     const { width, height } = this.state.cage;
-    const backing = this.add.graphics();
-    backing.setDepth(0);
-    backing.fillStyle(0xcdb58d, 1);
-    backing.fillRoundedRect(0, 0, width, height, 22);
+    this.cageBacking = this.add.graphics().setDepth(0);
 
     this.cageFloor = this.add
       .tileSprite(width / 2, height / 2, width - 28, height - 28, "cage-floor-fleece")
       .setDepth(1)
       .setAlpha(0.92);
-    this.drawAmbientCageDetails(width, height);
+    this.cageDetails = this.add.graphics().setDepth(2.2);
 
     this.cleanlinessWash = this.add
       .rectangle(width / 2, height / 2, width - 28, height - 28, 0x6b503a, 0)
       .setDepth(3);
     this.dirtPatches = this.add.graphics().setDepth(3.1);
+    this.cageRim = this.add.graphics().setDepth(6);
+    this.redrawCage();
+  }
 
-    const graphics = this.add.graphics();
-    graphics.setDepth(6);
-    graphics.lineStyle(14, 0x8a6e4d, 1);
-    graphics.strokeRoundedRect(7, 7, width - 14, height - 14, 20);
+  private redrawCage(): void {
+    const { width, height } = this.state.cage;
+
+    this.cageBacking.clear();
+    this.cageBacking.fillStyle(0xcdb58d, 1);
+    this.cageBacking.fillRoundedRect(0, 0, width, height, 22);
+
+    this.cageFloor
+      .setPosition(width / 2, height / 2)
+      .setSize(width - 28, height - 28)
+      .setDisplaySize(width - 28, height - 28);
+    this.drawAmbientCageDetails(width, height);
+
+    this.cleanlinessWash
+      .setPosition(width / 2, height / 2)
+      .setSize(width - 28, height - 28)
+      .setDisplaySize(width - 28, height - 28);
+
+    this.cageRim.clear();
+    this.cageRim.lineStyle(14, 0x8a6e4d, 1);
+    this.cageRim.strokeRoundedRect(7, 7, width - 14, height - 14, 20);
+    this.lastCageWidth = width;
+    this.lastCageHeight = height;
   }
 
   private drawAmbientCageDetails(width: number, height: number): void {
-    const details = this.add.graphics().setDepth(2.2);
+    const details = this.cageDetails;
+    details.clear();
 
     details.fillStyle(0xffffff, 0.045);
     for (const patch of BEDDING_VARIATIONS) {
@@ -255,6 +282,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private syncViews(): void {
+    this.syncCageSize();
     this.syncCleanlinessVisuals();
 
     const seenPigIds = new Set<number>();
@@ -330,6 +358,14 @@ export class GameScene extends Phaser.Scene {
 
     this.scoopPreview.setSize(getScoopRadius(this.state) * 2, getScoopRadius(this.state) * 2);
     this.syncCareObjectStates();
+  }
+
+  private syncCageSize(): void {
+    if (this.state.cage.width === this.lastCageWidth && this.state.cage.height === this.lastCageHeight) return;
+
+    this.redrawCage();
+    this.repositionCareObjects();
+    this.resize();
   }
 
   private syncPigRequestFeedback(): void {
@@ -888,7 +924,15 @@ export class GameScene extends Phaser.Scene {
     return this.add.image(x, y, "water-bottle-full").setDisplaySize(76, 76).setDepth(4);
   }
 
+  private repositionCareObjects(): void {
+    this.hayPile.setPosition(88, 88);
+    this.hayShadow.setPosition(88, 116);
+    this.waterBottle.setPosition(this.state.cage.width - 90, 82);
+    this.waterShadow.setPosition(this.state.cage.width - 90, 109);
+  }
+
   private syncCareObjectStates(): void {
+    this.repositionCareObjects();
     this.applyNeedSpriteState(this.hayPile, this.hayShadow, this.state.needs.hay, 84, 84, 0xd8cb58);
     this.applyNeedSpriteState(this.waterBottle, this.waterShadow, this.state.needs.water, 76, 76, 0x86d9f0);
   }
@@ -924,6 +968,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   private createFurnitureParts(id: FurnitureId): Phaser.GameObjects.GameObject[] {
+    if (id === "hideyHouse") {
+      return [this.add.image(0, -6, "hidey-house").setDisplaySize(108, 91)];
+    }
     if (id === "litterTray") {
       return [this.add.image(0, 0, "litter-tray-clean").setDisplaySize(90, 76)];
     }
@@ -934,10 +981,7 @@ export class GameScene extends Phaser.Scene {
       return [this.add.image(0, 0, "compost-bin").setDisplaySize(74, 76)];
     }
     if (id === "tunnel") {
-      return [
-        this.add.ellipse(0, 0, 96, 36, 0x7a5736).setStrokeStyle(3, 0x51351f, 0.72),
-        this.add.ellipse(0, 6, 68, 22, 0x3d2c20),
-      ];
+      return [this.add.image(0, -8, "toy-tunnel-blue").setDisplaySize(112, 92)];
     }
     if (id === "royalThrone") {
       return [this.add.image(0, -22, "royal-throne").setDisplaySize(118, 142)];
@@ -1003,10 +1047,11 @@ function getCleanlinessFloorTint(cleanliness: number): number {
 }
 
 function getFurnitureShadowSize(id: FurnitureId): { width: number; height: number; y: number } {
+  if (id === "hideyHouse") return { width: 92, height: 28, y: 32 };
   if (id === "litterTray") return { width: 86, height: 24, y: 28 };
   if (id === "chewToy") return { width: 64, height: 20, y: 24 };
   if (id === "cardboardCastle") return { width: 68, height: 22, y: 28 };
-  if (id === "tunnel") return { width: 92, height: 22, y: 18 };
+  if (id === "tunnel") return { width: 96, height: 26, y: 30 };
   if (id === "royalThrone") return { width: 94, height: 28, y: 42 };
   if (id === "snuggleSack") return { width: 74, height: 22, y: 18 };
   return { width: 74, height: 22, y: 26 };

@@ -13,7 +13,7 @@ import {
 } from "./balance";
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
-import { addLegendaryPig, addLog, addPig, spawnEventPoop } from "./state";
+import { addLegendaryPig, addLog, addPig, spawnEventPoop, syncCageDimensionsToLevel } from "./state";
 import type { AbilityId, BeanRecipeId, EventChoiceId, EventId, FurnitureId, GameState, PoopType, WisdomPerkId } from "./types";
 
 export interface CleanResult {
@@ -244,7 +244,14 @@ export function buyCageUpgrade(state: GameState): boolean {
   if (state.beans < cost) return false;
   state.beans -= cost;
   state.upgrades.cageLevel += 1;
-  addLog(state, `Cage expanded to level ${state.upgrades.cageLevel}. Capacity is now ${getPigCapacity(state)} pigs.`);
+  const previousDimensions = { width: state.cage.width, height: state.cage.height };
+  syncCageDimensionsToLevel(state);
+  const widthIncrease = state.cage.width - previousDimensions.width;
+  const heightIncrease = state.cage.height - previousDimensions.height;
+  addLog(
+    state,
+    `Cage expanded to level ${state.upgrades.cageLevel}: +${widthIncrease}x${heightIncrease} space. Capacity is now ${getPigCapacity(state)} pigs.`,
+  );
   updateMilestones(state);
   return true;
 }
@@ -600,6 +607,7 @@ export function prestige(state: GameState): boolean {
   state.upgrades.feedLevel = 0;
   state.upgrades.scoopLevel = 0;
   state.upgrades.cageLevel = 0;
+  syncCageDimensionsToLevel(state);
   state.needs.hay = 100;
   state.needs.water = 100;
   state.cage.cleanliness = 100;

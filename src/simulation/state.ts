@@ -1,4 +1,4 @@
-import { CAGE_PADDING, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
+import { CAGE_PADDING, getCageDimensions, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
 import type { FurnitureId, GameState, Pig, PigBreed, PigTrait, Poop, PoopType } from "./types";
 
 const pigNames = [
@@ -67,6 +67,7 @@ const quirks = [
 let nextPigId = 1;
 let nextPoopId = 1;
 export function createInitialState(): GameState {
+  const cageDimensions = getCageDimensions(0);
   const state: GameState = {
     beans: 0,
     compost: 0,
@@ -86,8 +87,8 @@ export function createInitialState(): GameState {
       water: 100,
     },
     cage: {
-      width: 720,
-      height: 520,
+      width: cageDimensions.width,
+      height: cageDimensions.height,
       cleanliness: 100,
       happiness: 86,
       enrichment: 0,
@@ -212,6 +213,13 @@ export function syncEntityIdCounters(state: GameState): void {
   const nextSavedPoopId = state.poops.reduce((nextId, poop) => Math.max(nextId, poop.id + 1), 1);
   nextPigId = Math.max(nextPigId, nextSavedPigId);
   nextPoopId = Math.max(nextPoopId, nextSavedPoopId);
+}
+
+export function syncCageDimensionsToLevel(state: GameState): void {
+  const dimensions = getCageDimensions(state.upgrades.cageLevel);
+  state.cage.width = dimensions.width;
+  state.cage.height = dimensions.height;
+  clampEntitiesToCage(state);
 }
 
 export function addPig(state: GameState): Pig {
@@ -410,6 +418,31 @@ function randomBetween(min: number, max: number): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function clampEntitiesToCage(state: GameState): void {
+  const minX = CAGE_PADDING;
+  const minY = CAGE_PADDING;
+  const maxX = state.cage.width - CAGE_PADDING;
+  const maxY = state.cage.height - CAGE_PADDING;
+
+  for (const pig of state.pigs) {
+    pig.x = clamp(pig.x, minX, maxX);
+    pig.y = clamp(pig.y, minY, maxY);
+    pig.targetX = clamp(pig.targetX, minX, maxX);
+    pig.targetY = clamp(pig.targetY, minY, maxY);
+  }
+
+  for (const poop of state.poops) {
+    poop.x = clamp(poop.x, CAGE_PADDING + 20, state.cage.width - CAGE_PADDING - 20);
+    poop.y = clamp(poop.y, CAGE_PADDING + 20, state.cage.height - CAGE_PADDING - 20);
+  }
+
+  if (!state.robot) return;
+  state.robot.x = clamp(state.robot.x, minX, maxX);
+  state.robot.y = clamp(state.robot.y, minY, maxY);
+  state.robot.targetX = clamp(state.robot.targetX, minX, maxX);
+  state.robot.targetY = clamp(state.robot.targetY, minY, maxY);
 }
 
 function targetNearFurniture(

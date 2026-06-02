@@ -17,12 +17,13 @@
             </div>
           </div>
           <div class="topbar-actions">
-            <button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" aria-label="Mute sound effects">
-              SFX
-            </button>
             <span class="save-status-slot">
               <span id="save-status" class="save-status" role="status" aria-live="polite" hidden></span>
             </span>
+            <button id="sound-toggle" class="sound-toggle" type="button" aria-pressed="false" aria-label="Mute sound effects">
+              SFX
+            </button>
+            <button id="reset-run" class="reset-game-button" type="button">Reset Game</button>
           </div>
           <div class="stats">
             <div><span>Beans</span><strong id="beans">0</strong></div>
@@ -301,12 +302,30 @@
 
               <section class="shop compact-shop section-panel" data-section-panel="mythos" hidden>
               <h2>Mythos</h2>
-              <button id="hay-dimension" type="button"><span>Hay Dimension</span><strong id="hay-dimension-status"></strong></button>
-              <button id="bean-exchange" type="button"><span>Bean Exchange</span><strong id="bean-exchange-status"></strong></button>
-              <button id="cavy-council" type="button"><span>Cavy Council</span><strong id="cavy-council-status"></strong></button>
-              <button id="squeak-choir" type="button"><span>Squeak Choir</span><strong id="squeak-choir-status"></strong></button>
-              <button id="bean-singularity" type="button"><span>Bean Singularity</span><strong id="bean-singularity-status"></strong></button>
-              <button id="prestige" type="button"><span>Great Composting</span><strong id="prestige-cost"></strong></button>
+              <button id="hay-dimension" type="button">
+                <span>Hay Dimension</span><strong id="hay-dimension-status"></strong>
+                <em>Slows hay drain, helps pigs produce faster, and adds a little furniture room.</em>
+              </button>
+              <button id="bean-exchange" type="button">
+                <span>Bean Exchange</span><strong id="bean-exchange-status"></strong>
+                <em>Spends Beans and Gold to open the late-game economy track.</em>
+              </button>
+              <button id="cavy-council" type="button">
+                <span>Cavy Council</span><strong id="cavy-council-status"></strong>
+                <em>Turns a large herd and stored Squeaks into council-level progression.</em>
+              </button>
+              <button id="squeak-choir" type="button">
+                <span>Squeak Choir</span><strong id="squeak-choir-status"></strong>
+                <em>Generates Squeaks over time and reduces every active ability cost by 1.</em>
+              </button>
+              <button id="bean-singularity" type="button">
+                <span>Bean Singularity</span><strong id="bean-singularity-status"></strong>
+                <em>Adds cursed bean potential and slowly pulls loose beans toward the cage center.</em>
+              </button>
+              <button id="prestige" type="button">
+                <span>Great Composting</span><strong id="prestige-cost"></strong>
+                <em>Resets the run for Cavy Wisdom after enough lifetime Beans.</em>
+              </button>
             </section>
 
               <section class="shop compact-shop ability-shop section-panel" data-section-panel="wisdom" hidden>
@@ -344,7 +363,6 @@
               <section class="log section-panel" data-section-panel="log" hidden>
               <h2>Cage Log</h2>
               <ol id="event-log"></ol>
-              <button id="reset-run" class="danger-action" type="button">Reset Run</button>
             </section>
             </div>
           </div>

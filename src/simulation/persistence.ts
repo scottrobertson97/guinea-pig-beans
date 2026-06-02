@@ -1,4 +1,4 @@
-import { addLog, createInitialState, syncEntityIdCounters } from "./state";
+import { addLog, createInitialState, syncCageDimensionsToLevel, syncEntityIdCounters } from "./state";
 import type { GameState } from "./types";
 
 export const SAVE_KEY = "gpb-save-v1";
@@ -50,6 +50,7 @@ export function loadGameState(): LoadGameStateResult {
     }
 
     const hydratedState = hydrateState(freshState, parsed.state as Partial<GameState>);
+    syncCageDimensionsToLevel(hydratedState);
     syncEntityIdCounters(hydratedState);
     lastSerializedState = serializeState(hydratedState);
     return { state: hydratedState, recovered: false };

@@ -1,0 +1,2 @@
+pigs can die. if happieness or hunger or water gets too low then they have a change of dieing every so often. if a pig dies the adopt pig cost should revert to what it was befor that amount of pigs. if the user drop bellow the starting amount of pigs then the cost for at 1 pig is free. and iff all die an user is down to 0, then adopting is also free. if there is only 1 guinea pig, that pig has a happieness debuff untill a second pig is adopted.
+

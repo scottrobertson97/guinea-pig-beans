@@ -141,9 +141,11 @@ h1 {
 .topbar-actions {
   grid-area: actions;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
-  min-width: 156px;
+  min-width: 248px;
 }
 
 .sound-toggle {
@@ -161,6 +163,22 @@ h1 {
 .sound-toggle[aria-pressed="true"] {
   color: #6f4f2f;
   background: #eee8da;
+}
+
+.reset-game-button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 1px solid rgba(130, 55, 43, 0.28);
+  color: #74372d;
+  background: rgba(248, 230, 224, 0.82);
+  box-shadow: 0 8px 18px rgba(70, 32, 24, 0.06);
+  font-size: 0.74rem;
+  letter-spacing: 0;
+}
+
+.reset-game-button:hover:not(:disabled) {
+  background: #f0d6ce;
 }
 
 .save-status-slot {

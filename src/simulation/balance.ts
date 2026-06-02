@@ -1,6 +1,7 @@
 import type { AbilityId, Costs, FurnitureId, GameState, Pig, WisdomPerkId } from "./types";
 
 export const CAGE_PADDING = 34;
+export const MAX_CAGE_LEVEL_FOR_SIZE = 7;
 export const BASE_POOP_INTERVAL = 5;
 export const MAX_LOG_ITEMS = 8;
 export const ROBOT_COST = 75;
@@ -226,6 +227,19 @@ export function getPrestigeWisdomGain(state: GameState): number {
 
 export function getPigCapacity(state: GameState): number {
   return 2 + state.upgrades.cageLevel * 2 + (state.wisdom.roomyStart ? 2 : 0) + (state.recipes.royalAccord ? 1 : 0);
+}
+
+export function getCageDimensions(cageLevel: number): { width: number; height: number } {
+  const level = Math.max(0, Math.min(MAX_CAGE_LEVEL_FOR_SIZE, Math.floor(cageLevel)));
+  let width = 440;
+  let height = 320;
+
+  for (let step = 1; step <= level; step += 1) {
+    width += 110 + step * 20;
+    height += 85 + step * 15;
+  }
+
+  return { width, height };
 }
 
 export function getScoopRadius(state: GameState): number {
