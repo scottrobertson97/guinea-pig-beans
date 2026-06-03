@@ -41,6 +41,8 @@ export type FurnitureId =
   | "royalThrone";
 export type AbilityId = "wheekCall" | "treatBag" | "deepClean" | "freshBedding" | "snackTime" | "zoomieMode";
 export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord";
+export type BeanExchangeTradeId = "beansToCompost" | "compostToSqueaks" | "goldToBeans" | "squeaksToGold";
+export type CouncilDecreeId = "careMandate" | "cleanupOrdinance" | "herdCharter";
 export type WisdomPerkId =
   | "roomyStart"
   | "steadySupplies"

@@ -8,7 +8,12 @@ import {
   buyRarePig,
   buyRobot,
   buyScoopUpgrade,
+  exchangeBeanResource,
   fuelAutomation,
+  getBeanExchangeTradeStatus,
+  getBeanExchangeTrades,
+  getCouncilDecreeStatus,
+  getCouncilDecrees,
   canUseEventChoice,
   getEventChoiceStatus,
   getEventChoices,
@@ -18,6 +23,7 @@ import {
   respondToEventChoice,
   unlockBeanRecipe,
   unlockLateGameSystem,
+  useCouncilDecree,
   useAbility,
   type EventChoiceView,
 } from "../simulation/actions";
@@ -41,8 +47,17 @@ import {
 import { getAchievementViews, getQuestViews, type MilestoneView } from "../simulation/milestones";
 import { SAVE_STATUS_EVENT, type SaveStatusDetail } from "../simulation/persistence";
 import { getActivePigRequestView } from "../simulation/pigRequests";
-import type { AbilityId, BeanRecipeId, EventChoiceId, FurnitureId, GameState, WisdomPerkId } from "../simulation/types";
-import { emitPlayerAction, emitUiSound, type PlayerActionId, type UiSoundId } from "./events";
+import type {
+  AbilityId,
+  BeanExchangeTradeId,
+  BeanRecipeId,
+  CouncilDecreeId,
+  EventChoiceId,
+  FurnitureId,
+  GameState,
+  WisdomPerkId,
+} from "../simulation/types";
+import { emitPlayerAction, emitUiSound, type PlayerActionId, type SceneFeedbackDetail, type UiSoundId } from "./events";
 
 type ButtonId =
   | "adopt-pig"
@@ -76,7 +91,14 @@ type ButtonId =
   | "recipe-royal-accord"
   | "hay-dimension"
   | "bean-exchange"
+  | "exchange-beans-to-compost"
+  | "exchange-compost-to-squeaks"
+  | "exchange-gold-to-beans"
+  | "exchange-squeaks-to-gold"
   | "cavy-council"
+  | "council-care-mandate"
+  | "council-cleanup-ordinance"
+  | "council-herd-charter"
   | "squeak-choir"
   | "bean-singularity"
   | "wisdom-roomy-start"
@@ -114,8 +136,17 @@ type SectionMeta = {
 };
 
 type PurchaseEffectId = "hay" | "scoop" | "robot" | "cage" | "furniture-ready" | "herd" | "ability";
-type HudActionEffect = PurchaseEffectId | { effect: PurchaseEffectId; abilityId?: AbilityId; furnitureId?: FurnitureId };
+type HudActionEffect = PurchaseEffectId | SceneFeedbackDetail;
 type HudPlayerAction = PlayerActionId | PlayerActionId[];
+type StatId = "beans" | "pigs" | "clean" | "streak" | "compost" | "squeaks" | "gold" | "wisdom" | "furniture";
+type DockBadgeKind = "available" | "urgent" | "notice";
+type ActionVisualState = "available" | "locked" | "completed" | "attention";
+type ObjectivePulseState = {
+  id: GameState["objective"]["id"];
+  progress: number;
+  target: number;
+  completed: number;
+};
 
 const HUD_ACTION_EFFECT_EVENT = "guinea-pig-action-effect";
 
@@ -160,6 +191,19 @@ const WISDOM_BUTTONS: Record<WisdomPerkId, ButtonId> = {
   royalMemory: "wisdom-royal-memory",
 };
 
+const BEAN_EXCHANGE_BUTTONS: Record<BeanExchangeTradeId, ButtonId> = {
+  beansToCompost: "exchange-beans-to-compost",
+  compostToSqueaks: "exchange-compost-to-squeaks",
+  goldToBeans: "exchange-gold-to-beans",
+  squeaksToGold: "exchange-squeaks-to-gold",
+};
+
+const COUNCIL_DECREE_BUTTONS: Record<CouncilDecreeId, ButtonId> = {
+  careMandate: "council-care-mandate",
+  cleanupOrdinance: "council-cleanup-ordinance",
+  herdCharter: "council-herd-charter",
+};
+
 export class Hud {
   private buttons: Record<ButtonId, HTMLButtonElement>;
   private quickButtons: Record<QuickCareButtonId, HTMLButtonElement>;
@@ -169,18 +213,24 @@ export class Hud {
   private eventChoiceSummary: HTMLElement;
   private launchers: Record<SectionId, HTMLButtonElement>;
   private badges: Record<SectionId, HTMLElement>;
+  private statCards: Record<StatId, HTMLElement>;
   private modal: HTMLDialogElement;
   private modalTitle: HTMLElement;
   private modalIcon: HTMLImageElement;
   private modalCloseButton: HTMLButtonElement;
   private resetRunButton: HTMLButtonElement;
   private saveStatus: HTMLElement;
+  private beanExchangePanel: HTMLElement;
+  private cavyCouncilPanel: HTMLElement;
   private panels: Record<SectionId, HTMLElement>;
   private activeSection: SectionId | null = null;
   private activeLauncher: HTMLButtonElement | null = null;
   private previousComboCount = 0;
+  private previousObjectivePulseState: ObjectivePulseState | null = null;
   private previousGoalSignature: string | null = null;
   private previousLogSignature: string | null = null;
+  private previousCompletedQuestIds: Set<string> | null = null;
+  private previousCompletedAchievementIds: Set<string> | null = null;
   private hasGoalUpdate = false;
   private hasUnreadLog = false;
   private readonly handleKeyDown = (event: KeyboardEvent): void => {
@@ -235,7 +285,14 @@ export class Hud {
       "recipe-royal-accord": getButton("recipe-royal-accord"),
       "hay-dimension": getButton("hay-dimension"),
       "bean-exchange": getButton("bean-exchange"),
+      "exchange-beans-to-compost": getButton("exchange-beans-to-compost"),
+      "exchange-compost-to-squeaks": getButton("exchange-compost-to-squeaks"),
+      "exchange-gold-to-beans": getButton("exchange-gold-to-beans"),
+      "exchange-squeaks-to-gold": getButton("exchange-squeaks-to-gold"),
       "cavy-council": getButton("cavy-council"),
+      "council-care-mandate": getButton("council-care-mandate"),
+      "council-cleanup-ordinance": getButton("council-cleanup-ordinance"),
+      "council-herd-charter": getButton("council-herd-charter"),
       "squeak-choir": getButton("squeak-choir"),
       "bean-singularity": getButton("bean-singularity"),
       "wisdom-roomy-start": getButton("wisdom-roomy-start"),
@@ -291,12 +348,25 @@ export class Hud {
       goals: getBadge("goals"),
       log: getBadge("log"),
     };
+    this.statCards = {
+      beans: getStatCard("beans"),
+      pigs: getStatCard("pigs"),
+      clean: getStatCard("clean"),
+      streak: getStatCard("streak"),
+      compost: getStatCard("compost"),
+      squeaks: getStatCard("squeaks"),
+      gold: getStatCard("gold"),
+      wisdom: getStatCard("wisdom"),
+      furniture: getStatCard("furniture"),
+    };
     this.modal = getDialog("section-modal");
     this.modalTitle = getElement("section-modal-title");
     this.modalIcon = getImage("section-modal-icon");
     this.modalCloseButton = getButton("close-section-modal");
     this.resetRunButton = getButton("reset-run");
     this.saveStatus = getElement("save-status");
+    this.beanExchangePanel = getElement("bean-exchange-panel");
+    this.cavyCouncilPanel = getElement("cavy-council-panel");
     this.panels = {
       care: getPanel("care"),
       shop: getPanel("shop"),
@@ -314,7 +384,13 @@ export class Hud {
     }
 
     this.buttons["adopt-pig"].addEventListener("click", () =>
-      this.runAction(() => buyPig(this.state), this.buttons["adopt-pig"], "herd", "purchase", "purchase"),
+      this.runAction(
+        () => buyPig(this.state),
+        this.buttons["adopt-pig"],
+        { category: "adoption", target: "herd", label: "New Pig", color: 0xf0d56b },
+        "purchase",
+        "purchase",
+      ),
     );
     this.buttons["better-hay"].addEventListener("click", () =>
       this.runAction(
@@ -344,19 +420,45 @@ export class Hud {
       this.runAction(() => buyCageUpgrade(this.state), this.buttons["bigger-cage"], "cage", "purchase", "purchase"),
     );
     this.buttons["rare-pig"].addEventListener("click", () =>
-      this.runAction(() => buyRarePig(this.state), this.buttons["rare-pig"], "herd", "purchase", "purchase"),
+      this.runAction(
+        () => buyRarePig(this.state),
+        this.buttons["rare-pig"],
+        { category: "adoption", target: "herd", label: "Legendary Pig", color: 0xb965d2 },
+        "purchase",
+        "purchase",
+      ),
     );
     this.buttons["refill-hay"].addEventListener("click", () =>
-      this.runAction(() => refillHay(this.state), this.buttons["refill-hay"], undefined, "refillCare"),
+      this.runAction(
+        () => refillHay(this.state),
+        this.buttons["refill-hay"],
+        { category: "care", target: "hay", label: "Hay Full", resourceText: "+Hay", color: 0xd7c74b },
+        "refillCare",
+      ),
     );
     this.quickButtons["quick-refill-hay"].addEventListener("click", () =>
-      this.runAction(() => refillHay(this.state), this.quickButtons["quick-refill-hay"], undefined, "refillCare"),
+      this.runAction(
+        () => refillHay(this.state),
+        this.quickButtons["quick-refill-hay"],
+        { category: "care", target: "hay", label: "Hay Full", resourceText: "+Hay", color: 0xd7c74b },
+        "refillCare",
+      ),
     );
     this.buttons["refill-water"].addEventListener("click", () =>
-      this.runAction(() => refillWater(this.state), this.buttons["refill-water"], undefined, "refillCare"),
+      this.runAction(
+        () => refillWater(this.state),
+        this.buttons["refill-water"],
+        { category: "care", target: "water", label: "Water Full", resourceText: "+Water", color: 0x86d9f0 },
+        "refillCare",
+      ),
     );
     this.quickButtons["quick-refill-water"].addEventListener("click", () =>
-      this.runAction(() => refillWater(this.state), this.quickButtons["quick-refill-water"], undefined, "refillCare"),
+      this.runAction(
+        () => refillWater(this.state),
+        this.quickButtons["quick-refill-water"],
+        { category: "care", target: "water", label: "Water Full", resourceText: "+Water", color: 0x86d9f0 },
+        "refillCare",
+      ),
     );
     this.buttons["event-response"].addEventListener("click", () =>
       this.focusFirstEventChoice(),
@@ -387,7 +489,7 @@ export class Hud {
       this.runAction(
         () => unlockLateGameSystem(this.state, "hayDimension"),
         this.buttons["hay-dimension"],
-        undefined,
+        { category: "unlock", target: "cage", label: "Hay Dimension", resourceText: "Hay Slowed", color: 0xd7c74b },
         "purchase",
         "purchase",
       ),
@@ -396,25 +498,63 @@ export class Hud {
       this.runAction(
         () => unlockLateGameSystem(this.state, "beanExchange"),
         this.buttons["bean-exchange"],
-        undefined,
+        { category: "unlock", target: "center", label: "Bean Exchange", resourceText: "Trades Open", color: 0xe4b83b },
         "purchase",
         "purchase",
       ),
     );
+    for (const trade of getBeanExchangeTrades()) {
+      const buttonId = BEAN_EXCHANGE_BUTTONS[trade.id];
+      this.buttons[buttonId].addEventListener("click", () =>
+        this.runAction(
+          () => exchangeBeanResource(this.state, trade.id),
+          this.buttons[buttonId],
+          {
+            category: "trade",
+            target: "center",
+            tradeId: trade.id,
+            label: trade.label,
+            resourceText: getBeanExchangeFeedbackText(trade.id),
+            color: getBeanExchangeFeedbackColor(trade.id),
+          },
+          "purchase",
+          "purchase",
+        ),
+      );
+    }
     this.buttons["cavy-council"].addEventListener("click", () =>
       this.runAction(
         () => unlockLateGameSystem(this.state, "cavyCouncil"),
         this.buttons["cavy-council"],
-        undefined,
+        { category: "unlock", target: "herd", label: "Cavy Council", resourceText: "Council Active", color: 0xb965d2 },
         "purchase",
         "purchase",
       ),
     );
+    for (const decree of getCouncilDecrees()) {
+      const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
+      this.buttons[buttonId].addEventListener("click", () =>
+        this.runAction(
+          () => useCouncilDecree(this.state, decree.id),
+          this.buttons[buttonId],
+          {
+            category: "decree",
+            target: "cage",
+            decreeId: decree.id,
+            label: decree.label,
+            resourceText: getCouncilDecreeFeedbackText(decree.id),
+            color: getCouncilDecreeFeedbackColor(decree.id),
+          },
+          "purchase",
+          "purchase",
+        ),
+      );
+    }
     this.buttons["squeak-choir"].addEventListener("click", () =>
       this.runAction(
         () => unlockLateGameSystem(this.state, "squeakChoir"),
         this.buttons["squeak-choir"],
-        undefined,
+        { category: "unlock", target: "herd", label: "Squeak Choir", resourceText: "+Squeaks over time", color: 0xf0d56b },
         "purchase",
         "purchase",
       ),
@@ -423,7 +563,7 @@ export class Hud {
       this.runAction(
         () => unlockLateGameSystem(this.state, "beanSingularity"),
         this.buttons["bean-singularity"],
-        undefined,
+        { category: "unlock", target: "cage", label: "Bean Singularity", resourceText: "Gravity Shift", color: 0x75608f },
         "purchase",
         "purchase",
       ),
@@ -432,7 +572,13 @@ export class Hud {
       this.bindWisdomButton(buttonId, wisdomId);
     }
     this.buttons.prestige.addEventListener("click", () =>
-      this.runAction(() => prestige(this.state), this.buttons.prestige, undefined, "purchase", "purchase"),
+      this.runAction(
+        () => prestige(this.state),
+        this.buttons.prestige,
+        { category: "prestige", target: "cage", label: "Great Composting", resourceText: "+Wisdom", color: 0xf0d56b },
+        "purchase",
+        "purchase",
+      ),
     );
     this.resetRunButton.addEventListener("click", () => this.resetRun());
 
@@ -478,6 +624,8 @@ export class Hud {
       `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
     );
     setText("combo-value", getComboText(this.state));
+    this.updateStatEmphasis(furnitureUnlocked);
+    this.updateObjectivePulse();
     this.updateComboPulse();
     setText("adopt-cost", getAdoptPigStatusText(this.state, costs.pig, pigCapacity));
     setText("feed-cost", getBeanCostStatusText(this.state, costs.feed, `${costs.feed} Beans`));
@@ -494,6 +642,7 @@ export class Hud {
     this.renderWisdomStatuses();
     this.renderEventChoices();
     this.renderPigRequest();
+    this.updateEventButtonLabels();
     setText("prestige-cost", getPrestigeStatusText(this.state));
     setText("status-line", getStatusLine(this.state));
 
@@ -521,8 +670,8 @@ export class Hud {
     this.updateLateGameDisabled();
     this.updateWisdomDisabled();
     this.buttons.prestige.disabled = getPrestigeProgress(this.state) < costs.prestige;
-    this.updateAvailableNowStyles();
     this.updateSectionIndicators();
+    this.updateActionVisualStates();
 
     const log = document.querySelector<HTMLOListElement>("#event-log");
     if (log) {
@@ -554,20 +703,23 @@ export class Hud {
       roster.replaceChildren(...rosterItems);
     }
 
+    const questViews = getQuestViews(this.state);
+    const achievementViews = getAchievementViews(this.state);
     renderMilestoneList(
       "quest-list",
-      getQuestViews(this.state),
+      questViews,
       4,
       "No open quests right now. Keep the cage cozy and clean.",
       "Visible quests are handled. New cage ambitions unlock as the herd grows.",
     );
     renderMilestoneList(
       "achievement-list",
-      getAchievementViews(this.state),
+      achievementViews,
       3,
       "No achievements yet. The first bean usually starts it.",
       "Visible achievements are handled. The cage is quietly impressed.",
     );
+    this.updateMilestoneFeedback(questViews, achievementViews);
   }
 
   private runAction(
@@ -597,10 +749,18 @@ export class Hud {
   private runEventChoice(source: HTMLButtonElement): void {
     const choiceId = source.dataset.eventChoiceId as EventChoiceId | undefined;
     if (!choiceId) return;
+    const choice = getEventChoices(this.state).find((candidate) => candidate.id === choiceId);
     this.runAction(
       () => respondToEventChoice(this.state, choiceId),
       source,
-      undefined,
+      {
+        category: "event",
+        target: "cage",
+        eventChoiceId: choiceId,
+        label: choice?.label ?? "Event Choice",
+        resourceText: getEventChoiceFeedbackText(choiceId),
+        color: getEventChoiceFeedbackColor(choiceId),
+      },
       "eventResponse",
       "event",
     );
@@ -621,20 +781,67 @@ export class Hud {
   }
 
   private renderSaveStatus(detail: SaveStatusDetail): void {
+    this.saveStatus.classList.remove("saving", "saved", "warning");
     this.saveStatus.hidden = false;
     if (detail.status === "saving") {
       this.saveStatus.textContent = "Saving...";
+      this.saveStatus.classList.add("saving");
       return;
     }
     if (detail.status === "saved") {
       this.saveStatus.textContent = "Saved";
+      this.saveStatus.classList.add("saved");
       return;
     }
     if (detail.status === "unavailable") {
       this.saveStatus.textContent = "Save unavailable";
+      this.saveStatus.classList.add("warning");
       return;
     }
     this.saveStatus.hidden = true;
+  }
+
+  private updateMilestoneFeedback(questViews: MilestoneView[], achievementViews: MilestoneView[]): void {
+    const completedQuests = new Set(questViews.filter((milestone) => milestone.complete).map((milestone) => milestone.id));
+    const completedAchievements = new Set(achievementViews.filter((milestone) => milestone.complete).map((milestone) => milestone.id));
+
+    this.dispatchNewMilestoneFeedback(
+      "quest",
+      questViews,
+      completedQuests,
+      this.previousCompletedQuestIds,
+      0x7db46a,
+    );
+    this.dispatchNewMilestoneFeedback(
+      "achievement",
+      achievementViews,
+      completedAchievements,
+      this.previousCompletedAchievementIds,
+      0xf0d56b,
+    );
+
+    this.previousCompletedQuestIds = completedQuests;
+    this.previousCompletedAchievementIds = completedAchievements;
+  }
+
+  private dispatchNewMilestoneFeedback(
+    kind: "quest" | "achievement",
+    views: MilestoneView[],
+    completedIds: Set<string>,
+    previousIds: Set<string> | null,
+    color: number,
+  ): void {
+    if (!previousIds) return;
+    const completed = views.find((milestone) => milestone.complete && completedIds.has(milestone.id) && !previousIds.has(milestone.id));
+    if (!completed) return;
+    this.dispatchSceneFeedback({
+      category: "milestone",
+      target: "center",
+      milestoneKind: kind,
+      label: kind === "quest" ? "Quest Complete" : "Achievement",
+      resourceText: completed.title,
+      color,
+    });
   }
 
   private playActionSuccess(source: HTMLButtonElement, effect?: HudActionEffect): void {
@@ -652,10 +859,11 @@ export class Hud {
     source.addEventListener("animationend", clearSuccess, { once: true });
     window.setTimeout(clearSuccess, 680);
 
-    if (effect) {
-      const detail = typeof effect === "string" ? { effect } : effect;
-      window.dispatchEvent(new CustomEvent(HUD_ACTION_EFFECT_EVENT, { detail }));
-    }
+    if (effect) this.dispatchSceneFeedback(toSceneFeedbackDetail(effect));
+  }
+
+  private dispatchSceneFeedback(detail: SceneFeedbackDetail): void {
+    window.dispatchEvent(new CustomEvent(HUD_ACTION_EFFECT_EVENT, { detail }));
   }
 
   private openSection(section: SectionId, launcher: HTMLButtonElement): void {
@@ -719,19 +927,39 @@ export class Hud {
     this.previousComboCount = comboCount;
   }
 
+  private updateObjectivePulse(): void {
+    const current = getObjectivePulseState(this.state);
+    const previous = this.previousObjectivePulseState;
+    this.previousObjectivePulseState = current;
+    if (!previous) return;
+
+    const objectiveChanged = current.id !== previous.id || current.target !== previous.target;
+    const objectiveCompleted = current.completed > previous.completed;
+    const progressIncreased = current.id === previous.id && current.progress > previous.progress;
+
+    if (objectiveChanged || objectiveCompleted) {
+      pulseElement("quick-objective-title", "objective-pulse");
+      pulseElement("quick-objective-progress", "objective-pulse");
+    } else if (progressIncreased) {
+      pulseElement("quick-objective-progress", "objective-pulse");
+    }
+  }
+
   private updateSectionIndicators(): void {
     this.updateGoalAndLogMarkers();
 
     const eventReady = Boolean(this.state.event.active && this.state.event.responseReady);
+    const eventActive = Boolean(this.state.event.active);
     const requestReady = Boolean(this.state.pigRequest?.active);
-    const careNeedsAttention = eventReady || requestReady || this.state.needs.hay < 25 || this.state.needs.water < 25;
     const careLowCount = Number(this.state.needs.hay < 25) + Number(this.state.needs.water < 25);
     this.setAttention(this.buttons["event-response"], eventReady);
     this.setAttention(this.quickButtons["quick-event-response"], eventReady);
-    this.launchers.care.classList.toggle("dock-alert", careNeedsAttention);
-
-    this.setBadge("care", eventReady || requestReady ? "!" : careLowCount > 0 ? careLowCount.toString() : "");
-    this.setBadge("shop", countEnabled(this.buttons, [
+    this.setDockIndicator(
+      "care",
+      eventReady || requestReady ? "!" : eventActive ? "..." : careLowCount > 0 ? careLowCount.toString() : "",
+      eventReady || requestReady ? "urgent" : "notice",
+    );
+    this.setDockIndicator("shop", countEnabled(this.buttons, [
       "adopt-pig",
       "better-hay",
       "better-scoop",
@@ -739,8 +967,8 @@ export class Hud {
       "fuel-automation",
       "bigger-cage",
       "rare-pig",
-    ]));
-    this.setBadge("furniture", countEnabled(this.buttons, [
+    ]), "available");
+    this.setDockIndicator("furniture", countEnabled(this.buttons, [
       "hidey-house",
       "tunnel",
       "litter-tray",
@@ -748,29 +976,36 @@ export class Hud {
       "snuggle-sack",
       "cardboard-castle",
       "royal-throne",
-    ]));
-    this.setBadge("abilities", countEnabled(this.buttons, [
+    ]), "available");
+    this.setDockIndicator("abilities", countEnabled(this.buttons, [
       "wheek-call",
       "treat-bag",
       "deep-clean",
       "fresh-bedding",
       "snack-time",
       "zoomie-mode",
-    ]));
-    this.setBadge("recipes", countEnabled(this.buttons, [
+    ]), "available");
+    this.setDockIndicator("recipes", countEnabled(this.buttons, [
       "recipe-bean-blessing",
       "recipe-compost-catalyst",
       "recipe-royal-accord",
-    ]));
-    this.setBadge("mythos", countEnabled(this.buttons, [
+    ]), "available");
+    this.setDockIndicator("mythos", countEnabled(this.buttons, [
       "hay-dimension",
       "bean-exchange",
+      "exchange-beans-to-compost",
+      "exchange-compost-to-squeaks",
+      "exchange-gold-to-beans",
+      "exchange-squeaks-to-gold",
       "cavy-council",
+      "council-care-mandate",
+      "council-cleanup-ordinance",
+      "council-herd-charter",
       "squeak-choir",
       "bean-singularity",
       "prestige",
-    ]));
-    this.setBadge("wisdom", countEnabled(this.buttons, [
+    ]), "available");
+    this.setDockIndicator("wisdom", countEnabled(this.buttons, [
       "wisdom-roomy-start",
       "wisdom-steady-supplies",
       "wisdom-fresh-start",
@@ -783,10 +1018,10 @@ export class Hud {
       "wisdom-rare-instinct",
       "wisdom-golden-nose",
       "wisdom-royal-memory",
-    ]));
-    this.setBadge("herd", "");
-    this.setBadge("goals", this.hasGoalUpdate ? "!" : "");
-    this.setBadge("log", this.hasUnreadLog ? "!" : "");
+    ]), "available");
+    this.setDockIndicator("herd", "", "notice");
+    this.setDockIndicator("goals", this.hasGoalUpdate ? "!" : "", "notice");
+    this.setDockIndicator("log", this.hasUnreadLog ? "!" : "", "notice");
   }
 
   private updateGoalAndLogMarkers(): void {
@@ -809,21 +1044,69 @@ export class Hud {
     if (this.activeSection === "log") this.hasUnreadLog = false;
   }
 
-  private setBadge(section: SectionId, value: number | string): void {
+  private setDockIndicator(section: SectionId, value: number | string, kind: DockBadgeKind): void {
     const badge = this.badges[section];
+    const launcher = this.launchers[section];
     const text = typeof value === "number" ? (value > 0 ? value.toString() : "") : value;
     badge.textContent = text;
     badge.hidden = text.length === 0;
+    badge.dataset.badgeKind = kind;
+    launcher.classList.toggle("dock-urgent", text.length > 0 && kind === "urgent");
+    launcher.classList.toggle("dock-available", text.length > 0 && kind === "available");
+    launcher.classList.toggle("dock-notice", text.length > 0 && kind === "notice");
   }
 
   private setAttention(button: HTMLButtonElement, active: boolean): void {
     button.classList.toggle("attention", active);
   }
 
-  private updateAvailableNowStyles(): void {
+  private updateStatEmphasis(furnitureUnlocked: number): void {
+    this.setStatClasses("beans", "stat-primary", true);
+    this.setStatClasses("pigs", "stat-primary", true);
+    this.setStatClasses("clean", "stat-primary", true);
+    this.setStatClasses("streak", "stat-primary", true);
+
+    this.setStatClasses("compost", "stat-secondary", true);
+    this.setStatClasses("squeaks", "stat-secondary", true);
+    this.setStatClasses("gold", "stat-secondary", true);
+    this.setStatClasses("wisdom", "stat-secondary", true);
+    this.setStatClasses("furniture", "stat-secondary", true);
+
+    this.setStatClasses("clean", "stat-danger", this.state.cage.cleanliness < 45);
+    this.setStatClasses("streak", "stat-active", this.state.combo.timer > 0 && this.state.combo.count > 1);
+    this.setResourceStatState("compost", this.state.compost > 0);
+    this.setResourceStatState("squeaks", this.state.squeaks > 0);
+    this.setResourceStatState("gold", this.state.goldenBeans > 0);
+    this.setResourceStatState("wisdom", this.state.cavyWisdom > 0);
+    this.setResourceStatState("furniture", furnitureUnlocked > 0);
+  }
+
+  private setStatClasses(id: StatId, className: string, active: boolean): void {
+    this.statCards[id].classList.toggle(className, active);
+  }
+
+  private setResourceStatState(id: StatId, unlocked: boolean): void {
+    this.setStatClasses(id, "stat-unlocked", unlocked);
+    this.setStatClasses(id, "stat-dormant", !unlocked);
+  }
+
+  private updateActionVisualStates(): void {
     for (const button of Object.values(this.buttons)) {
-      button.classList.toggle("available-now", !button.disabled);
+      this.setActionVisualState(button, getActionVisualState(button));
     }
+    for (const button of Object.values(this.quickButtons)) {
+      this.setActionVisualState(button, getActionVisualState(button));
+    }
+    for (const button of Object.values(this.eventChoiceButtons)) {
+      this.setActionVisualState(button, button.hidden ? "locked" : getActionVisualState(button));
+    }
+  }
+
+  private setActionVisualState(button: HTMLButtonElement, state: ActionVisualState): void {
+    button.classList.toggle("available-now", state === "available");
+    button.classList.toggle("locked-now", state === "locked");
+    button.classList.toggle("completed-now", state === "completed");
+    button.classList.toggle("attention-now", state === "attention");
   }
 
   private bindFurnitureButton(buttonId: ButtonId, furnitureId: FurnitureId): void {
@@ -831,7 +1114,7 @@ export class Hud {
       this.runAction(
         () => buyFurniture(this.state, furnitureId),
         this.buttons[buttonId],
-        { effect: "furniture-ready", furnitureId },
+        { category: "unlock", target: "furniture", furnitureId, label: "Unlocked", color: 0x7db46a },
         "purchase",
         "purchase",
       ),
@@ -843,7 +1126,7 @@ export class Hud {
       this.runAction(
         () => useAbility(this.state, abilityId),
         this.buttons[buttonId],
-        { effect: "ability", abilityId },
+        { category: "purchase", target: "ability", abilityId },
         "useAbility",
         "ability",
       ),
@@ -855,7 +1138,13 @@ export class Hud {
       this.runAction(
         () => unlockBeanRecipe(this.state, recipeId),
         this.buttons[buttonId],
-        undefined,
+        {
+          category: "unlock",
+          target: "center",
+          label: getBeanRecipeName(recipeId),
+          resourceText: "Recipe Active",
+          color: 0x8c75d8,
+        },
         "purchase",
         "purchase",
       ),
@@ -867,7 +1156,13 @@ export class Hud {
       this.runAction(
         () => buyWisdomPerk(this.state, wisdomId),
         this.buttons[buttonId],
-        undefined,
+        {
+          category: "unlock",
+          target: "center",
+          label: getWisdomPerk(wisdomId).label,
+          resourceText: "Wisdom Learned",
+          color: 0xf0d56b,
+        },
         "purchase",
         "purchase",
       ),
@@ -925,9 +1220,27 @@ export class Hud {
   private renderLateGameStatuses(): void {
     setText("hay-dimension-status", getLateGameStatusText(this.state, "hayDimension"));
     setText("bean-exchange-status", getLateGameStatusText(this.state, "beanExchange"));
+    this.renderBeanExchangeStatuses();
     setText("cavy-council-status", getLateGameStatusText(this.state, "cavyCouncil"));
+    this.renderCouncilDecreeStatuses();
     setText("squeak-choir-status", getLateGameStatusText(this.state, "squeakChoir"));
     setText("bean-singularity-status", getLateGameStatusText(this.state, "beanSingularity"));
+  }
+
+  private renderBeanExchangeStatuses(): void {
+    this.beanExchangePanel.hidden = !this.state.lateGame.beanExchange;
+    for (const trade of getBeanExchangeTrades()) {
+      const buttonId = BEAN_EXCHANGE_BUTTONS[trade.id];
+      setText(`${buttonId}-status`, getBeanExchangeTradeStatus(this.state, trade.id));
+    }
+  }
+
+  private renderCouncilDecreeStatuses(): void {
+    this.cavyCouncilPanel.hidden = !this.state.lateGame.cavyCouncil;
+    for (const decree of getCouncilDecrees()) {
+      const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
+      setText(`${buttonId}-status`, getCouncilDecreeStatus(this.state, decree.id));
+    }
   }
 
   private renderWisdomStatuses(): void {
@@ -979,6 +1292,16 @@ export class Hud {
     if (description) description.textContent = choice.description;
   }
 
+  private updateEventButtonLabels(): void {
+    const label = this.state.event.active
+      ? this.state.event.responseReady
+        ? "Respond"
+        : "Event active"
+      : "Event";
+    this.buttons["event-response"].textContent = label;
+    this.quickButtons["quick-event-response"].textContent = label;
+  }
+
   private renderPigRequest(): void {
     const panel = document.getElementById("pig-request-panel");
     if (!panel) return;
@@ -1028,7 +1351,17 @@ export class Hud {
   private updateLateGameDisabled(): void {
     this.buttons["hay-dimension"].disabled = this.state.lateGame.hayDimension || this.state.beans < 750 || this.state.compost < 25;
     this.buttons["bean-exchange"].disabled = this.state.lateGame.beanExchange || this.state.beans < 1200 || this.state.goldenBeans < 2;
+    for (const trade of getBeanExchangeTrades()) {
+      const buttonId = BEAN_EXCHANGE_BUTTONS[trade.id];
+      this.buttons[buttonId].disabled = getBeanExchangeTradeStatus(this.state, trade.id) !== "Trade";
+      this.buttons[buttonId].hidden = !this.state.lateGame.beanExchange;
+    }
     this.buttons["cavy-council"].disabled = this.state.lateGame.cavyCouncil || this.state.pigs.length < 8 || this.state.squeaks < 10;
+    for (const decree of getCouncilDecrees()) {
+      const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
+      this.buttons[buttonId].disabled = getCouncilDecreeStatus(this.state, decree.id) !== "Pass";
+      this.buttons[buttonId].hidden = !this.state.lateGame.cavyCouncil;
+    }
     this.buttons["squeak-choir"].disabled = this.state.lateGame.squeakChoir || this.state.squeaks < 25;
     this.buttons["bean-singularity"].disabled =
       this.state.lateGame.beanSingularity || this.state.compost < 100 || this.state.stats.rarePoopsCleaned < 25;
@@ -1097,6 +1430,14 @@ function getBadge(section: SectionId): HTMLElement {
   return element;
 }
 
+function getStatCard(id: StatId): HTMLElement {
+  const element = document.querySelector<HTMLElement>(`[data-stat="${id}"]`);
+  if (!element) {
+    throw new Error(`Missing stat card for ${id}`);
+  }
+  return element;
+}
+
 function countEnabled(buttons: Record<ButtonId, HTMLButtonElement>, ids: ButtonId[]): number {
   return ids.reduce((total, id) => total + Number(!buttons[id].disabled), 0);
 }
@@ -1130,6 +1471,87 @@ function getGoalSignature(state: GameState): string {
     state.milestones.quests.join(","),
     state.milestones.achievements.join(","),
   ].join("|");
+}
+
+function getObjectivePulseState(state: GameState): ObjectivePulseState {
+  return {
+    id: state.objective.id,
+    progress: Math.floor(state.objective.progress),
+    target: state.objective.target,
+    completed: state.stats.objectivesCompleted,
+  };
+}
+
+function getActionVisualState(button: HTMLButtonElement): ActionVisualState {
+  if (button.classList.contains("attention")) return "attention";
+  if (isCompletedButton(button)) return "completed";
+  return button.disabled ? "locked" : "available";
+}
+
+function toSceneFeedbackDetail(effect: HudActionEffect): SceneFeedbackDetail {
+  if (typeof effect !== "string") return effect;
+  if (effect === "hay") return { category: "purchase", target: "hay", label: "Better Hay", color: 0xd7c74b };
+  if (effect === "scoop") return { category: "purchase", target: "scoop", label: "Better Scoop", color: 0xf0d56b };
+  if (effect === "robot") return { category: "purchase", target: "robot", label: "Roomba", color: 0x86d9f0 };
+  if (effect === "cage") return { category: "purchase", target: "cage", label: "Bigger Cage", color: 0xf0d56b };
+  if (effect === "herd") return { category: "adoption", target: "herd", label: "New Pig", color: 0xf0d56b };
+  if (effect === "ability") return { category: "purchase", target: "ability", label: "Ability", color: 0xf0d56b };
+  return { category: "unlock", target: "furniture", label: "Unlocked", color: 0x7db46a };
+}
+
+function getBeanExchangeFeedbackText(tradeId: BeanExchangeTradeId): string {
+  if (tradeId === "beansToCompost") return "-250 Beans / +20 Compost";
+  if (tradeId === "compostToSqueaks") return "-30 Compost / +5 Squeaks";
+  if (tradeId === "goldToBeans") return "-1 Gold / +300 Beans";
+  return "-20 Squeaks / +1 Gold";
+}
+
+function getBeanExchangeFeedbackColor(tradeId: BeanExchangeTradeId): number {
+  if (tradeId === "beansToCompost") return 0x6fa55d;
+  if (tradeId === "compostToSqueaks") return 0xf0d56b;
+  if (tradeId === "goldToBeans" || tradeId === "squeaksToGold") return 0xe4b83b;
+  return 0x7db46a;
+}
+
+function getCouncilDecreeFeedbackText(decreeId: CouncilDecreeId): string {
+  if (decreeId === "careMandate") return "+Hay / +Water / +Happy";
+  if (decreeId === "cleanupOrdinance") return "Center Cleaned";
+  return "+75 Beans / +1 Gold";
+}
+
+function getCouncilDecreeFeedbackColor(decreeId: CouncilDecreeId): number {
+  if (decreeId === "careMandate") return 0x7db46a;
+  if (decreeId === "cleanupOrdinance") return 0x86d9f0;
+  return 0xb965d2;
+}
+
+function getEventChoiceFeedbackText(choiceId: EventChoiceId): string {
+  if (choiceId.includes("Hay") || choiceId.includes("hay")) return "Hay Shift";
+  if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return "Water Shift";
+  if (choiceId.includes("Squeak") || choiceId.includes("squeak") || choiceId.includes("wheek")) return "Squeaks";
+  if (choiceId.includes("Clean") || choiceId.includes("Tidy") || choiceId.includes("inspection")) return "Cage Shift";
+  if (choiceId.includes("compost") || choiceId.includes("Compost")) return "Compost";
+  if (choiceId.includes("zoomies") || choiceId.includes("Zoomies")) return "Zoomies";
+  return "Event Resolved";
+}
+
+function getEventChoiceFeedbackColor(choiceId: EventChoiceId): number {
+  if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return 0x86d9f0;
+  if (choiceId.includes("compost") || choiceId.includes("Compost")) return 0x6fa55d;
+  if (choiceId.includes("Squeak") || choiceId.includes("squeak") || choiceId.includes("wheek")) return 0xf0d56b;
+  if (choiceId.includes("zoomies") || choiceId.includes("Zoomies")) return 0xb965d2;
+  return 0x7db46a;
+}
+
+function isCompletedButton(button: HTMLButtonElement): boolean {
+  const status = button.querySelector("strong")?.textContent?.trim().toLowerCase() ?? "";
+  return status === "active" || status === "unlocked" || status === "learned";
+}
+
+function getBeanRecipeName(id: BeanRecipeId): string {
+  if (id === "beanBlessing") return "Bean Blessing";
+  if (id === "compostCatalyst") return "Compost Catalyst";
+  return "Royal Accord";
 }
 
 function getLogSignature(state: GameState): string {

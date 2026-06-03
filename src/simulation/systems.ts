@@ -90,10 +90,12 @@ function updateDerivedCageStats(state: GameState): void {
     Number(state.furniture.cardboardCastle) * 2 +
     (state.recipes.royalAccord ? 2 : 0);
   const unsupportedPigs = Math.max(0, state.pigs.length - 2 - supportScore);
+  const unsupportedPenalty = Math.max(0, unsupportedPigs * 9 - (state.lateGame.cavyCouncil ? 4 : 0));
   const bondedPigCount = state.pigs.filter((pig) => pig.bondedPigId !== null).length;
   const bondBonus =
     bondedPigCount * (2 + (state.wisdom.socialMemory ? 1 : 0)) +
     (state.wisdom.bondedBeginnings && bondedPigCount > 0 ? 4 : 0);
+  const councilSocialBonus = state.lateGame.cavyCouncil ? 12 : 0;
   state.cage.enrichment =
     Number(state.furniture.chewToy) * 22 +
     Number(state.furniture.snuggleSack) * 24 +
@@ -109,7 +111,8 @@ function updateDerivedCageStats(state: GameState): void {
       Number(state.furniture.snuggleSack) * 3 +
       (hasFurnitureSynergy(state, "cozyCorner") ? 8 : 0) +
       bondBonus -
-      unsupportedPigs * 9,
+      unsupportedPenalty +
+      councilSocialBonus,
   );
   state.cage.space = Math.max(
     0,
@@ -135,6 +138,7 @@ function updateHappiness(state: GameState): void {
   const dramaPenalty =
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
   const lonePigPenalty = state.pigs.length === 1 ? 14 : 0;
+  const councilHappinessBonus = state.lateGame.cavyCouncil && state.pigs.length >= 8 ? 5 : 0;
   state.cage.happiness = Math.max(
     0,
     Math.min(
@@ -149,7 +153,8 @@ function updateHappiness(state: GameState): void {
           abilityBonus -
           dramaPenalty +
           synergyBonus -
-          lonePigPenalty,
+          lonePigPenalty +
+          councilHappinessBonus,
       ),
     ),
   );

@@ -14,7 +14,18 @@ import {
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
 import { addLegendaryPig, addLog, addPig, spawnEventPoop, syncCageDimensionsToLevel } from "./state";
-import type { AbilityId, BeanRecipeId, EventChoiceId, EventId, FurnitureId, GameState, PoopType, WisdomPerkId } from "./types";
+import type {
+  AbilityId,
+  BeanExchangeTradeId,
+  BeanRecipeId,
+  CouncilDecreeId,
+  EventChoiceId,
+  EventId,
+  FurnitureId,
+  GameState,
+  PoopType,
+  WisdomPerkId,
+} from "./types";
 
 export interface CleanResult {
   cleaned: number;
@@ -27,6 +38,68 @@ export interface CleanResult {
   rare: number;
   cleanedPoops: CleanedPoop[];
 }
+
+interface CleanOptions {
+  advanceRequests?: boolean;
+}
+
+export interface BeanExchangeTradeDefinition {
+  id: BeanExchangeTradeId;
+  label: string;
+  description: string;
+  log: string;
+}
+
+export interface CouncilDecreeDefinition {
+  id: CouncilDecreeId;
+  label: string;
+  description: string;
+}
+
+const BEAN_EXCHANGE_TRADES: BeanExchangeTradeDefinition[] = [
+  {
+    id: "beansToCompost",
+    label: "Compost Futures",
+    description: "Convert Beans into Compost.",
+    log: "Bean Exchange converted 250 Beans into 20 Compost.",
+  },
+  {
+    id: "compostToSqueaks",
+    label: "Squeak Brokerage",
+    description: "Convert Compost into Squeaks.",
+    log: "Bean Exchange converted 30 Compost into 5 Squeaks.",
+  },
+  {
+    id: "goldToBeans",
+    label: "Liquidate Gold",
+    description: "Convert a Golden Bean into Beans.",
+    log: "Bean Exchange liquidated 1 Golden Bean into 300 Beans.",
+  },
+  {
+    id: "squeaksToGold",
+    label: "Mint Gold",
+    description: "Convert Squeaks and Beans into a Golden Bean.",
+    log: "Bean Exchange minted 1 Golden Bean from 20 Squeaks and 150 Beans.",
+  },
+];
+
+const COUNCIL_DECREES: CouncilDecreeDefinition[] = [
+  {
+    id: "careMandate",
+    label: "Care Mandate",
+    description: "Spend 6 Squeaks to restore +30 Hay, +30 Water, and +4 Happiness.",
+  },
+  {
+    id: "cleanupOrdinance",
+    label: "Cleanup Ordinance",
+    description: "Spend 8 Squeaks to clean a wide area in the cage center.",
+  },
+  {
+    id: "herdCharter",
+    label: "Herd Charter",
+    description: "Spend 10 Squeaks to grant +75 Beans and +1 Golden Bean to a large, happy herd.",
+  },
+];
 
 export interface CleanedPoop {
   id: number;
@@ -103,7 +176,7 @@ export function cleanAtWithResult(state: GameState, x: number, y: number): Clean
   return result;
 }
 
-export function cleanPoopsInRadius(state: GameState, x: number, y: number, radius: number): CleanResult {
+export function cleanPoopsInRadius(state: GameState, x: number, y: number, radius: number, options: CleanOptions = {}): CleanResult {
   const result: CleanResult = {
     cleaned: 0,
     earned: 0,
@@ -166,9 +239,11 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
     state.stats.goldenCleaned += result.golden;
     state.stats.stinkyCleaned += result.stinky;
     state.stats.rarePoopsCleaned += result.rare;
-    advancePigRequest(state, "clean", result.cleaned);
-    advancePigRequest(state, "combo", comboCount);
-    updateHeldPigRequestProgress(state);
+    if (options.advanceRequests !== false) {
+      advancePigRequest(state, "clean", result.cleaned);
+      advancePigRequest(state, "combo", comboCount);
+      updateHeldPigRequestProgress(state);
+    }
   }
   return result;
 }
@@ -429,6 +504,96 @@ export function unlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
   return true;
 }
 
+export function getBeanExchangeTrades(): BeanExchangeTradeDefinition[] {
+  return BEAN_EXCHANGE_TRADES;
+}
+
+export function exchangeBeanResource(state: GameState, tradeId: BeanExchangeTradeId): boolean {
+  if (!state.lateGame.beanExchange || getBeanExchangeTradeStatus(state, tradeId) !== "Trade") return false;
+
+  if (tradeId === "beansToCompost") {
+    state.beans -= 250;
+    state.compost += 20;
+  } else if (tradeId === "compostToSqueaks") {
+    state.compost -= 30;
+    state.squeaks += 5;
+  } else if (tradeId === "goldToBeans") {
+    state.goldenBeans -= 1;
+    state.beans += 300;
+    state.stats.lifetimeBeans += 300;
+  } else {
+    state.squeaks -= 20;
+    state.beans -= 150;
+    state.goldenBeans += 1;
+  }
+
+  addLog(state, getBeanExchangeTrade(tradeId).log);
+  updateMilestones(state);
+  return true;
+}
+
+export function getBeanExchangeTradeStatus(state: GameState, tradeId: BeanExchangeTradeId): string {
+  if (!state.lateGame.beanExchange) return "Unlock Bean Exchange";
+  if (tradeId === "beansToCompost" && state.beans < 250) return formatNeed(state.beans, 250, "Bean");
+  if (tradeId === "compostToSqueaks" && state.compost < 30) return formatNeed(state.compost, 30, "Compost", "Compost");
+  if (tradeId === "goldToBeans" && state.goldenBeans < 1) return formatNeed(state.goldenBeans, 1, "Golden Bean");
+  if (tradeId === "squeaksToGold") {
+    if (state.squeaks < 20) return formatNeed(state.squeaks, 20, "Squeak");
+    if (state.beans < 150) return formatNeed(state.beans, 150, "Bean");
+  }
+  return "Trade";
+}
+
+function getBeanExchangeTrade(tradeId: BeanExchangeTradeId): BeanExchangeTradeDefinition {
+  return BEAN_EXCHANGE_TRADES.find((trade) => trade.id === tradeId) ?? BEAN_EXCHANGE_TRADES[0];
+}
+
+export function getCouncilDecrees(): CouncilDecreeDefinition[] {
+  return COUNCIL_DECREES;
+}
+
+export function useCouncilDecree(state: GameState, decreeId: CouncilDecreeId): boolean {
+  if (getCouncilDecreeStatus(state, decreeId) !== "Pass") return false;
+
+  if (decreeId === "careMandate") {
+    state.squeaks -= 6;
+    state.needs.hay = Math.min(100, state.needs.hay + 30);
+    state.needs.water = Math.min(100, state.needs.water + 30);
+    state.cage.happiness = Math.min(100, state.cage.happiness + 4);
+    addLog(state, "Cavy Council passed a Care Mandate: hay, water, and morale improved.");
+  } else if (decreeId === "cleanupOrdinance") {
+    state.squeaks -= 8;
+    const radius = Math.max(state.cage.width, state.cage.height) * 0.45;
+    const result = cleanPoopsInRadius(state, state.cage.width / 2, state.cage.height / 2, radius, { advanceRequests: false });
+    addLog(state, `Cavy Council passed a Cleanup Ordinance: cleaned ${result.cleaned} beans for +${result.earned}.`);
+  } else {
+    state.squeaks -= 10;
+    awardBeans(state, 75);
+    state.goldenBeans += 1;
+    addLog(state, "Cavy Council ratified a Herd Charter for +75 Beans and +1 Golden Bean.");
+  }
+
+  updateMilestones(state);
+  return true;
+}
+
+export function getCouncilDecreeStatus(state: GameState, decreeId: CouncilDecreeId): string {
+  if (!state.lateGame.cavyCouncil) return "Unlock Cavy Council";
+  if (decreeId === "careMandate") {
+    if (state.squeaks < 6) return formatNeed(state.squeaks, 6, "Squeak");
+    return "Pass";
+  }
+  if (decreeId === "cleanupOrdinance") {
+    if (state.squeaks < 8) return formatNeed(state.squeaks, 8, "Squeak");
+    if (state.poops.length === 0) return "No beans to clean";
+    return "Pass";
+  }
+  if (state.squeaks < 10) return formatNeed(state.squeaks, 10, "Squeak");
+  if (state.pigs.length < 8) return formatNeed(state.pigs.length, 8, "Pig");
+  if (state.cage.happiness < 70) return "Need 70% Happy";
+  return "Pass";
+}
+
 export function canUnlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
   if (state.recipes[id]) return false;
   if (id === "beanBlessing") return state.goldenBeans >= 2 && state.squeaks >= 8 && state.stats.blessedCleaned >= 1;
@@ -618,6 +783,11 @@ export function prestige(state: GameState): boolean {
   state.recipes.beanBlessing = false;
   state.recipes.compostCatalyst = false;
   state.recipes.royalAccord = false;
+  state.lateGame.hayDimension = false;
+  state.lateGame.beanExchange = false;
+  state.lateGame.cavyCouncil = false;
+  state.lateGame.squeakChoir = false;
+  state.lateGame.beanSingularity = false;
   state.event.active = null;
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;

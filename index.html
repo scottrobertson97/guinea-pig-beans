@@ -26,15 +26,15 @@
             <button id="reset-run" class="reset-game-button" type="button">Reset Game</button>
           </div>
           <div class="stats">
-            <div><span>Beans</span><strong id="beans">0</strong></div>
-            <div><span>Pigs</span><strong id="pig-count">1</strong></div>
-            <div><span>Clean</span><strong id="cleanliness">100%</strong></div>
-            <div><span>Streak</span><strong id="combo-value">Ready</strong></div>
-            <div><span>Compost</span><strong id="compost">0</strong></div>
-            <div><span>Squeaks</span><strong id="squeaks">0</strong></div>
-            <div><span>Gold</span><strong id="golden-beans">0</strong></div>
-            <div><span>Wisdom</span><strong id="cavy-wisdom">0</strong></div>
-            <div><span>Furniture</span><strong id="habitat-space">0/7</strong></div>
+            <div data-stat="beans"><span>Beans</span><strong id="beans">0</strong></div>
+            <div data-stat="pigs"><span>Pigs</span><strong id="pig-count">1</strong></div>
+            <div data-stat="clean"><span>Clean</span><strong id="cleanliness">100%</strong></div>
+            <div data-stat="streak"><span>Streak</span><strong id="combo-value">Ready</strong></div>
+            <div data-stat="compost"><span>Compost</span><strong id="compost">0</strong></div>
+            <div data-stat="squeaks"><span>Squeaks</span><strong id="squeaks">0</strong></div>
+            <div data-stat="gold"><span>Gold</span><strong id="golden-beans">0</strong></div>
+            <div data-stat="wisdom"><span>Wisdom</span><strong id="cavy-wisdom">0</strong></div>
+            <div data-stat="furniture"><span>Furniture</span><strong id="habitat-space">0/7</strong></div>
           </div>
         </header>
 
@@ -310,10 +310,44 @@
                 <span>Bean Exchange</span><strong id="bean-exchange-status"></strong>
                 <em>Spends Beans and Gold to open the late-game economy track.</em>
               </button>
+              <div id="bean-exchange-panel" class="exchange-panel" hidden>
+                <h2>Exchange</h2>
+                <button id="exchange-beans-to-compost" type="button">
+                  <span>Compost Futures</span><strong id="exchange-beans-to-compost-status"></strong>
+                  <em>Convert 250 Beans into 20 Compost.</em>
+                </button>
+                <button id="exchange-compost-to-squeaks" type="button">
+                  <span>Squeak Brokerage</span><strong id="exchange-compost-to-squeaks-status"></strong>
+                  <em>Convert 30 Compost into 5 Squeaks.</em>
+                </button>
+                <button id="exchange-gold-to-beans" type="button">
+                  <span>Liquidate Gold</span><strong id="exchange-gold-to-beans-status"></strong>
+                  <em>Convert 1 Golden Bean into 300 Beans.</em>
+                </button>
+                <button id="exchange-squeaks-to-gold" type="button">
+                  <span>Mint Gold</span><strong id="exchange-squeaks-to-gold-status"></strong>
+                  <em>Convert 20 Squeaks and 150 Beans into 1 Golden Bean.</em>
+                </button>
+              </div>
               <button id="cavy-council" type="button">
                 <span>Cavy Council</span><strong id="cavy-council-status"></strong>
-                <em>Turns a large herd and stored Squeaks into council-level progression.</em>
+                <em>Large herds gain social stability and unlock repeatable Council Decrees.</em>
               </button>
+              <div id="cavy-council-panel" class="exchange-panel" hidden>
+                <h2>Council Decrees</h2>
+                <button id="council-care-mandate" type="button">
+                  <span>Care Mandate</span><strong id="council-care-mandate-status"></strong>
+                  <em>Spend 6 Squeaks to restore +30 Hay, +30 Water, and +4 Happiness.</em>
+                </button>
+                <button id="council-cleanup-ordinance" type="button">
+                  <span>Cleanup Ordinance</span><strong id="council-cleanup-ordinance-status"></strong>
+                  <em>Spend 8 Squeaks to clean a wide area in the cage center.</em>
+                </button>
+                <button id="council-herd-charter" type="button">
+                  <span>Herd Charter</span><strong id="council-herd-charter-status"></strong>
+                  <em>Spend 10 Squeaks to grant +75 Beans and +1 Golden Bean to a large, happy herd.</em>
+                </button>
+              </div>
               <button id="squeak-choir" type="button">
                 <span>Squeak Choir</span><strong id="squeak-choir-status"></strong>
                 <em>Generates Squeaks over time and reduces every active ability cost by 1.</em>

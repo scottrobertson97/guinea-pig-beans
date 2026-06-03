@@ -4,19 +4,11 @@ import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simula
 import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
 import { updateSimulation } from "../simulation/systems";
 import type { AbilityId, FurnitureId, GameState, Pig, Poop, PoopType, Robot } from "../simulation/types";
-import { emitPlayerAction, emitUiSound } from "../ui/events";
+import { emitPlayerAction, emitUiSound, type SceneFeedbackDetail } from "../ui/events";
 
 interface SceneData {
   state: GameState;
   onStateChanged: () => void;
-}
-
-type ActionEffectId = "hay" | "scoop" | "robot" | "cage" | "furniture-ready" | "herd" | "ability";
-
-interface HudActionEffectDetail {
-  effect?: ActionEffectId;
-  abilityId?: AbilityId;
-  furnitureId?: FurnitureId;
 }
 
 const HUD_ACTION_EFFECT_EVENT = "guinea-pig-action-effect";
@@ -78,6 +70,10 @@ const PIG_THOUGHT_Y = -52;
 const POOP_SHADOW_Y = 14;
 const BEAN_POP_SCALE = 1.3;
 const MESS_PILE_POP_SCALE = 1.16;
+const FIRST_CLEAN_POP_SCALE = 1.52;
+const FIRST_CLEAN_BURST_COUNT = 14;
+const FLOATING_TEXT_MARGIN = 34;
+const MAX_FLOATING_TEXT_LABELS = 5;
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
@@ -104,12 +100,12 @@ export class GameScene extends Phaser.Scene {
   private scoopPreview!: Phaser.GameObjects.Ellipse;
   private lastCageWidth = 0;
   private lastCageHeight = 0;
+  private activeFloatingTextCount = 0;
+  private lastCleanedPoops = 0;
   private prefersReducedMotion = false;
   private readonly handleHudActionEffect = (event: Event): void => {
-    const detail = (event as CustomEvent<HudActionEffectDetail>).detail ?? {};
-    const { effect } = detail;
-    if (!effect) return;
-    this.playActionEffect(detail);
+    const detail = (event as CustomEvent<SceneFeedbackDetail>).detail;
+    if (detail) this.playActionEffect(detail);
   };
 
   constructor() {
@@ -164,11 +160,14 @@ export class GameScene extends Phaser.Scene {
     });
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
+      const isFirstCleanAttempt = this.state.stats.cleanedPoops === 0;
       const cleanResult = cleanAtWithResult(this.state, pointer.worldX, pointer.worldY);
-      this.playCleanFeedback(cleanResult, pointer.worldX, pointer.worldY);
+      const isFirstClean = isFirstCleanAttempt && cleanResult.cleaned > 0;
+      this.playCleanFeedback(cleanResult, pointer.worldX, pointer.worldY, isFirstClean);
       if (cleanResult.cleaned === 0) {
         this.reactToEmptyClick(pointer.worldX, pointer.worldY);
       }
+      this.lastCleanedPoops = this.state.stats.cleanedPoops;
       this.onStateChanged();
       this.syncViews();
     });
@@ -180,11 +179,14 @@ export class GameScene extends Phaser.Scene {
     });
     this.resize();
     this.syncViews();
+    this.lastCleanedPoops = this.state.stats.cleanedPoops;
   }
 
   update(_: number, delta: number): void {
+    const cleanedBefore = this.state.stats.cleanedPoops;
     updateSimulation(this.state, delta / 1000);
     this.syncViews();
+    this.playAutomaticCleanupFeedback(cleanedBefore);
     this.onStateChanged();
   }
 
@@ -536,41 +538,156 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
-  private playActionEffect(detail: HudActionEffectDetail): void {
+  private playActionEffect(detail: SceneFeedbackDetail): void {
     this.syncViews();
-    const effect = detail.effect;
 
-    if (effect === "hay") {
-      this.playImageGlow(this.hayPile, "Better Hay", 0xf0d56b);
+    if (detail.category === "care") {
+      this.playCareFeedback(detail);
       return;
     }
 
-    if (effect === "scoop") {
+    if (detail.category === "trade") {
+      this.playCenterFeedback(detail.label ?? "Trade", detail.resourceText, detail.color ?? 0xe4b83b, "Trade!");
+      return;
+    }
+
+    if (detail.category === "decree") {
+      this.playCouncilDecreeFeedback(detail);
+      return;
+    }
+
+    if (detail.category === "event") {
+      this.playEventChoiceFeedback(detail);
+      return;
+    }
+
+    if (detail.category === "prestige") {
+      this.playPrestigeFeedback(detail);
+      return;
+    }
+
+    if (detail.category === "milestone") {
+      this.playMilestoneFeedback(detail);
+      return;
+    }
+
+    if (detail.category === "adoption") {
+      this.playHerdWelcome(detail.label, detail.color);
+      return;
+    }
+
+    if (detail.target === "hay") {
+      this.playImageGlow(this.hayPile, detail.label ?? "Better Hay", detail.color ?? 0xf0d56b);
+      return;
+    }
+
+    if (detail.target === "scoop") {
       this.playScoopPulse();
       return;
     }
 
-    if (effect === "cage") {
-      this.playCageFlash();
+    if (detail.target === "cage") {
+      this.playCageFlash(detail.label ?? "Bigger Cage", detail.color ?? 0xf0d56b);
       return;
     }
 
-    if (effect === "robot") {
-      this.playRobotPulse();
+    if (detail.target === "robot") {
+      this.playRobotPulse(detail.label, detail.color);
       return;
     }
 
-    if (effect === "herd") {
-      this.playHerdWelcome();
+    if (detail.target === "herd") {
+      this.playCenterFeedback(detail.label ?? "Unlocked", detail.resourceText, detail.color ?? 0xf0d56b, "!");
       return;
     }
 
-    if (effect === "ability") {
+    if (detail.target === "ability") {
       this.playAbilityReaction(detail.abilityId);
       return;
     }
 
+    if (detail.category === "unlock") {
+      this.playUnlockFeedback(detail);
+      return;
+    }
+
     this.playFurnitureReadyEffect(detail.furnitureId);
+  }
+
+  private playCareFeedback(detail: SceneFeedbackDetail): void {
+    const isWater = detail.target === "water";
+    const source = isWater ? this.waterBottle : this.hayPile;
+    const label = detail.label ?? (isWater ? "Water Full" : "Hay Full");
+    const color = detail.color ?? (isWater ? 0x86d9f0 : 0xd7c74b);
+    this.playImageGlow(source, label, color);
+    if (detail.resourceText) this.addFloatingText(source.x, source.y + 38, detail.resourceText, color, 0.94);
+    this.reactPigsNear(source.x, source.y, isWater ? "Sip!" : "Hay!", 170, 3);
+  }
+
+  private playCenterFeedback(label: string, resourceText: string | undefined, color: number, herdThought: string): void {
+    const x = this.state.cage.width / 2;
+    const y = this.state.cage.height / 2;
+    this.addFloatingText(x, y - 38, label, color, 1.05, true);
+    if (resourceText) this.addFloatingText(x, y - 12, resourceText, color, 0.92, true);
+    this.reactHerd(herdThought, 3);
+    if (!this.prefersReducedMotion) this.addBurst(x, y, color, 8);
+  }
+
+  private playUnlockFeedback(detail: SceneFeedbackDetail): void {
+    if (detail.target === "furniture" || detail.furnitureId) {
+      this.playFurnitureReadyEffect(detail.furnitureId);
+      return;
+    }
+    if (detail.target === "cage") {
+      this.playCageFlash(detail.label ?? "Unlocked", detail.color ?? 0xf0d56b);
+      if (detail.resourceText) this.addFloatingText(this.state.cage.width / 2, 84, detail.resourceText, detail.color ?? 0xf0d56b, 0.92);
+      return;
+    }
+    this.playCenterFeedback(detail.label ?? "Unlocked", detail.resourceText, detail.color ?? 0xf0d56b, "New!");
+  }
+
+  private playCouncilDecreeFeedback(detail: SceneFeedbackDetail): void {
+    const color = detail.color ?? 0xb965d2;
+    this.playCageFlash(detail.label ?? "Council Decree", color);
+    if (detail.resourceText) this.addFloatingText(this.state.cage.width / 2, 92, detail.resourceText, color, 0.94, true);
+    this.reactHerd(getCouncilReactionText(detail.decreeId), 5);
+    if (!this.prefersReducedMotion) this.addBurst(this.state.cage.width / 2, this.state.cage.height / 2, color, 12);
+  }
+
+  private playEventChoiceFeedback(detail: SceneFeedbackDetail): void {
+    const color = detail.color ?? 0x7db46a;
+    this.playCageRipple(color, 0.09);
+    this.playCenterFeedback(detail.label ?? "Event Resolved", detail.resourceText, color, getEventReactionText(detail.eventChoiceId));
+  }
+
+  private playPrestigeFeedback(detail: SceneFeedbackDetail): void {
+    const color = detail.color ?? 0xf0d56b;
+    this.playCageFlash(detail.label ?? "Great Composting", color, 0.18);
+    if (detail.resourceText) this.addFloatingText(this.state.cage.width / 2, this.state.cage.height / 2 - 8, detail.resourceText, color, 1, true);
+    this.reactHerd("Again?", 4);
+    if (!this.prefersReducedMotion) this.addBurst(this.state.cage.width / 2, this.state.cage.height / 2, color, 16);
+  }
+
+  private playMilestoneFeedback(detail: SceneFeedbackDetail): void {
+    const color = detail.color ?? 0xf0d56b;
+    const x = this.state.cage.width / 2;
+    const y = 62;
+    this.addFloatingText(x, y, detail.label ?? "Milestone", color, 1.05, true);
+    if (detail.resourceText) this.addFloatingText(x, y + 26, detail.resourceText, color, 0.88, true);
+    if (!this.prefersReducedMotion) this.addBurst(x, y + 16, color, detail.milestoneKind === "achievement" ? 10 : 7);
+  }
+
+  private playAutomaticCleanupFeedback(cleanedBefore: number): void {
+    if (this.state.stats.cleanedPoops <= cleanedBefore || this.lastCleanedPoops >= this.state.stats.cleanedPoops) {
+      this.lastCleanedPoops = this.state.stats.cleanedPoops;
+      return;
+    }
+
+    this.lastCleanedPoops = this.state.stats.cleanedPoops;
+    const x = this.state.robot?.x ?? this.state.cage.width / 2;
+    const y = this.state.robot?.y ?? this.state.cage.height / 2;
+    this.addFloatingText(x, y - 28, "Auto Clean", 0x86d9f0, 0.82);
+    if (!this.prefersReducedMotion) this.addBurst(x, y, 0x86d9f0, 4);
   }
 
   private playImageGlow(source: Phaser.GameObjects.Image, text: string, color: number): void {
@@ -626,14 +743,14 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private playCageFlash(): void {
+  private playCageFlash(label = "Bigger Cage", color = 0xf0d56b, fillAlpha = 0.11): void {
     const { width, height } = this.state.cage;
     const flash = this.add.graphics().setDepth(7);
-    flash.fillStyle(0xf0d56b, 0.11);
+    flash.fillStyle(color, fillAlpha);
     flash.fillRoundedRect(0, 0, width, height, 22);
-    flash.lineStyle(14, 0xf0d56b, 0.68);
+    flash.lineStyle(14, color, 0.68);
     flash.strokeRoundedRect(7, 7, width - 14, height - 14, 20);
-    this.addFloatingText(width / 2, 56, "Bigger Cage", 0xf0d56b, 1);
+    this.addFloatingText(width / 2, 56, label, color, 1);
 
     if (this.prefersReducedMotion) {
       this.time.delayedCall(240, () => flash.destroy());
@@ -649,24 +766,45 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  private playRobotPulse(): void {
+  private playCageRipple(color: number, fillAlpha: number): void {
+    const { width, height } = this.state.cage;
+    const ripple = this.add.graphics().setDepth(6.5);
+    ripple.fillStyle(color, fillAlpha);
+    ripple.fillRoundedRect(22, 22, width - 44, height - 44, 16);
+
+    if (this.prefersReducedMotion) {
+      this.time.delayedCall(220, () => ripple.destroy());
+      return;
+    }
+
+    this.tweens.add({
+      targets: ripple,
+      alpha: 0,
+      duration: 360,
+      ease: "Cubic.easeOut",
+      onComplete: () => ripple.destroy(),
+    });
+  }
+
+  private playRobotPulse(label = "Roomba", color = 0x86d9f0): void {
     if (this.robotView) {
-      this.playImageGlow(this.robotView, "Roomba", 0x86d9f0);
+      this.playImageGlow(this.robotView, label, color);
       return;
     }
 
     const x = this.state.robot?.x ?? this.state.cage.width / 2;
     const y = this.state.robot?.y ?? this.state.cage.height / 2;
-    this.addFloatingText(x, y - 30, "Roomba", 0x86d9f0, 1);
-    if (!this.prefersReducedMotion) this.addBurst(x, y, 0x86d9f0, 7);
+    this.addFloatingText(x, y - 30, label, color, 1);
+    if (!this.prefersReducedMotion) this.addBurst(x, y, color, 7);
   }
 
-  private playHerdWelcome(): void {
+  private playHerdWelcome(label = "Hi!", color = 0xf0d56b): void {
     const pig = this.state.pigs.at(-1);
     if (!pig) return;
 
-    this.showPigReaction(pig, "Hi!", 1200, 1200);
-    if (!this.prefersReducedMotion) this.addBurst(pig.x, pig.y, 0xf0d56b, 5);
+    this.addFloatingText(pig.x, pig.y - 46, label, color, 1);
+    this.showPigReaction(pig, pig.legendary ? "Royal!" : "Hi!", 1200, 1200);
+    if (!this.prefersReducedMotion) this.addBurst(pig.x, pig.y, color, pig.legendary ? 9 : 5);
   }
 
   private playFurnitureReadyEffect(furnitureId?: FurnitureId): void {
@@ -716,20 +854,25 @@ export class GameScene extends Phaser.Scene {
     if (!this.prefersReducedMotion) this.addBurst(x, y, reaction.color, reaction.burstCount);
   }
 
-  private playCleanFeedback(result: CleanResult, x: number, y: number): void {
+  private playCleanFeedback(result: CleanResult, x: number, y: number, isFirstClean: boolean): void {
     if (result.cleaned === 0) return;
 
     emitPlayerAction("cleanBean");
-    emitUiSound(result.rare > 0 || result.golden > 0 ? "rareClean" : "clean");
+    emitUiSound(isFirstClean || result.rare > 0 || result.golden > 0 ? "rareClean" : "clean");
 
-    for (const cleaned of result.cleanedPoops) {
-      this.playBeanPop(cleaned);
+    for (const [index, cleaned] of result.cleanedPoops.entries()) {
+      this.playBeanPop(cleaned, isFirstClean && index === 0);
     }
 
     this.reactPigsNear(x, y, result.cleaned > 1 ? "Nice!" : "!");
 
+    if (isFirstClean) {
+      this.addFloatingText(x, y - 54, "Cage economy started", 0xf0d56b, 1.12, true);
+      if (!this.prefersReducedMotion) this.addBurst(x, y, 0xf0d56b, FIRST_CLEAN_BURST_COUNT);
+    }
+
     if (result.comboBonus > 0) {
-      this.addFloatingText(x, y - 26, `Streak +${result.comboBonus}`, 0xffd95a, 1.06);
+      this.addFloatingText(x, y - 26, `Streak +${result.comboBonus}`, 0xffd95a, 1.06, true);
       if (!this.prefersReducedMotion) this.addBurst(x, y, 0xffd95a, 8);
     }
   }
@@ -784,15 +927,15 @@ export class GameScene extends Phaser.Scene {
     return nearest;
   }
 
-  private playBeanPop(cleaned: CleanedPoop): void {
+  private playBeanPop(cleaned: CleanedPoop, isFirstClean: boolean): void {
     const color = getPoopAccentColor(cleaned.type);
     if (this.prefersReducedMotion) {
-      this.addFloatingText(cleaned.x, cleaned.y - 18, getCleanRewardText(cleaned), color, 1);
+      this.addFloatingText(cleaned.x, cleaned.y - 18, getCleanRewardText(cleaned), color, isFirstClean ? 1.08 : 1, isFirstClean);
       return;
     }
 
     const size = getPoopDisplaySize(cleaned.type);
-    const popScale = cleaned.type === "messPile" ? MESS_PILE_POP_SCALE : BEAN_POP_SCALE;
+    const popScale = isFirstClean ? FIRST_CLEAN_POP_SCALE : cleaned.type === "messPile" ? MESS_PILE_POP_SCALE : BEAN_POP_SCALE;
     const sprite = this.add
       .image(cleaned.x, cleaned.y, this.getPoopFeedbackTextureKey(cleaned))
       .setDepth(65)
@@ -813,13 +956,20 @@ export class GameScene extends Phaser.Scene {
       onComplete: () => sprite.destroy(),
     });
 
-    this.addFloatingText(cleaned.x, cleaned.y - 18, getCleanRewardText(cleaned), color, 1);
-    this.addBurst(cleaned.x, cleaned.y, color, cleaned.type === "normal" ? 4 : 7);
+    this.addFloatingText(cleaned.x, cleaned.y - 18, getCleanRewardText(cleaned), color, isFirstClean ? 1.12 : 1, isFirstClean);
+    this.addBurst(cleaned.x, cleaned.y, color, isFirstClean ? 9 : cleaned.type === "normal" ? 4 : 7);
   }
 
-  private addFloatingText(x: number, y: number, text: string, color: number, scale: number): void {
+  private addFloatingText(x: number, y: number, text: string, color: number, scale: number, priority = false): void {
+    if (!priority && this.activeFloatingTextCount >= MAX_FLOATING_TEXT_LABELS) return;
+    this.activeFloatingTextCount += 1;
+    const clearLabel = (label: Phaser.GameObjects.Text): void => {
+      this.activeFloatingTextCount = Math.max(0, this.activeFloatingTextCount - 1);
+      label.destroy();
+    };
+    const point = this.clampFeedbackPoint(x, y);
     const label = this.add
-      .text(x, y, text, {
+      .text(point.x, point.y, text, {
         fontFamily: "Inter, Arial, sans-serif",
         fontSize: "17px",
         fontStyle: "700",
@@ -834,11 +984,18 @@ export class GameScene extends Phaser.Scene {
     this.tweens.add({
       targets: label,
       alpha: 0,
-      y: y - (this.prefersReducedMotion ? 8 : 28),
+      y: point.y - (this.prefersReducedMotion ? 8 : 28),
       duration: this.prefersReducedMotion ? 280 : 620,
       ease: "Cubic.easeOut",
-      onComplete: () => label.destroy(),
+      onComplete: () => clearLabel(label),
     });
+  }
+
+  private clampFeedbackPoint(x: number, y: number): { x: number; y: number } {
+    return {
+      x: Phaser.Math.Clamp(x, FLOATING_TEXT_MARGIN, this.state.cage.width - FLOATING_TEXT_MARGIN),
+      y: Phaser.Math.Clamp(y, FLOATING_TEXT_MARGIN, this.state.cage.height - FLOATING_TEXT_MARGIN),
+    };
   }
 
   private addBurst(x: number, y: number, color: number, count: number): void {
@@ -1100,9 +1257,32 @@ function getAbilityReaction(abilityId?: AbilityId): { label: string; thought: st
   return { label: "Ability", thought: "!", color: 0xf0d56b, pigCount: 3, burstCount: 5 };
 }
 
+function getCouncilReactionText(decreeId?: SceneFeedbackDetail["decreeId"]): string {
+  if (decreeId === "careMandate") return "Order!";
+  if (decreeId === "cleanupOrdinance") return "Clean!";
+  if (decreeId === "herdCharter") return "Charter!";
+  return "Council!";
+}
+
+function getEventReactionText(choiceId?: SceneFeedbackDetail["eventChoiceId"]): string {
+  if (!choiceId) return "Event!";
+  if (choiceId.includes("zoomies") || choiceId.includes("Zoomies")) return "Zoom!";
+  if (choiceId.includes("hay") || choiceId.includes("Hay")) return "Hay!";
+  if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return "Sip!";
+  if (choiceId.includes("nap") || choiceId.includes("Nap")) return "Nap!";
+  if (choiceId.includes("compost") || choiceId.includes("Compost")) return "Compost!";
+  if (choiceId.includes("wheek") || choiceId.includes("Wheek")) return "Wheek!";
+  return "Done!";
+}
+
 function getCleanRewardText(cleaned: CleanedPoop): string {
   if (cleaned.type === "golden") return "+Gold";
   if (cleaned.type === "compost") return "+Compost";
   if (cleaned.type === "blessed") return "+Squeak";
+  if (cleaned.type === "royal") return "+Royal";
+  if (cleaned.type === "cursed") return "+Cursed";
+  if (cleaned.type === "mystery") return "+Mystery";
+  if (cleaned.type === "stinky") return "+Stinky";
+  if (cleaned.type === "messPile") return "+Pile";
   return `+${cleaned.value}`;
 }

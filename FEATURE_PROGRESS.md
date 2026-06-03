@@ -484,6 +484,8 @@ Implementation notes:
 
 Priority: P3
 
+Status: First pass implemented.
+
 Description: When persistence is added or confirmed, show a small `Saved` indicator after meaningful state changes. Players should trust that progress is not lost without adding a large UI surface.
 
 Acceptance criteria:
@@ -517,3 +519,246 @@ Implementation notes:
 
 - Add keydown handling in `Hud` or a small input helper.
 - Do not add visible shortcut text to every button unless the UI has room.
+
+### PB-021: First-Clean Ceremony
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Make the first successful bean cleanup feel like the moment the game begins. The current cleanup feedback is functional, but the very first clean should teach the economy with a slightly stronger pop, reward label, burst, and sound treatment.
+
+Acceptance criteria:
+
+- The first successful bean clean plays a distinct but brief ceremony.
+- The ceremony uses existing cleanup state and does not duplicate reward calculations outside the simulation layer.
+- Normal cleanup after the first bean remains fast and readable.
+- Rare beans still have stronger feedback than normal beans.
+- Reduced-motion users receive clear reward text without burst-heavy animation.
+
+Implementation notes:
+
+- Implement in `src/scenes/GameScene.ts` around `playCleanFeedback()` and `playBeanPop()`.
+- Detect the first successful clean from existing `state.stats.cleanedPoops` / `CleanResult` timing.
+- Add small local constants for first-clean burst size, label scale, and animation duration.
+- Keep all resource updates in `cleanAtWithResult()` and only add view-layer ceremony here.
+
+### PB-022: Cleanup Feedback Budgeting
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Keep rapid cleanup readable by limiting floating labels, bursts, and pop effects when several beans or mess piles are cleaned quickly. Polish should add juice without creating visual noise.
+
+Acceptance criteria:
+
+- Floating reward labels are capped or staggered during rapid cleanup.
+- Reward labels clamp inside cage bounds and do not leave the visible playfield.
+- Mess piles and multi-clean actions summarize or prioritize feedback instead of spawning excessive clutter.
+- Cleanup still feels responsive when many beans are clicked quickly.
+- Performance remains stable during dense mess cleanup.
+
+Implementation notes:
+
+- Add a small active-label tracker in `GameScene`.
+- Consider helper functions such as `clampFeedbackPoint()` and `canShowFloatingLabel()`.
+- Keep particle counts small and scale them by bean rarity rather than cleaned count alone.
+
+### PB-023: Objective Progress Pulse
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Make objective progress visibly respond when player actions advance it. The quick objective card should pulse or brighten when progress changes, especially during the first "Clean beans quickly" objective.
+
+Acceptance criteria:
+
+- `#quick-objective-title` or `#quick-objective-progress` animates when objective progress changes.
+- The top objective row in the Goals modal also remains accurate after the pulse.
+- Objective completion uses a stronger but still short feedback state.
+- The animation does not resize or shift the care strip.
+- Reduced-motion settings avoid bounce/scale-heavy effects.
+
+Implementation notes:
+
+- Track a previous objective signature in `src/ui/hud.ts`, similar to `updateGoalAndLogMarkers()`.
+- Reuse the existing `pulseElement()` helper pattern.
+- Add CSS for a reusable pulse class in `src/styles.css`.
+
+### PB-024: Tutorial Hint As Game Prompt
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Restyle the first-run tutorial hint so it feels like an authored in-game prompt attached to the cage, not a generic toast card. The prompt should guide the first cleanup without blocking beans, pigs, or clicks.
+
+Acceptance criteria:
+
+- The first tutorial prompt feels visually connected to the playfield.
+- The prompt does not cover important cleanup targets on desktop or mobile.
+- The dismiss button remains clickable while the hint body does not block playfield input.
+- Prompt copy remains short and readable at narrow widths.
+- Tutorial progression behavior remains unchanged.
+
+Implementation notes:
+
+- Keep behavior in `src/ui/tutorialController.ts`; make most changes in `src/styles.css`.
+- Continue using `#tutorial-hint`, `#tutorial-hint-text`, and `#tutorial-dismiss`.
+- Preserve `pointer-events: none` for the hint body and `pointer-events: auto` for dismiss.
+
+### PB-025: HUD Stat Hierarchy
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Rework the top stat bar so fresh-run priorities are obvious. Early-loop information like Beans, Pigs, Clean, and Streak should read stronger than dormant late-game counters.
+
+Acceptance criteria:
+
+- Fresh runs emphasize Beans, Pigs, Clean, and Streak.
+- Compost, Squeaks, Gold, Wisdom, and Furniture read quieter while they are zero or not yet central.
+- Cleanliness receives a warning state at low thresholds.
+- Active streaks receive a positive/energized state.
+- Stat cards remain stable and do not overflow on desktop or mobile.
+
+Implementation notes:
+
+- Add stable stat classes or data attributes in `index.html`.
+- Add helper logic in `src/ui/hud.ts`, such as `updateStatEmphasis()`.
+- Prefer CSS emphasis/opacity/state changes over hiding stats or reordering them every render.
+
+### PB-026: Cage Frame Staging
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Make the cage feel like the intentionally staged centerpiece of the screen. The current cage art is strong, but the canvas wrapper and outer beige area should feel more deliberate and less like unused background.
+
+Acceptance criteria:
+
+- The cage reads as the main object at first glance.
+- The outer canvas area has a warmer, more intentional frame treatment.
+- The frame does not reduce click accuracy or hide beans.
+- Desktop and mobile layouts keep the cage comfortably visible.
+- The canvas wrapper does not shift size during ordinary HUD updates.
+
+Implementation notes:
+
+- Tune `#canvas-wrap` and related layout rules in `src/styles.css`.
+- Adjust only `GameScene.resize()` if CSS framing cannot solve the visual balance.
+- Capture before/after screenshots at desktop and narrow widths.
+
+### PB-027: Dimensional Cage Rendering
+
+Priority: P2
+
+Status: Not started.
+
+Description: Add subtle dimension to the Phaser-rendered cage so the rim, bedding, shadows, and ambient details feel cohesive with the pig and bean sprites.
+
+Acceptance criteria:
+
+- Cage rim has a readable highlight and shadow treatment.
+- Bedding has subtle inner shadow or depth without reducing bean contrast.
+- Ambient details remain sparse and non-clickable.
+- Clean, moderate, and dirty cage states still remain distinct.
+- Pigs, beans, hay, water, and decor share a consistent depth language.
+
+Implementation notes:
+
+- Implement in `src/scenes/GameScene.ts` around `drawCage()`, `redrawCage()`, and `drawAmbientCageDetails()`.
+- Keep new details below interactive sprites in depth.
+- Avoid expensive filters; prefer Phaser graphics and simple shadow ellipses.
+
+### PB-028: Dock State Language
+
+Priority: P1
+
+Status: First pass implemented.
+
+Description: Make dock button states communicate clear meaning: urgent attention, available actions, selected modal, and quiet/locked states should not all look like the same badge treatment.
+
+Acceptance criteria:
+
+- Urgent care, events, and pig requests use an attention state distinct from ordinary availability.
+- Purchasable or usable sections can show count badges without looking like errors.
+- The active modal's dock button remains selected until the modal closes.
+- Hover, press, selected, and badge states do not increase dock height.
+- Mobile horizontal dock scrolling does not clip badges.
+
+Implementation notes:
+
+- Build on `updateSectionIndicators()` and `setBadge()` in `src/ui/hud.ts`.
+- Add selected-state handling in `openSection()` and dialog close logic.
+- Refine `.dock-button`, `.dock-alert`, `.attention`, `.available-now`, and `.dock-badge` in `src/styles.css`.
+
+### PB-029: Modal Scan States
+
+Priority: P2
+
+Status: Not started.
+
+Description: Make modal content faster to scan once opened. Available actions, disabled actions, purchased states, and empty sections should each have distinct visual treatment.
+
+Acceptance criteria:
+
+- Enabled action buttons are visually easier to find than disabled actions.
+- Disabled actions keep reason text visible in their existing status fields.
+- Purchased or completed rows use a calm completed state.
+- Herd, Goals, and Log sections have intentional early/empty states.
+- Modal content does not jump under the cursor while the player is deciding.
+
+Implementation notes:
+
+- Continue using existing modal panels and `SECTION_META` in `src/ui/hud.ts`.
+- Prefer highlight styling before adding sorting.
+- Keep reason text aligned with existing disabled logic and status helpers.
+
+### PB-030: Polishing Verification Harness
+
+Priority: P2
+
+Status: Not started.
+
+Description: Add a repeatable lightweight verification workflow for polish slices. Visual changes need quick build, browser, console, screenshot, and interaction checks so regressions are caught before the next pass.
+
+Acceptance criteria:
+
+- A documented command or script verifies the page title, canvas presence, and lack of console errors.
+- The workflow opens or targets the strict local review port for this checkout.
+- Desktop and narrow/mobile screenshots are captured after visual polish changes.
+- The smoke path includes cleaning a bean, refilling hay/water, opening a modal, closing it, and checking save status.
+- Verification remains short enough to run after each polish slice.
+
+Implementation notes:
+
+- Keep the checklist in `POLISHING_PLAN.md` as the human-readable source.
+- If automated, add a small Playwright script under `scripts/`.
+- Use strict Vite port `5176` for this checkout unless it is intentionally changed.
+
+### PB-031: Sound And Microinteraction Throttle
+
+Priority: P2
+
+Status: Not started.
+
+Description: Refine repeated action sounds and button microinteractions so the game feels warm without becoming noisy during rapid cleanup or modal use.
+
+Acceptance criteria:
+
+- Cleanup, rare cleanup, purchase, ability, modal, and pig sounds remain short and soft.
+- Rapid cleanup does not stack sounds aggressively.
+- Successful DOM actions receive press/purchase feedback only on success.
+- Mute remains easy to reach and continues to persist through the existing preference flow.
+- The game behaves normally if audio is blocked or unavailable.
+
+Implementation notes:
+
+- Build on `src/ui/audioManager.ts`, `src/ui/events.ts`, and `Hud.runAction()`.
+- Add throttling inside the audio manager rather than scattering timing checks across callers.
+- Keep visual button feedback tied to action success paths.

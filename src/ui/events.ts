@@ -21,6 +21,44 @@ export type UiSoundId =
   | "modalClose"
   | "pig";
 
+export type SceneFeedbackCategory =
+  | "care"
+  | "purchase"
+  | "unlock"
+  | "trade"
+  | "decree"
+  | "event"
+  | "prestige"
+  | "adoption"
+  | "clean"
+  | "autoClean"
+  | "milestone";
+
+export type SceneFeedbackTarget =
+  | "hay"
+  | "water"
+  | "scoop"
+  | "robot"
+  | "cage"
+  | "furniture"
+  | "herd"
+  | "ability"
+  | "center";
+
+export interface SceneFeedbackDetail {
+  category: SceneFeedbackCategory;
+  target?: SceneFeedbackTarget;
+  label?: string;
+  resourceText?: string;
+  color?: number;
+  abilityId?: import("../simulation/types").AbilityId;
+  furnitureId?: import("../simulation/types").FurnitureId;
+  tradeId?: import("../simulation/types").BeanExchangeTradeId;
+  decreeId?: import("../simulation/types").CouncilDecreeId;
+  eventChoiceId?: import("../simulation/types").EventChoiceId;
+  milestoneKind?: "quest" | "achievement";
+}
+
 export interface PlayerActionDetail {
   action: PlayerActionId;
 }
