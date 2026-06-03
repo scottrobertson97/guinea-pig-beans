@@ -1153,6 +1153,8 @@ function getStatusLine(state: GameState): string {
   if (state.event.active) return `${state.event.active.name} is active for ${Math.ceil(state.event.active.timer)}s.`;
   const request = getActivePigRequestView(state);
   if (request) return `${request.pigName} has a request: ${request.title}.`;
+  if (state.pigs.length === 0) return "The cage is empty. Adopt Pig is free so the herd can restart.";
+  if (state.pigs.length === 1) return "The last pig needs a companion. Adopt Pig is free until the pair is restored.";
   if (state.needs.hay <= 0) return "The hay rack is empty. The pigs have filed a complaint.";
   if (state.needs.water <= 0) return "The water bottle is empty, and the cage is giving you a look.";
   if (state.cage.cleanliness < 35) return "The cage is getting bold. Clean a few beans.";
@@ -1183,6 +1185,7 @@ function getAbilityStatusText(state: GameState, id: AbilityId): string {
 
 function getAdoptPigStatusText(state: GameState, cost: number, capacity: number): string {
   if (state.pigs.length >= capacity) return "Full - buy cage";
+  if (state.pigs.length < 2) return "Free - rebuild herd";
   return getBeanCostStatusText(state, cost, `${cost} Beans`);
 }
 

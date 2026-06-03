@@ -154,6 +154,9 @@ export function createInitialState(): GameState {
       expired: 0,
       lastResult: null,
     },
+    survival: {
+      deathCheckTimer: 12,
+    },
     prestige: {
       ascensions: 0,
       unlocked: [],
@@ -185,6 +188,7 @@ export function createInitialState(): GameState {
       abilitiesUsed: 0,
       furnitureBought: 0,
       legendaryPigsAdopted: 0,
+      pigsLost: 0,
       prestiges: 0,
       eventResponses: 0,
       objectivesCompleted: 0,

@@ -237,6 +237,9 @@ export interface GameState {
     expired: number;
     lastResult: PigRequestResult | null;
   };
+  survival: {
+    deathCheckTimer: number;
+  };
   prestige: {
     ascensions: number;
     unlocked: string[];
@@ -268,6 +271,7 @@ export interface GameState {
     abilitiesUsed: number;
     furnitureBought: number;
     legendaryPigsAdopted: number;
+    pigsLost: number;
     prestiges: number;
     eventResponses: number;
     objectivesCompleted: number;

@@ -193,7 +193,7 @@ export function getCosts(state: GameState): Costs {
   ) as Record<FurnitureId, number>;
 
   return {
-    pig: Math.ceil(10 * 1.35 ** Math.max(0, state.pigs.length - 1)),
+    pig: state.pigs.length < 2 ? 0 : Math.ceil(10 * 1.35 ** Math.max(0, state.pigs.length - 1)),
     feed: Math.ceil(18 * 1.6 ** state.upgrades.feedLevel),
     scoop: Math.ceil(14 * 1.7 ** state.upgrades.scoopLevel),
     robot: Math.max(45, ROBOT_COST - state.upgrades.scoopLevel * 5 - (state.wisdom.gentleAutomation ? 10 : 0)),

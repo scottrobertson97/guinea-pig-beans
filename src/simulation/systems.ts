@@ -3,7 +3,10 @@ import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } fro
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, spawnPoop } from "./state";
-import type { GameState, PigMood, Poop, Robot } from "./types";
+import type { GameState, Pig, PigMood, Poop, Robot } from "./types";
+
+const DEATH_CHECK_INTERVAL = 12;
+const MAX_DEATH_CHANCE_PER_CHECK = 0.35;
 
 export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateCombo(state, deltaSeconds);
@@ -15,6 +18,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateHappiness(state);
   updateObjective(state, deltaSeconds);
   updateNeeds(state, deltaSeconds);
+  updateSurvival(state, deltaSeconds);
   updatePigs(state, deltaSeconds);
   updatePoops(state, deltaSeconds);
   updateMessPiles(state);
@@ -130,6 +134,7 @@ function updateHappiness(state: GameState): void {
   const synergyBonus = hasFurnitureSynergy(state, "cozyCorner") ? 4 : 0;
   const dramaPenalty =
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
+  const lonePigPenalty = state.pigs.length === 1 ? 14 : 0;
   state.cage.happiness = Math.max(
     0,
     Math.min(
@@ -143,10 +148,79 @@ function updateHappiness(state: GameState): void {
           eventBonus +
           abilityBonus -
           dramaPenalty +
-          synergyBonus,
+          synergyBonus -
+          lonePigPenalty,
       ),
     ),
   );
+}
+
+function updateSurvival(state: GameState, deltaSeconds: number): void {
+  if (state.pigs.length === 0) {
+    state.survival.deathCheckTimer = DEATH_CHECK_INTERVAL;
+    return;
+  }
+
+  state.survival.deathCheckTimer -= deltaSeconds;
+  if (state.survival.deathCheckTimer > 0) return;
+  state.survival.deathCheckTimer = DEATH_CHECK_INTERVAL;
+
+  const risk = getDeathRisk(state);
+  if (risk.chance <= 0) return;
+
+  const lostPigs: Array<{ pig: Pig; cause: DeathCause }> = [];
+  for (const pig of state.pigs) {
+    if (Math.random() < risk.chance) {
+      lostPigs.push({ pig, cause: risk.cause });
+    }
+  }
+
+  for (const { pig, cause } of lostPigs) {
+    removePigFromHerd(state, pig, cause);
+  }
+}
+
+type DeathCause = "hay" | "water" | "happiness";
+
+function getDeathRisk(state: GameState): { chance: number; cause: DeathCause } {
+  const hayRisk = getNeedDeathRisk(state.needs.hay, 0.18, 0.08, 0.03);
+  const waterRisk = getNeedDeathRisk(state.needs.water, 0.22, 0.1, 0.04);
+  const happinessRisk = state.cage.happiness < 10 ? 0.1 : state.cage.happiness < 20 ? 0.05 : state.cage.happiness < 35 ? 0.02 : 0;
+  const chance = Math.min(MAX_DEATH_CHANCE_PER_CHECK, hayRisk + waterRisk + happinessRisk);
+
+  if (waterRisk >= hayRisk && waterRisk >= happinessRisk) return { chance, cause: "water" };
+  if (hayRisk >= happinessRisk) return { chance, cause: "hay" };
+  return { chance, cause: "happiness" };
+}
+
+function getNeedDeathRisk(value: number, emptyRisk: number, criticalRisk: number, lowRisk: number): number {
+  if (value <= 0) return emptyRisk;
+  if (value < 10) return criticalRisk;
+  if (value < 25) return lowRisk;
+  return 0;
+}
+
+function removePigFromHerd(state: GameState, pig: Pig, cause: DeathCause): void {
+  if (!state.pigs.some((candidate) => candidate.id === pig.id)) return;
+
+  state.pigs = state.pigs.filter((candidate) => candidate.id !== pig.id);
+  for (const survivor of state.pigs) {
+    if (survivor.bondedPigId === pig.id) survivor.bondedPigId = null;
+  }
+
+  if (state.pigRequest.active?.pigId === pig.id) {
+    state.pigRequest.active = null;
+    state.pigRequest.nextTimer = Math.max(state.pigRequest.nextTimer, 45);
+  }
+
+  state.stats.pigsLost += 1;
+  addLog(state, getPigDeathLogMessage(pig, cause));
+}
+
+function getPigDeathLogMessage(pig: Pig, cause: DeathCause): string {
+  if (cause === "water") return `${pig.name} died after the water bottle stayed too low.`;
+  if (cause === "hay") return `${pig.name} died after the hay ran too low.`;
+  return `${pig.name} died after the herd stayed deeply unhappy.`;
 }
 
 function updateObjective(state: GameState, deltaSeconds: number): void {

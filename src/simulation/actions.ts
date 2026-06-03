@@ -622,6 +622,7 @@ export function prestige(state: GameState): boolean {
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;
   state.event.responseReady = false;
+  state.survival.deathCheckTimer = 12;
   state.stats.prestiges += 1;
   state.objective = {
     id: "cleanBurst",
