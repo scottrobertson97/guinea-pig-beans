@@ -27,6 +27,7 @@ import {
   useAbility,
   type EventChoiceView,
 } from "../simulation/actions";
+import { assetPath } from "../assetPaths";
 import {
   getAbilityCost,
   getAutomationFuelCost,
@@ -55,6 +56,7 @@ import type {
   EventChoiceId,
   FurnitureId,
   GameState,
+  Pig,
   WisdomPerkId,
 } from "../simulation/types";
 import { emitPlayerAction, emitUiSound, type PlayerActionId, type SceneFeedbackDetail, type UiSoundId } from "./events";
@@ -151,16 +153,16 @@ type ObjectivePulseState = {
 const HUD_ACTION_EFFECT_EVENT = "guinea-pig-action-effect";
 
 const SECTION_META: Record<SectionId, SectionMeta> = {
-  care: { title: "Care", icon: "/assets/sprites/decor/hay_rack_full.png" },
-  shop: { title: "Shop", icon: "/assets/sprites/upgrades/roaming_dustpan.png" },
-  furniture: { title: "Furniture", icon: "/assets/sprites/decor/toy_pile.png" },
-  abilities: { title: "Abilities", icon: "/assets/sprites/beans/bean_golden.png" },
-  recipes: { title: "Bean Recipes", icon: "/assets/sprites/beans/bean_rainbow.png" },
-  mythos: { title: "Mythos", icon: "/assets/sprites/upgrades/compost_bin.png" },
-  wisdom: { title: "Wisdom", icon: "/assets/sprites/upgrades/cavybot_3000.png" },
-  herd: { title: "Herd", icon: "/assets/sprites/pigs/pig_cream_brown_idle.png" },
-  goals: { title: "Goals", icon: "/assets/sprites/decor/litter_tray_clean.png" },
-  log: { title: "Cage Log", icon: "/assets/sprites/beans/bean_normal.png" },
+  care: { title: "Care", icon: assetPath("assets/sprites/decor/hay_rack_full.png") },
+  shop: { title: "Shop", icon: assetPath("assets/sprites/upgrades/roaming_dustpan.png") },
+  furniture: { title: "Furniture", icon: assetPath("assets/sprites/decor/toy_pile.png") },
+  abilities: { title: "Abilities", icon: assetPath("assets/sprites/beans/bean_golden.png") },
+  recipes: { title: "Bean Recipes", icon: assetPath("assets/sprites/beans/bean_rainbow.png") },
+  mythos: { title: "Mythos", icon: assetPath("assets/sprites/upgrades/compost_bin.png") },
+  wisdom: { title: "Wisdom", icon: assetPath("assets/sprites/upgrades/cavybot_3000.png") },
+  herd: { title: "Herd", icon: assetPath("assets/sprites/pigs/pig_cream_brown_idle.png") },
+  goals: { title: "Goals", icon: assetPath("assets/sprites/decor/litter_tray_clean.png") },
+  log: { title: "Cage Log", icon: assetPath("assets/sprites/beans/bean_normal.png") },
 };
 
 const SECTION_SHORTCUTS: Record<string, SectionId> = {
@@ -693,7 +695,7 @@ export class Hud {
         const identity = document.createElement("strong");
         const details = document.createElement("span");
         identity.textContent = pig.name;
-        details.textContent = `${pig.breed} ${pig.trait} - ${pig.quirk}`;
+        details.textContent = `${pig.breed} ${pig.trait} - ${getPigGoalLabel(pig)} - ${getPigWeakestNeedLabel(pig)} - ${pig.quirk}`;
         item.append(identity, details);
         return item;
       });
@@ -1588,6 +1590,23 @@ function getStatusLine(state: GameState): string {
   const pig = state.pigs[0];
   if (pig) return `${pig.name} the ${pig.trait} is considering a bean.`;
   return "A pig is considering a bean.";
+}
+
+function getPigGoalLabel(pig: Pig): string {
+  if (pig.goal === "eat") return "Eating";
+  if (pig.goal === "drink") return "Drinking";
+  if (pig.goal === "sleep") return "Sleeping";
+  return "Roaming";
+}
+
+function getPigWeakestNeedLabel(pig: Pig): string {
+  const needs = [
+    { label: "Hunger", value: pig.hunger },
+    { label: "Thirst", value: pig.thirst },
+    { label: "Energy", value: pig.energy },
+  ];
+  const weakest = needs.reduce((lowest, need) => (need.value < lowest.value ? need : lowest));
+  return `${weakest.label} ${Math.round(weakest.value)}%`;
 }
 
 function getAutomationFuelText(state: GameState): string {

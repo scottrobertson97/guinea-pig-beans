@@ -2,11 +2,20 @@ import { cleanPoopsInRadius } from "./actions";
 import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } from "./balance";
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
-import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, spawnPoop } from "./state";
+import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
 import type { GameState, Pig, PigMood, Poop, Robot } from "./types";
 
 const DEATH_CHECK_INTERVAL = 12;
 const MAX_DEATH_CHANCE_PER_CHECK = 0.35;
+const HUNGER_GOAL_THRESHOLD = 38;
+const THIRST_GOAL_THRESHOLD = 35;
+const ENERGY_GOAL_THRESHOLD = 28;
+const NEED_SATISFIED_THRESHOLD = 86;
+const ENERGY_RESTED_THRESHOLD = 88;
+const HAY_X = 88;
+const HAY_Y = 88;
+const WATER_X_OFFSET = 90;
+const WATER_Y = 82;
 
 export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateCombo(state, deltaSeconds);
@@ -286,21 +295,28 @@ function updateNeeds(state: GameState, deltaSeconds: number): void {
   const totalWisdom = getTotalWisdom(state);
   const waterDrainMultiplier =
     state.event.bottleJammed ? 0 : (totalWisdom > 0 ? 0.98 ** totalWisdom : 1) * (state.wisdom.steadySupplies ? 0.9 : 1);
-  state.needs.hay = Math.max(0, state.needs.hay - 0.5 * pigCount * hayDrainMultiplier * deltaSeconds);
-  state.needs.water = Math.max(0, state.needs.water - 0.25 * pigCount * waterDrainMultiplier * deltaSeconds);
+  state.needs.hay = Math.max(0, state.needs.hay - 0.035 * pigCount * hayDrainMultiplier * deltaSeconds);
+  state.needs.water = Math.max(0, state.needs.water - 0.02 * pigCount * waterDrainMultiplier * deltaSeconds);
   if (state.lateGame.squeakChoir) state.squeaks += (state.wisdom.chorusTraining ? 0.035 : 0.02) * deltaSeconds;
 }
 
 function updatePigs(state: GameState, deltaSeconds: number): void {
-  const mood = getSharedMood(state);
   for (const pig of state.pigs) {
-    pig.mood = mood;
+    updatePigNeeds(pig, deltaSeconds);
+    updatePigGoal(state, pig);
+    pig.mood = getPigMood(state, pig);
 
     const dx = pig.targetX - pig.x;
     const dy = pig.targetY - pig.y;
     const distance = Math.hypot(dx, dy);
 
-    if (distance < 6) {
+    if (pig.goal === "sleep" && distance < 8) {
+      updateSleepingPig(state, pig, deltaSeconds);
+    } else if (pig.goal === "eat" && distance < 10) {
+      updateEatingPig(state, pig, deltaSeconds);
+    } else if (pig.goal === "drink" && distance < 10) {
+      updateDrinkingPig(state, pig, deltaSeconds);
+    } else if (distance < 6) {
       chooseTarget(state, pig);
     } else {
       const eventSpeed =
@@ -312,7 +328,8 @@ function updatePigs(state: GameState, deltaSeconds: number): void {
             ? 1.8
             : 1;
       const tunnelSpeed = state.furniture.tunnel ? 1.1 : 1;
-      const speedMultiplier = (mood === "content" ? 1 : mood === "messy" ? 0.82 : 0.9) * eventSpeed * tunnelSpeed;
+      const goalSpeed = pig.goal === "sleep" ? 0.72 : pig.goal === "eat" || pig.goal === "drink" ? 1.08 : 1;
+      const speedMultiplier = (pig.mood === "content" ? 1 : pig.mood === "messy" ? 0.82 : 0.9) * eventSpeed * tunnelSpeed * goalSpeed;
       const travel = Math.min(distance, pig.speed * speedMultiplier * deltaSeconds);
       pig.x += (dx / distance) * travel;
       pig.y += (dy / distance) * travel;
@@ -323,6 +340,66 @@ function updatePigs(state: GameState, deltaSeconds: number): void {
       spawnPoop(state, pig);
     }
   }
+}
+
+function updatePigNeeds(pig: Pig, deltaSeconds: number): void {
+  const hungerDrain = (pig.trait === "Hay Goblin" ? 0.46 : pig.trait === "Chonker" ? 0.38 : 0.31) * deltaSeconds;
+  const thirstDrain = (pig.trait === "Drama Pig" ? 0.3 : 0.24) * deltaSeconds;
+  const energyDrain = (pig.trait === "Zoomer" ? 0.28 : 0.17) * deltaSeconds;
+  pig.hunger = clampNeed(pig.hunger - hungerDrain);
+  pig.thirst = clampNeed(pig.thirst - thirstDrain);
+  if (pig.goal !== "sleep") pig.energy = clampNeed(pig.energy - energyDrain);
+}
+
+function updatePigGoal(state: GameState, pig: Pig): void {
+  if (pig.goal === "eat" && (pig.hunger < NEED_SATISFIED_THRESHOLD || state.needs.hay <= 0)) return;
+  if (pig.goal === "drink" && (pig.thirst < NEED_SATISFIED_THRESHOLD || state.needs.water <= 0 || state.event.bottleJammed)) return;
+  if (pig.goal === "sleep" && pig.energy < ENERGY_RESTED_THRESHOLD) return;
+
+  if (pig.hunger <= HUNGER_GOAL_THRESHOLD && state.needs.hay > 0) {
+    setPigGoal(state, pig, "eat");
+    return;
+  }
+
+  if (pig.thirst <= THIRST_GOAL_THRESHOLD && state.needs.water > 0 && !state.event.bottleJammed) {
+    setPigGoal(state, pig, "drink");
+    return;
+  }
+
+  if (pig.energy <= ENERGY_GOAL_THRESHOLD) {
+    setPigGoal(state, pig, "sleep");
+    return;
+  }
+
+  if (pig.goal !== "roam") setPigGoal(state, pig, "roam");
+}
+
+function updateEatingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
+  if (state.needs.hay <= 0) return;
+  pig.goalTimer = Math.max(pig.goalTimer, 2.4);
+  const intake = Math.min(state.needs.hay, (pig.trait === "Hay Goblin" ? 1.55 : 1.18) * deltaSeconds);
+  state.needs.hay = Math.max(0, state.needs.hay - intake);
+  pig.hunger = clampNeed(pig.hunger + intake * (pig.trait === "Hay Goblin" ? 15 : 18));
+  pig.goalTimer -= deltaSeconds;
+  if (pig.hunger >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) setPigGoal(state, pig, "roam");
+}
+
+function updateDrinkingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
+  if (state.needs.water <= 0 || state.event.bottleJammed) return;
+  pig.goalTimer = Math.max(pig.goalTimer, 2);
+  const intake = Math.min(state.needs.water, 1 * deltaSeconds);
+  state.needs.water = Math.max(0, state.needs.water - intake);
+  pig.thirst = clampNeed(pig.thirst + intake * 20);
+  pig.goalTimer -= deltaSeconds;
+  if (pig.thirst >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) setPigGoal(state, pig, "roam");
+}
+
+function updateSleepingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
+  pig.goalTimer = Math.max(pig.goalTimer, state.furniture.snuggleSack || state.furniture.hideyHouse ? 4.5 : 5.5);
+  const restRate = (state.furniture.snuggleSack ? 18 : state.furniture.hideyHouse ? 15 : 13) * deltaSeconds;
+  pig.energy = clampNeed(pig.energy + restRate);
+  pig.goalTimer -= deltaSeconds;
+  if (pig.energy >= ENERGY_RESTED_THRESHOLD && pig.goalTimer <= 0) setPigGoal(state, pig, "roam");
 }
 
 function updatePoops(state: GameState, deltaSeconds: number): void {
@@ -460,13 +537,17 @@ function updateCleanliness(state: GameState): void {
   state.cage.cleanliness = Math.max(0, Math.min(100, Math.round(100 - mess + inspectionBonus + beddingBonus)));
 }
 
-function getSharedMood(state: GameState): PigMood {
+function getPigMood(state: GameState, pig: Pig): PigMood {
   if (state.cage.happiness < 35) return "messy";
   if (state.cage.cleanliness < 35) return "messy";
-  if (state.needs.hay <= 0) return "hungry";
-  if (state.needs.water <= 0) return "thirsty";
+  if (pig.hunger <= HUNGER_GOAL_THRESHOLD || (pig.goal === "eat" && state.needs.hay <= 0)) return "hungry";
+  if (pig.thirst <= THIRST_GOAL_THRESHOLD || (pig.goal === "drink" && (state.needs.water <= 0 || state.event.bottleJammed))) return "thirsty";
   if (state.cage.space < 55) return "messy";
   return "content";
+}
+
+function clampNeed(value: number): number {
+  return Math.max(0, Math.min(100, value));
 }
 
 function randomBetween(min: number, max: number): number {

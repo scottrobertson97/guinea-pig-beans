@@ -1,4 +1,5 @@
 import Phaser from "phaser";
+import { assetPath } from "../assetPaths";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simulation/actions";
 import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
@@ -118,27 +119,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload(): void {
-    this.load.image("cage-floor-fleece", "/assets/backgrounds/cage_floor_fleece.png");
-    this.load.image("pig-cream-brown", "/assets/sprites/pigs/pig_cream_brown_idle.png");
-    this.load.image("pig-white-black", "/assets/sprites/pigs/pig_white_black_idle.png");
-    this.load.image("pig-russet", "/assets/sprites/pigs/pig_russet_idle.png");
-    this.load.image("pig-gray-white", "/assets/sprites/pigs/pig_gray_white_idle.png");
-    this.load.image("pig-tricolor", "/assets/sprites/pigs/pig_tricolor_idle.png");
-    this.load.image("bean-normal", "/assets/sprites/beans/bean_normal.png");
-    this.load.image("bean-aged", "/assets/sprites/beans/bean_aged.png");
-    this.load.image("bean-golden", "/assets/sprites/beans/bean_golden.png");
-    this.load.image("bean-rainbow", "/assets/sprites/beans/bean_rainbow.png");
-    this.load.image("bean-compost", "/assets/sprites/beans/bean_compost.png");
-    this.load.image("hay-rack-full", "/assets/sprites/decor/hay_rack_full.png");
-    this.load.image("water-bottle-full", "/assets/sprites/decor/water_bottle_full.png");
-    this.load.image("hidey-house", "/assets/sprites/decor/hidey_house.png");
-    this.load.image("litter-tray-clean", "/assets/sprites/decor/litter_tray_clean.png");
-    this.load.image("toy-pile", "/assets/sprites/decor/toy_pile.png");
-    this.load.image("toy-tunnel-blue", "/assets/sprites/decor/toy_tunnel_blue.png");
-    this.load.image("royal-throne", "/assets/sprites/decor/royal_throne.png");
-    this.load.image("roaming-dustpan", "/assets/sprites/upgrades/roaming_dustpan.png");
-    this.load.image("compost-bin", "/assets/sprites/upgrades/compost_bin.png");
-    this.load.image("cavybot-3000", "/assets/sprites/upgrades/cavybot_3000.png");
+    this.load.image("cage-floor-fleece", assetPath("assets/backgrounds/cage_floor_fleece.png"));
+    this.load.image("pig-cream-brown", assetPath("assets/sprites/pigs/pig_cream_brown_idle.png"));
+    this.load.image("pig-white-black", assetPath("assets/sprites/pigs/pig_white_black_idle.png"));
+    this.load.image("pig-russet", assetPath("assets/sprites/pigs/pig_russet_idle.png"));
+    this.load.image("pig-gray-white", assetPath("assets/sprites/pigs/pig_gray_white_idle.png"));
+    this.load.image("pig-tricolor", assetPath("assets/sprites/pigs/pig_tricolor_idle.png"));
+    this.load.image("bean-normal", assetPath("assets/sprites/beans/bean_normal.png"));
+    this.load.image("bean-aged", assetPath("assets/sprites/beans/bean_aged.png"));
+    this.load.image("bean-golden", assetPath("assets/sprites/beans/bean_golden.png"));
+    this.load.image("bean-rainbow", assetPath("assets/sprites/beans/bean_rainbow.png"));
+    this.load.image("bean-compost", assetPath("assets/sprites/beans/bean_compost.png"));
+    this.load.image("hay-rack-full", assetPath("assets/sprites/decor/hay_rack_full.png"));
+    this.load.image("water-bottle-full", assetPath("assets/sprites/decor/water_bottle_full.png"));
+    this.load.image("hidey-house", assetPath("assets/sprites/decor/hidey_house.png"));
+    this.load.image("litter-tray-clean", assetPath("assets/sprites/decor/litter_tray_clean.png"));
+    this.load.image("toy-pile", assetPath("assets/sprites/decor/toy_pile.png"));
+    this.load.image("toy-tunnel-blue", assetPath("assets/sprites/decor/toy_tunnel_blue.png"));
+    this.load.image("royal-throne", assetPath("assets/sprites/decor/royal_throne.png"));
+    this.load.image("roaming-dustpan", assetPath("assets/sprites/upgrades/roaming_dustpan.png"));
+    this.load.image("compost-bin", assetPath("assets/sprites/upgrades/compost_bin.png"));
+    this.load.image("cavybot-3000", assetPath("assets/sprites/upgrades/cavybot_3000.png"));
   }
 
   create(): void {
@@ -298,7 +299,7 @@ export class GameScene extends Phaser.Scene {
 
       const dx = pig.targetX - pig.x;
       view.setPosition(pig.x, pig.y);
-      view.setRotation(Math.sin(this.time.now / 220 + pig.id) * 0.035);
+      view.setRotation(pig.goal === "sleep" ? Math.sin(this.time.now / 480 + pig.id) * 0.015 : Math.sin(this.time.now / 220 + pig.id) * 0.035);
       view.setScale(dx < 0 ? -1 : 1, 1);
       this.applyPigMood(view, pig);
       this.maybeShowPigThought(pig);
@@ -471,7 +472,11 @@ export class GameScene extends Phaser.Scene {
     else if (pig.mood === "thirsty") sprite.setTint(0x9ed9e8);
     else if (pig.mood === "messy") sprite.setTint(0xd8c2a3);
 
-    if (nearHay && this.state.needs.hay > 0) {
+    if (pig.goal === "sleep") {
+      displayWidth *= 1.08;
+      displayHeight *= 0.9;
+      sprite.setAlpha(Math.min(sprite.alpha, 0.88));
+    } else if (nearHay && this.state.needs.hay > 0) {
       displayWidth *= 1.04 + idleWiggle;
       displayHeight *= 0.98 - idleWiggle;
     } else if (nearWater && this.state.needs.water > 0) {
@@ -1215,6 +1220,10 @@ function getFurnitureShadowSize(id: FurnitureId): { width: number; height: numbe
 }
 
 function getPigThoughtText(pig: Pig, state: GameState): string {
+  if (pig.goal === "sleep") return "Zzz";
+  if (pig.goal === "eat") return state.needs.hay > 0 ? "Hay?" : "Hay!";
+  if (pig.goal === "drink") return state.needs.water > 0 && !state.event.bottleJammed ? "Sip" : "H2O";
+  if (pig.goal === "roam" && Math.min(pig.hunger, pig.thirst, pig.energy) > 55) return "Roam";
   if (state.needs.hay < 25 || pig.mood === "hungry") return "Hay?";
   if (state.needs.water < 25 || pig.mood === "thirsty") return "H2O";
   if (pig.mood === "messy" || state.cage.cleanliness < 45) return "Clean?";

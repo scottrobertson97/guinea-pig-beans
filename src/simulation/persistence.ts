@@ -1,5 +1,5 @@
 import { addLog, createInitialState, syncCageDimensionsToLevel, syncEntityIdCounters } from "./state";
-import type { GameState } from "./types";
+import type { GameState, Pig, PigGoal } from "./types";
 
 export const SAVE_KEY = "gpb-save-v1";
 export const SAVE_STATUS_EVENT = "guinea-pig-save-status";
@@ -122,7 +122,32 @@ function removeUnreadableSave(): void {
 }
 
 function hydrateState(defaultState: GameState, savedState: Partial<GameState>): GameState {
-  return mergeDefaults(defaultState, savedState) as GameState;
+  const hydrated = mergeDefaults(defaultState, savedState) as GameState;
+  hydrated.pigs = hydrated.pigs.map(hydratePigLifeState);
+  return hydrated;
+}
+
+function hydratePigLifeState(pig: Pig): Pig {
+  return {
+    ...pig,
+    hunger: normalizeNeed(pig.hunger, 82),
+    thirst: normalizeNeed(pig.thirst, 84),
+    energy: normalizeNeed(pig.energy, 76),
+    goal: normalizePigGoal(pig.goal),
+    goalTimer: normalizeTimer(pig.goalTimer),
+  };
+}
+
+function normalizeNeed(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : fallback;
+}
+
+function normalizeTimer(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function normalizePigGoal(value: unknown): PigGoal {
+  return value === "eat" || value === "drink" || value === "sleep" || value === "roam" ? value : "roam";
 }
 
 function mergeDefaults(defaultValue: unknown, savedValue: unknown): unknown {

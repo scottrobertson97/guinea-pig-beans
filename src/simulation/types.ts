@@ -1,4 +1,5 @@
 export type PigMood = "content" | "hungry" | "thirsty" | "messy";
+export type PigGoal = "roam" | "eat" | "drink" | "sleep";
 export type PigBreed =
   | "American"
   | "Abyssinian"
@@ -129,6 +130,11 @@ export interface Pig {
   bodyTint: number;
   spotTint: number;
   mood: PigMood;
+  hunger: number;
+  thirst: number;
+  energy: number;
+  goal: PigGoal;
+  goalTimer: number;
   legendary: boolean;
   bondedPigId: number | null;
 }

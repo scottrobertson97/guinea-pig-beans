@@ -1,5 +1,5 @@
 import { CAGE_PADDING, getCageDimensions, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
-import type { FurnitureId, GameState, Pig, PigBreed, PigTrait, Poop, PoopType } from "./types";
+import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
 
 const pigNames = [
   "Muffin",
@@ -257,6 +257,11 @@ function createPig(state: GameState, legendary: boolean): Pig {
     bodyTint: colors[0],
     spotTint: colors[1],
     mood: "content",
+    hunger: randomBetween(72, 96),
+    thirst: randomBetween(74, 98),
+    energy: randomBetween(58, 94),
+    goal: "roam",
+    goalTimer: 0,
     legendary,
     bondedPigId: state.pigs.length > 0 && state.pigs.length % 2 === 1 ? state.pigs[state.pigs.length - 1].id : null,
   };
@@ -271,6 +276,21 @@ function createPig(state: GameState, legendary: boolean): Pig {
 }
 
 export function chooseTarget(state: GameState, pig: Pig): void {
+  if (pig.goal === "eat") {
+    targetNearFurniture(state, pig, "hayRack", 88, 88, 34);
+    return;
+  }
+
+  if (pig.goal === "drink") {
+    targetNearFurniture(state, pig, "waterBottle", state.cage.width - 90, 82, 30);
+    return;
+  }
+
+  if (pig.goal === "sleep") {
+    targetSleepSpot(state, pig);
+    return;
+  }
+
   if (state.abilities.wheekCall > 0) {
     targetNearFurniture(state, pig, "hayRack", 88, 88, 34);
     return;
@@ -305,6 +325,14 @@ export function chooseTarget(state: GameState, pig: Pig): void {
 
   pig.targetX = randomBetween(CAGE_PADDING, state.cage.width - CAGE_PADDING);
   pig.targetY = randomBetween(CAGE_PADDING, state.cage.height - CAGE_PADDING);
+}
+
+export function setPigGoal(state: GameState, pig: Pig, goal: PigGoal): void {
+  if (pig.goal !== goal) {
+    pig.goal = goal;
+    pig.goalTimer = 0;
+  }
+  chooseTarget(state, pig);
 }
 
 export function spawnPoop(state: GameState, pig: Pig): Poop {
@@ -452,18 +480,44 @@ function clampEntitiesToCage(state: GameState): void {
 function targetNearFurniture(
   state: GameState,
   pig: Pig,
-  furnitureId: FurnitureId | "hayRack",
+  furnitureId: FurnitureId | "hayRack" | "waterBottle",
   fallbackX: number,
   fallbackY: number,
   radius: number,
 ): void {
-  const placement = furnitureId !== "hayRack" && state.furniture[furnitureId]
+  const placement = furnitureId !== "hayRack" && furnitureId !== "waterBottle" && state.furniture[furnitureId]
     ? getStaticFurniturePlacement(state, furnitureId)
     : null;
   const centerX = placement?.x ?? fallbackX;
   const centerY = placement?.y ?? fallbackY;
   pig.targetX = clamp(centerX + randomBetween(-radius, radius), CAGE_PADDING, state.cage.width - CAGE_PADDING);
   pig.targetY = clamp(centerY + randomBetween(-radius, radius), CAGE_PADDING, state.cage.height - CAGE_PADDING);
+}
+
+function targetSleepSpot(state: GameState, pig: Pig): void {
+  if (pig.trait === "Shy Beaner" && state.furniture.hideyHouse) {
+    targetNearFurniture(state, pig, "hideyHouse", 116, state.cage.height - 108, 36);
+    return;
+  }
+
+  const sleepOptions: Array<{ furnitureId: FurnitureId; fallbackX: number; fallbackY: number; radius: number; weight: number }> = [
+    { furnitureId: "snuggleSack", fallbackX: state.cage.width - 150, fallbackY: state.cage.height - 118, radius: 34, weight: state.furniture.snuggleSack ? 4 : 0 },
+    { furnitureId: "hideyHouse", fallbackX: 116, fallbackY: state.cage.height - 108, radius: 42, weight: state.furniture.hideyHouse ? 3 : 0 },
+  ];
+  const totalWeight = sleepOptions.reduce((total, option) => total + option.weight, 0);
+  if (totalWeight > 0) {
+    let roll = Math.random() * totalWeight;
+    for (const option of sleepOptions) {
+      roll -= option.weight;
+      if (roll <= 0) {
+        targetNearFurniture(state, pig, option.furnitureId, option.fallbackX, option.fallbackY, option.radius);
+        return;
+      }
+    }
+  }
+
+  pig.targetX = randomBetween(CAGE_PADDING + 24, state.cage.width - CAGE_PADDING - 24);
+  pig.targetY = randomBetween(CAGE_PADDING + 24, state.cage.height - CAGE_PADDING - 24);
 }
 
 function getFurnitureName(id: FurnitureId): string {
