@@ -136,6 +136,7 @@ export class GameScene extends Phaser.Scene {
     this.load.image("litter-tray-clean", assetPath("assets/sprites/decor/litter_tray_clean.png"));
     this.load.image("toy-pile", assetPath("assets/sprites/decor/toy_pile.png"));
     this.load.image("toy-tunnel-blue", assetPath("assets/sprites/decor/toy_tunnel_blue.png"));
+    this.load.image("snuggle-sack", assetPath("assets/sprites/decor/snuggle_sack.png"));
     this.load.image("royal-throne", assetPath("assets/sprites/decor/royal_throne.png"));
     this.load.image("roaming-dustpan", assetPath("assets/sprites/upgrades/roaming_dustpan.png"));
     this.load.image("compost-bin", assetPath("assets/sprites/upgrades/compost_bin.png"));
@@ -710,10 +711,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    const targetScaleX = glow.scaleX * 1.24;
+    const targetScaleY = glow.scaleY * 1.24;
+
     this.tweens.add({
       targets: glow,
       alpha: 0,
-      scale: 1.24,
+      scaleX: targetScaleX,
+      scaleY: targetScaleY,
       duration: 460,
       ease: "Cubic.easeOut",
       onComplete: () => glow.destroy(),
@@ -1149,10 +1154,7 @@ export class GameScene extends Phaser.Scene {
       return [this.add.image(0, -22, "royal-throne").setDisplaySize(118, 142)];
     }
     if (id === "snuggleSack") {
-      return [
-        this.add.ellipse(0, 0, 78, 42, 0xd6d1c4).setStrokeStyle(3, 0x8f8a80, 0.7),
-        this.add.ellipse(0, 4, 48, 20, 0x6a5f54),
-      ];
+      return [this.add.image(0, -16, "snuggle-sack").setDisplaySize(112, 112)];
     }
     return [
       this.add.rectangle(0, 12, 76, 48, 0x8a6e4d).setStrokeStyle(3, 0x5d4129, 0.7),
