@@ -1,4 +1,5 @@
 import { addLog } from "./state";
+import { getCageZoneName, getPigZoneId, getZoneMetrics } from "./ecology";
 import type { GameState, Pig, PigRequestId, PigRequestProgressKind } from "./types";
 
 export interface PigRequestView {
@@ -18,6 +19,8 @@ export function updatePigRequests(state: GameState, deltaSeconds: number): void 
 
   if (active) {
     active.timer = Math.max(0, active.timer - deltaSeconds);
+    updatePassiveRequestProgress(state, active, deltaSeconds);
+    if (requestState.active !== active) return;
     if (active.timer <= 0) {
       const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
       requestState.expired += 1;
@@ -98,7 +101,7 @@ function completePigRequest(state: GameState): void {
   if (!active) return;
 
   const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
-  applyReward(state, active.id);
+  applyReward(state, active);
   requestState.completed += 1;
   requestState.lastResult = {
     pigId: active.pigId,
@@ -198,6 +201,49 @@ function createRequest(state: GameState, pig: Pig, id: PigRequestId): NonNullabl
       token,
     };
   }
+  if (id === "favoriteCornerFavor") {
+    return {
+      id,
+      pigId: pig.id,
+      title: "Favorite Corner",
+      description: `${pig.name} wants two beans cleaned from ${getCageZoneName(pig.favoriteZone)}.`,
+      progress: 0,
+      target: 2,
+      timer: 90,
+      rewardText: "+22 Beans, calmer favorite zone",
+      thought: "Corner?",
+      token,
+    };
+  }
+  if (id === "quietZoneFavor") {
+    return {
+      id,
+      pigId: pig.id,
+      title: "Quiet Zone",
+      description: `${pig.name} wants an ability used to calm the habitat pressure.`,
+      progress: 0,
+      target: 1,
+      timer: 90,
+      rewardText: "+18 Beans, -stress",
+      thought: "Cozy?",
+      token,
+    };
+  }
+  if (id === "bondSupportFavor") {
+    const partner = state.pigs.find((candidate) => candidate.id === pig.bondedPigId);
+    return {
+      id,
+      pigId: pig.id,
+      title: "Bond Support",
+      description: `${pig.name}${partner ? ` and ${partner.name}` : ""} want 10s together in a comfortable zone.`,
+      progress: 0,
+      target: 10,
+      timer: 105,
+      rewardText: "+24 Beans, +1 Squeak",
+      thought: "Together?",
+      token,
+    };
+  }
   return {
     id,
     pigId: pig.id,
@@ -212,7 +258,8 @@ function createRequest(state: GameState, pig: Pig, id: PigRequestId): NonNullabl
   };
 }
 
-function applyReward(state: GameState, id: PigRequestId): void {
+function applyReward(state: GameState, active: NonNullable<GameState["pigRequest"]["active"]>): void {
+  const id = active.id;
   if (id === "tidyFavor") {
     awardBeans(state, 18);
     state.squeaks += 1;
@@ -227,6 +274,20 @@ function applyReward(state: GameState, id: PigRequestId): void {
     state.cage.happiness = Math.min(100, state.cage.happiness + 6);
   } else if (id === "furnitureFavor") {
     awardBeans(state, 26);
+  } else if (id === "favoriteCornerFavor") {
+    awardBeans(state, 22);
+    const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
+    if (pig) pig.stress = Math.max(0, pig.stress - 16);
+  } else if (id === "quietZoneFavor") {
+    awardBeans(state, 18);
+    for (const pig of state.pigs) pig.stress = Math.max(0, pig.stress - 6);
+  } else if (id === "bondSupportFavor") {
+    awardBeans(state, 24);
+    state.squeaks += 1;
+    const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
+    const partner = pig ? state.pigs.find((candidate) => candidate.id === pig.bondedPigId) : null;
+    if (pig) pig.stress = Math.max(0, pig.stress - 12);
+    if (partner) partner.stress = Math.max(0, partner.stress - 12);
   } else {
     awardBeans(state, 18);
     state.compost += 4;
@@ -242,6 +303,9 @@ function chooseRequestId(state: GameState, pig: Pig): PigRequestId {
     { id: "snackFavor", weight: state.squeaks >= 1 ? 1.2 : 0.4 },
     { id: "furnitureFavor", weight: hasLockedFurniture(state) ? 1.1 : 0 },
     { id: "compostFavor", weight: pig.trait === "Compost Mystic" || state.compost >= 3 ? 1.6 : 0.5 },
+    { id: "favoriteCornerFavor", weight: getZoneMetrics(state, pig.favoriteZone).mess >= 18 ? 2.1 : 0.8 },
+    { id: "quietZoneFavor", weight: pig.stress >= 42 || state.ecology.averageStress >= 34 ? 1.9 : 0.45 },
+    { id: "bondSupportFavor", weight: pig.bondedPigId !== null ? 1.25 : 0 },
   ];
   return pickWeighted(options);
 }
@@ -255,7 +319,9 @@ function chooseRequestPig(state: GameState): Pig | null {
       (pig.trait === "Neat Freak" && state.poops.length >= 3 ? 1 : 0) +
       (pig.trait === "Hay Goblin" && state.needs.hay < 65 ? 1 : 0) +
       (pig.trait === "Drama Pig" && state.needs.water < 65 ? 1 : 0) +
-      (pig.trait === "Compost Mystic" && state.compost >= 2 ? 1 : 0),
+      (pig.trait === "Compost Mystic" && state.compost >= 2 ? 1 : 0) +
+      (pig.stress >= 45 ? 1.4 : 0) +
+      (getZoneMetrics(state, pig.favoriteZone).mess >= 24 ? 1 : 0),
   }));
   return pickWeighted(weightedPigs);
 }
@@ -267,7 +333,29 @@ function getRequestProgressKind(id: PigRequestId): PigRequestProgressKind {
   if (id === "zoomieFavor") return "combo";
   if (id === "snackFavor") return "ability";
   if (id === "furnitureFavor") return "furniture";
+  if (id === "favoriteCornerFavor") return "ecologyClean";
+  if (id === "quietZoneFavor") return "ability";
+  if (id === "bondSupportFavor") return "bondedZone";
   return "compost";
+}
+
+function updatePassiveRequestProgress(
+  state: GameState,
+  active: NonNullable<GameState["pigRequest"]["active"]>,
+  deltaSeconds: number,
+): void {
+  if (active.id !== "bondSupportFavor") return;
+  const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
+  const partner = pig ? state.pigs.find((candidate) => candidate.id === pig.bondedPigId) : null;
+  if (!pig || !partner) return;
+
+  const zoneId = getPigZoneId(state, pig);
+  const zone = getZoneMetrics(state, zoneId);
+  const partnerTogether = getPigZoneId(state, partner) === zoneId;
+  if (!partnerTogether || zone.comfort < 45 || zone.mess > 55) return;
+
+  active.progress = Math.min(active.target, active.progress + deltaSeconds);
+  if (active.progress >= active.target) completePigRequest(state);
 }
 
 function ensurePigRequestState(state: GameState): GameState["pigRequest"] {

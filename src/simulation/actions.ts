@@ -11,6 +11,7 @@ import {
   getWisdomCost,
   getWisdomPerk,
 } from "./balance";
+import { adjustHerdStress, adjustPigStressInZone, getCageZoneName, getPoopZoneId, getZoneMetrics, refreshEcology } from "./ecology";
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
 import { addLegendaryPig, addLog, addPig, spawnEventPoop, syncCageDimensionsToLevel } from "./state";
@@ -152,6 +153,21 @@ const EVENT_CHOICES: Record<EventId, EventChoiceView[]> = {
     { id: "wheekingConduct", eventId: "greatWheeking", label: "Conduct the Herd", description: "Spend Beans for happiness and Squeaks." },
     { id: "wheekingEcho", eventId: "greatWheeking", label: "Echo Into Mythos", description: "Spend Squeaks to gain a Golden Bean." },
   ],
+  litterRevolt: [
+    { id: "litterScrub", eventId: "litterRevolt", label: "Scrub the Corner", description: "Clean the litter corner and calm tidy pigs." },
+    { id: "litterCompost", eventId: "litterRevolt", label: "Compost the Evidence", description: "Accept a little mess for Compost and relief." },
+    { id: "litterCircuit", eventId: "litterRevolt", label: "Run Cleanup Circuit", description: "Use Roomba or Compost to stabilize the dirty corner." },
+  ],
+  hideySquabble: [
+    { id: "hideyQuiet", eventId: "hideySquabble", label: "Quiet Time", description: "Give shy pigs space and lower hidey stress." },
+    { id: "hideyTreaty", eventId: "hideySquabble", label: "Treat Treaty", description: "Spend Beans to settle the argument with snacks." },
+    { id: "hideyRebond", eventId: "hideySquabble", label: "Rebond Pair", description: "Spend Squeaks to strengthen social stability." },
+  ],
+  zoomieTraffic: [
+    { id: "trafficLanes", eventId: "zoomieTraffic", label: "Mark Zoomie Lanes", description: "Guide the run into combo momentum." },
+    { id: "trafficSprint", eventId: "zoomieTraffic", label: "Join the Sprint", description: "Gain Beans, but the play run gets messier." },
+    { id: "trafficTunnel", eventId: "zoomieTraffic", label: "Close the Tunnel Loop", description: "Use the Tunnel to turn traffic into calmer speed." },
+  ],
 };
 
 const EVENT_CHOICE_MAP = Object.fromEntries(
@@ -242,6 +258,12 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
     if (options.advanceRequests !== false) {
       advancePigRequest(state, "clean", result.cleaned);
       advancePigRequest(state, "combo", comboCount);
+      const activeRequest = state.pigRequest?.active;
+      const requestPig = activeRequest ? state.pigs.find((pig) => pig.id === activeRequest.pigId) : null;
+      if (requestPig && activeRequest?.id === "favoriteCornerFavor") {
+        const favoriteZoneCleans = result.cleanedPoops.filter((poop) => getPoopZoneId(state, poop) === requestPig.favoriteZone).length;
+        if (favoriteZoneCleans > 0) advancePigRequest(state, "ecologyClean", favoriteZoneCleans);
+      }
       updateHeldPigRequestProgress(state);
     }
   }
@@ -287,7 +309,7 @@ export function buyPig(state: GameState): boolean {
   state.beans -= cost;
   const pig = addPig(state);
   state.stats.pigsAdopted += 1;
-  addLog(state, `${pig.name} joined as a ${pig.breed} ${pig.trait}. Favorite: ${pig.favoriteFood}.`);
+  addLog(state, `${pig.name} joined as a ${pig.breed} ${pig.trait}. Favorite: ${pig.favoriteFood}; zone: ${getCageZoneName(pig.favoriteZone)}.`);
   updateMilestones(state);
   return true;
 }
@@ -357,7 +379,7 @@ export function buyRarePig(state: GameState): boolean {
   const pig = addLegendaryPig(state);
   state.stats.pigsAdopted += 1;
   state.stats.legendaryPigsAdopted += 1;
-  addLog(state, `${pig.name} arrived as a legendary ${pig.breed} ${pig.trait}.`);
+  addLog(state, `${pig.name} arrived as a legendary ${pig.breed} ${pig.trait} who favors ${getCageZoneName(pig.favoriteZone)}.`);
   updateMilestones(state);
   return true;
 }
@@ -448,9 +470,11 @@ export function useAbility(state: GameState, id: AbilityId): boolean {
   } else if (id === "freshBedding") {
     state.cage.cleanliness = 100;
     state.abilities.freshBedding = 35;
+    adjustHerdStress(state, -8);
     addLog(state, "Fresh bedding restored the cage to suspicious respectability.");
   } else if (id === "snackTime") {
     state.abilities.snackTime = 20;
+    adjustHerdStress(state, -6);
     addLog(state, `Snack Time spent ${squeakCost} Squeaks to boost happiness and rare bean odds.`);
   } else {
     state.abilities.zoomieMode = 12;
@@ -643,6 +667,10 @@ export function getEventChoiceStatus(state: GameState, id: EventChoiceId): strin
   if (id === "compostFuel" && state.compost < 8) return formatNeed(state.compost, 8, "Compost", "Compost");
   if (id === "wheekingConduct" && state.beans < 30) return formatNeed(state.beans, 30, "Bean");
   if (id === "wheekingEcho" && state.squeaks < 5) return formatNeed(state.squeaks, 5, "Squeak");
+  if (id === "litterCircuit" && !state.robot && state.compost < 5) return "Need Roomba or 5 Compost";
+  if (id === "hideyTreaty" && state.beans < 20) return formatNeed(state.beans, 20, "Bean");
+  if (id === "hideyRebond" && state.squeaks < 2) return formatNeed(state.squeaks, 2, "Squeak");
+  if (id === "trafficTunnel" && !state.furniture.tunnel) return "Need Tunnel";
   return "";
 }
 
@@ -741,10 +769,58 @@ export function respondToEventChoice(state: GameState, id: EventChoiceId): boole
     state.cage.happiness = Math.min(100, state.cage.happiness + 10);
     state.squeaks += 4;
     addLog(state, "The herd was conducted for 30 Beans. Happiness rose and +4 Squeaks rang out.");
-  } else {
+  } else if (id === "wheekingEcho") {
     state.squeaks -= 5;
     state.goldenBeans += 1;
     addLog(state, "The Great Wheeking echoed into mythos. +1 Golden Bean.");
+  } else if (id === "litterScrub") {
+    const litter = getZoneMetrics(state, "litterCorner");
+    const result = cleanPoopsInRadius(state, litter.x, litter.y, litter.radius * 0.92);
+    adjustPigStressInZone(state, "litterCorner", -16);
+    addLog(state, `Litter Revolt scrubbed down: cleaned ${result.cleaned} beans and settled the corner.`);
+  } else if (id === "litterCompost") {
+    state.compost += 8;
+    state.cage.cleanliness = Math.max(0, state.cage.cleanliness - 4);
+    adjustPigStressInZone(state, "litterCorner", -8);
+    addLog(state, "Litter Revolt composted into +8 Compost. The bedding looks offended but calmer.");
+  } else if (id === "litterCircuit") {
+    const litter = getZoneMetrics(state, "litterCorner");
+    if (state.robot) {
+      state.automation.overdrive = Math.min(60, state.automation.overdrive + 12);
+    } else {
+      state.compost -= 5;
+    }
+    const result = cleanPoopsInRadius(state, litter.x, litter.y, litter.radius * 0.72);
+    adjustPigStressInZone(state, "litterCorner", -18);
+    addLog(state, `Cleanup Circuit stabilized the litter corner and cleaned ${result.cleaned} beans.`);
+  } else if (id === "hideyQuiet") {
+    adjustPigStressInZone(state, "hideyZone", -18);
+    state.cage.happiness = Math.min(100, state.cage.happiness + 4);
+    addLog(state, "Hidey Squabble resolved with quiet time. Shy corners are calmer.");
+  } else if (id === "hideyTreaty") {
+    state.beans -= 20;
+    adjustPigStressInZone(state, "hideyZone", -24);
+    state.cage.happiness = Math.min(100, state.cage.happiness + 7);
+    addLog(state, "Treat Treaty spent 20 Beans. The hidey zone accepted snack diplomacy.");
+  } else if (id === "hideyRebond") {
+    state.squeaks -= 2;
+    adjustHerdStress(state, -10);
+    state.cage.socialization += 4;
+    addLog(state, "Two Squeaks rebonded the herd. Social stability improved.");
+  } else if (id === "trafficLanes") {
+    state.combo.timer = Math.max(state.combo.timer, 5);
+    state.combo.count = Math.max(state.combo.count, 3);
+    adjustPigStressInZone(state, "playRun", -10);
+    addLog(state, "Zoomie lanes marked. Clean streak momentum is ready.");
+  } else if (id === "trafficSprint") {
+    awardBeans(state, 40);
+    spawnBeansNearPigs(state, "normal", 3);
+    adjustPigStressInZone(state, "playRun", 5);
+    addLog(state, "You joined the sprint for +40 Beans. Three beans joined the traffic report.");
+  } else if (id === "trafficTunnel") {
+    state.abilities.zoomieMode = Math.max(state.abilities.zoomieMode, 8);
+    adjustPigStressInZone(state, "playRun", -18);
+    addLog(state, "Tunnel loop closed. Zoomies are faster and less frantic for a bit.");
   }
 
   state.event.responseReady = false;
@@ -792,6 +868,8 @@ export function prestige(state: GameState): boolean {
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;
   state.event.responseReady = false;
+  for (const pig of state.pigs) pig.stress = 0;
+  refreshEcology(state);
   state.survival.deathCheckTimer = 12;
   state.stats.prestiges += 1;
   state.objective = {

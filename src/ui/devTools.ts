@@ -6,7 +6,8 @@ import {
   setBeans,
   unlockRobot,
 } from "../simulation/actions";
-import { addLog, spawnDebugPoop } from "../simulation/state";
+import { getZoneMetrics, refreshEcology } from "../simulation/ecology";
+import { addLog, spawnDebugPoop, spawnEventPoop } from "../simulation/state";
 import type { GameState, PoopType } from "../simulation/types";
 
 export class DevTools {
@@ -47,6 +48,7 @@ export class DevTools {
       this.createButton("Spawn Blessed", () => this.spawnPoop("blessed")),
       this.createButton("Spawn Royal", () => this.spawnPoop("royal")),
       this.createButton("Spawn Stinky", () => this.spawnPoop("stinky")),
+      this.createButton("Seed Ecology Stress", () => this.seedEcologyStress()),
       this.createButton("Buy/Unlock Roomba", () => unlockRobot(this.state)),
       this.createButton("Clear Poops", () => clearPoops(this.state)),
     );
@@ -78,5 +80,28 @@ export class DevTools {
   private addResource(id: "compost" | "squeaks" | "cavyWisdom", amount: number): void {
     this.state[id] += amount;
     addLog(this.state, `Dev tools added ${amount} ${id}.`);
+  }
+
+  private seedEcologyStress(): void {
+    const litter = getZoneMetrics(this.state, "litterCorner");
+    const hidey = getZoneMetrics(this.state, "hideyZone");
+    for (let index = 0; index < 5; index += 1) {
+      spawnEventPoop(
+        this.state,
+        index % 2 === 0 ? "stinky" : "normal",
+        litter.x + (index - 2) * 12,
+        litter.y + (index % 2 === 0 ? -10 : 14),
+      );
+    }
+    for (const [index, pig] of this.state.pigs.entries()) {
+      if (index >= 4) break;
+      pig.x = hidey.x + index * 8;
+      pig.y = hidey.y + index * 6;
+      pig.targetX = pig.x;
+      pig.targetY = pig.y;
+      pig.stress = Math.max(pig.stress, 62);
+    }
+    refreshEcology(this.state);
+    addLog(this.state, "Dev tools seeded a dirty, crowded ecology state.");
   }
 }

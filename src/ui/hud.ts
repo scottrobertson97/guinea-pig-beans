@@ -45,6 +45,7 @@ import {
   getWisdomPerks,
   hasFurnitureSynergy,
 } from "../simulation/balance";
+import { getCageZoneName, getEcologyConcernCount, getEcologyStatusLine } from "../simulation/ecology";
 import { getAchievementViews, getQuestViews, type MilestoneView } from "../simulation/milestones";
 import { SAVE_STATUS_EVENT, type SaveStatusDetail } from "../simulation/persistence";
 import { getActivePigRequestView } from "../simulation/pigRequests";
@@ -638,6 +639,7 @@ export class Hud {
     setText("rare-pig-cost", getRarePigStatusText(this.state, costs.rarePig, pigCapacity));
     this.renderFurnitureCosts(costs.furniture);
     this.renderFurnitureSynergies();
+    this.renderEcologyZones();
     this.renderAbilityStatuses();
     this.renderRecipeStatuses();
     this.renderLateGameStatuses();
@@ -695,7 +697,7 @@ export class Hud {
         const identity = document.createElement("strong");
         const details = document.createElement("span");
         identity.textContent = pig.name;
-        details.textContent = `${pig.breed} ${pig.trait} - ${getPigGoalLabel(pig)} - ${getPigWeakestNeedLabel(pig)} - ${pig.quirk}`;
+        details.textContent = `${pig.breed} ${pig.trait} - ${getPigGoalLabel(pig)} - ${getPigWeakestNeedLabel(pig)} - ${getPigEcologyLabel(pig)} - ${pig.quirk}`;
         item.append(identity, details);
         return item;
       });
@@ -970,7 +972,8 @@ export class Hud {
       "bigger-cage",
       "rare-pig",
     ]), "available");
-    this.setDockIndicator("furniture", countEnabled(this.buttons, [
+    const ecologyConcerns = getEcologyConcernCount(this.state);
+    this.setDockIndicator("furniture", ecologyConcerns > 0 ? "!" : countEnabled(this.buttons, [
       "hidey-house",
       "tunnel",
       "litter-tray",
@@ -978,7 +981,7 @@ export class Hud {
       "snuggle-sack",
       "cardboard-castle",
       "royal-throne",
-    ]), "available");
+    ]), ecologyConcerns > 0 ? "urgent" : "available");
     this.setDockIndicator("abilities", countEnabled(this.buttons, [
       "wheek-call",
       "treat-bag",
@@ -1198,6 +1201,30 @@ export class Hud {
       status.textContent = active ? "Active" : `Needs ${missing.map(getFurnitureName).join(" + ")}`;
       description.textContent = synergy.description;
       item.append(title, status, description);
+      return item;
+    });
+
+    list.replaceChildren(...items);
+  }
+
+  private renderEcologyZones(): void {
+    const list = document.querySelector<HTMLUListElement>("#ecology-zone-list");
+    if (!list) return;
+
+    const items = this.state.ecology.zones.map((zone) => {
+      const item = document.createElement("li");
+      if (zone.mess >= 55 || zone.traffic >= 72 || zone.comfort <= 32) item.classList.add("attention");
+      if (zone.appeal >= 78 && zone.pigIds.length > 0) item.classList.add("complete");
+
+      const title = document.createElement("span");
+      const status = document.createElement("strong");
+      const metrics = document.createElement("small");
+      const action = document.createElement("em");
+      title.textContent = zone.label;
+      status.textContent = zone.status;
+      metrics.textContent = `Comfort ${zone.comfort} - Mess ${zone.mess} - Traffic ${zone.traffic}`;
+      action.textContent = `${zone.action}${zone.pigIds.length > 0 ? ` - ${zone.pigIds.length} pig${zone.pigIds.length === 1 ? "" : "s"}` : ""}`;
+      item.append(title, status, metrics, action);
       return item;
     });
 
@@ -1528,6 +1555,9 @@ function getCouncilDecreeFeedbackColor(decreeId: CouncilDecreeId): number {
 }
 
 function getEventChoiceFeedbackText(choiceId: EventChoiceId): string {
+  if (choiceId.includes("litter")) return "Litter Shift";
+  if (choiceId.includes("hidey")) return "Hidey Calm";
+  if (choiceId.includes("traffic")) return "Traffic Shift";
   if (choiceId.includes("Hay") || choiceId.includes("hay")) return "Hay Shift";
   if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return "Water Shift";
   if (choiceId.includes("Squeak") || choiceId.includes("squeak") || choiceId.includes("wheek")) return "Squeaks";
@@ -1538,6 +1568,9 @@ function getEventChoiceFeedbackText(choiceId: EventChoiceId): string {
 }
 
 function getEventChoiceFeedbackColor(choiceId: EventChoiceId): number {
+  if (choiceId.includes("litter")) return 0x8a6e4d;
+  if (choiceId.includes("hidey")) return 0x7db46a;
+  if (choiceId.includes("traffic")) return 0xb965d2;
   if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return 0x86d9f0;
   if (choiceId.includes("compost") || choiceId.includes("Compost")) return 0x6fa55d;
   if (choiceId.includes("Squeak") || choiceId.includes("squeak") || choiceId.includes("wheek")) return 0xf0d56b;
@@ -1571,6 +1604,8 @@ function setMeter(id: string, value: number): void {
 }
 
 function getStatusLine(state: GameState): string {
+  const ecologyLine = getEcologyStatusLine(state);
+  if (ecologyLine) return ecologyLine;
   if (state.automation.overdrive > 0) return `Automation overdrive is sweeping faster for ${Math.ceil(state.automation.overdrive)}s.`;
   if (state.event.active && state.event.responseReady)
     return `${state.event.active.name} is active. Use Event to choose a response.`;
@@ -1607,6 +1642,12 @@ function getPigWeakestNeedLabel(pig: Pig): string {
   ];
   const weakest = needs.reduce((lowest, need) => (need.value < lowest.value ? need : lowest));
   return `${weakest.label} ${Math.round(weakest.value)}%`;
+}
+
+function getPigEcologyLabel(pig: Pig): string {
+  const stress = Math.round(pig.stress);
+  const stressLabel = stress >= 70 ? "stressed" : stress >= 40 ? "uneasy" : "settled";
+  return `${getCageZoneName(pig.favoriteZone)} ${stress}% ${stressLabel}`;
 }
 
 function getAutomationFuelText(state: GameState): string {

@@ -1,5 +1,6 @@
 import { cleanPoopsInRadius } from "./actions";
 import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } from "./balance";
+import { getZoneMetrics, refreshEcology, updatePigEcology } from "./ecology";
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
@@ -21,9 +22,11 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateCombo(state, deltaSeconds);
   updateAbilities(state, deltaSeconds);
   updateAutomation(state, deltaSeconds);
+  updateDerivedCageStats(state);
+  refreshEcology(state);
   updateEvent(state, deltaSeconds);
   updatePigRequests(state, deltaSeconds);
-  updateDerivedCageStats(state);
+  refreshEcology(state);
   updateHappiness(state);
   updateObjective(state, deltaSeconds);
   updateNeeds(state, deltaSeconds);
@@ -35,6 +38,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateRobot(state, deltaSeconds);
   updateCleanliness(state);
   updateHeldPigRequestProgress(state);
+  refreshEcology(state);
   updateMilestones(state);
 }
 
@@ -72,14 +76,22 @@ function updateEvent(state: GameState, deltaSeconds: number): void {
 }
 
 function startRandomEvent(state: GameState): void {
+  const litterZone = getZoneMetrics(state, "litterCorner");
+  const hideyZone = getZoneMetrics(state, "hideyZone");
+  const playZone = getZoneMetrics(state, "playRun");
+  const hayZone = getZoneMetrics(state, "hayCorner");
+  const waterZone = getZoneMetrics(state, "waterBottle");
   const events: Array<{ event: NonNullable<GameState["event"]["active"]>; weight: number }> = [
-    { event: { id: "zoomies", name: "Zoomies", timer: 15 }, weight: state.cage.enrichment > 70 ? 1.8 : 1 },
-    { event: { id: "hayFrenzy", name: "Hay Frenzy", timer: 18 }, weight: state.needs.hay < 35 ? 2.4 : 1 },
+    { event: { id: "zoomies", name: "Zoomies", timer: 15 }, weight: state.cage.enrichment > 70 || playZone.appeal > 72 ? 1.9 : 1 },
+    { event: { id: "hayFrenzy", name: "Hay Frenzy", timer: 18 }, weight: state.needs.hay < 35 || hayZone.comfort < 38 ? 2.5 : 1 },
     { event: { id: "napTime", name: "Nap Time", timer: 12 }, weight: state.cage.happiness > 82 ? 1.7 : 1 },
-    { event: { id: "bottleJam", name: "Bottle Jam", timer: 20 }, weight: state.needs.water < 40 ? 2.5 : 1 },
-    { event: { id: "cageInspection", name: "Cage Inspection", timer: 22 }, weight: state.cage.cleanliness > 85 || state.poops.length > 18 ? 1.8 : 0.8 },
-    { event: { id: "compostBloom", name: "Compost Bloom", timer: 18 }, weight: state.compost > 20 || state.recipes.compostCatalyst ? 2 : 1 },
+    { event: { id: "bottleJam", name: "Bottle Jam", timer: 20 }, weight: state.needs.water < 40 || waterZone.traffic > 60 ? 2.5 : 1 },
+    { event: { id: "cageInspection", name: "Cage Inspection", timer: 22 }, weight: state.cage.cleanliness > 85 || state.poops.length > 18 || litterZone.mess > 55 ? 1.9 : 0.8 },
+    { event: { id: "compostBloom", name: "Compost Bloom", timer: 18 }, weight: state.compost > 20 || state.recipes.compostCatalyst || litterZone.mess > 45 ? 2 : 1 },
     { event: { id: "greatWheeking", name: "The Great Wheeking", timer: 16 }, weight: state.squeaks > 8 || state.wisdom.chorusTraining ? 2 : 1 },
+    { event: { id: "litterRevolt", name: "Litter Revolt", timer: 18 }, weight: litterZone.mess > 48 || litterZone.traffic > 68 ? 2.2 : 0.35 },
+    { event: { id: "hideySquabble", name: "Hidey Squabble", timer: 18 }, weight: hideyZone.traffic > 62 || state.ecology.averageStress > 42 ? 2.1 : 0.35 },
+    { event: { id: "zoomieTraffic", name: "Zoomie Traffic", timer: 16 }, weight: playZone.traffic > 62 || hasFurnitureSynergy(state, "zoomiePlayground") ? 1.8 : 0.4 },
   ];
   const event = pickWeighted(events);
   const timerBonus = event.id === "zoomies" && hasFurnitureSynergy(state, "zoomiePlayground") ? 4 : 0;
@@ -87,6 +99,11 @@ function startRandomEvent(state: GameState): void {
   state.event.responseReady = true;
   if (event.id === "bottleJam") state.event.bottleJammed = true;
   if (event.id === "greatWheeking") state.squeaks += 5;
+  if (event.id === "hideySquabble") {
+    for (const pig of state.pigs) {
+      if (pig.favoriteZone === "hideyZone") pig.stress = Math.min(100, pig.stress + 8);
+    }
+  }
   addLog(state, `${event.name}! The cage situation has changed.`);
 }
 
@@ -148,6 +165,8 @@ function updateHappiness(state: GameState): void {
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
   const lonePigPenalty = state.pigs.length === 1 ? 14 : 0;
   const councilHappinessBonus = state.lateGame.cavyCouncil && state.pigs.length >= 8 ? 5 : 0;
+  const ecologyStressPenalty = Math.min(16, state.ecology.averageStress * 0.18);
+  const ecologyComfortBonus = state.ecology.zones.some((zone) => zone.appeal >= 80 && zone.pigIds.length > 0) ? 4 : 0;
   state.cage.happiness = Math.max(
     0,
     Math.min(
@@ -163,7 +182,9 @@ function updateHappiness(state: GameState): void {
           dramaPenalty +
           synergyBonus -
           lonePigPenalty +
-          councilHappinessBonus,
+          councilHappinessBonus -
+          ecologyStressPenalty +
+          ecologyComfortBonus,
       ),
     ),
   );
@@ -303,6 +324,7 @@ function updateNeeds(state: GameState, deltaSeconds: number): void {
 function updatePigs(state: GameState, deltaSeconds: number): void {
   for (const pig of state.pigs) {
     updatePigNeeds(pig, deltaSeconds);
+    updatePigEcology(state, pig, deltaSeconds);
     updatePigGoal(state, pig);
     pig.mood = getPigMood(state, pig);
 
@@ -538,6 +560,7 @@ function updateCleanliness(state: GameState): void {
 }
 
 function getPigMood(state: GameState, pig: Pig): PigMood {
+  if (pig.stress >= 72) return "messy";
   if (state.cage.happiness < 35) return "messy";
   if (state.cage.cleanliness < 35) return "messy";
   if (pig.hunger <= HUNGER_GOAL_THRESHOLD || (pig.goal === "eat" && state.needs.hay <= 0)) return "hungry";

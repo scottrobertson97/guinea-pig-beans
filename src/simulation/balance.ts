@@ -336,6 +336,11 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
   const enrichmentMultiplier = 1 - Math.min(0.22, state.cage.enrichment / 500);
   const socialMultiplier = 1 - Math.min(0.18, state.cage.socialization / 600);
   const happinessMultiplier = state.cage.happiness >= 85 ? 0.88 : state.cage.happiness < 45 ? 1.22 : 1;
+  const favoriteZoneMultiplier =
+    state.ecology.zones.some((zone) => zone.id === pig.favoriteZone && zone.pigIds.includes(pig.id) && zone.comfort >= 62)
+      ? 0.92
+      : 1;
+  const stressMultiplier = 1 + Math.min(0.28, Math.max(0, pig.stress) / 260);
   const eventMultiplier =
     state.event.active?.id === "hayFrenzy" || state.event.active?.id === "greatWheeking"
       ? 0.68
@@ -365,6 +370,8 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
     enrichmentMultiplier *
     socialMultiplier *
     happinessMultiplier *
+    favoriteZoneMultiplier *
+    stressMultiplier *
     eventMultiplier *
     abilityMultiplier *
     wisdomMultiplier *

@@ -1,4 +1,5 @@
 import { addLog, createInitialState, syncCageDimensionsToLevel, syncEntityIdCounters } from "./state";
+import { chooseFavoriteZoneForPig, createInitialEcologyState, normalizeCageZoneId, refreshEcology } from "./ecology";
 import type { GameState, Pig, PigGoal } from "./types";
 
 export const SAVE_KEY = "gpb-save-v1";
@@ -51,6 +52,7 @@ export function loadGameState(): LoadGameStateResult {
 
     const hydratedState = hydrateState(freshState, parsed.state as Partial<GameState>);
     syncCageDimensionsToLevel(hydratedState);
+    refreshEcology(hydratedState);
     syncEntityIdCounters(hydratedState);
     lastSerializedState = serializeState(hydratedState);
     return { state: hydratedState, recovered: false };
@@ -123,11 +125,13 @@ function removeUnreadableSave(): void {
 
 function hydrateState(defaultState: GameState, savedState: Partial<GameState>): GameState {
   const hydrated = mergeDefaults(defaultState, savedState) as GameState;
-  hydrated.pigs = hydrated.pigs.map(hydratePigLifeState);
+  hydrated.ecology = hydrated.ecology ?? createInitialEcologyState(hydrated.cage.width, hydrated.cage.height);
+  hydrated.pigs = hydrated.pigs.map((pig, index) => hydratePigLifeState(pig, index));
+  refreshEcology(hydrated);
   return hydrated;
 }
 
-function hydratePigLifeState(pig: Pig): Pig {
+function hydratePigLifeState(pig: Pig, index: number): Pig {
   return {
     ...pig,
     hunger: normalizeNeed(pig.hunger, 82),
@@ -135,6 +139,8 @@ function hydratePigLifeState(pig: Pig): Pig {
     energy: normalizeNeed(pig.energy, 76),
     goal: normalizePigGoal(pig.goal),
     goalTimer: normalizeTimer(pig.goalTimer),
+    favoriteZone: normalizeCageZoneId(pig.favoriteZone, chooseFavoriteZoneForPig(pig, index)),
+    stress: normalizeNeed(pig.stress, 0),
   };
 }
 

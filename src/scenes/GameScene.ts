@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { assetPath } from "../assetPaths";
+import { isPigComfortableInFavoriteZone } from "../simulation/ecology";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simulation/actions";
 import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
@@ -464,12 +465,14 @@ export class GameScene extends Phaser.Scene {
 
     sprite.setTexture(this.getPigTextureKey(pig));
     sprite.clearTint();
-    if (pig.mood === "hungry") sprite.setAlpha(0.78);
+    if (pig.stress >= 70) sprite.setAlpha(0.68);
+    else if (pig.mood === "hungry") sprite.setAlpha(0.78);
     else if (pig.mood === "thirsty") sprite.setAlpha(0.86);
     else if (pig.mood === "messy") sprite.setAlpha(0.7);
     else sprite.setAlpha(1);
 
-    if (pig.mood === "hungry") sprite.setTint(0xf0d56b);
+    if (pig.stress >= 70) sprite.setTint(0xd8a36f);
+    else if (pig.mood === "hungry") sprite.setTint(0xf0d56b);
     else if (pig.mood === "thirsty") sprite.setTint(0x9ed9e8);
     else if (pig.mood === "messy") sprite.setTint(0xd8c2a3);
 
@@ -1222,9 +1225,12 @@ function getFurnitureShadowSize(id: FurnitureId): { width: number; height: numbe
 }
 
 function getPigThoughtText(pig: Pig, state: GameState): string {
+  if (pig.stress >= 72) return "Too much";
+  if (pig.stress >= 48) return "Uneasy";
   if (pig.goal === "sleep") return "Zzz";
   if (pig.goal === "eat") return state.needs.hay > 0 ? "Hay?" : "Hay!";
   if (pig.goal === "drink") return state.needs.water > 0 && !state.event.bottleJammed ? "Sip" : "H2O";
+  if (isPigComfortableInFavoriteZone(state, pig)) return "Cozy";
   if (pig.goal === "roam" && Math.min(pig.hunger, pig.thirst, pig.energy) > 55) return "Roam";
   if (state.needs.hay < 25 || pig.mood === "hungry") return "Hay?";
   if (state.needs.water < 25 || pig.mood === "thirsty") return "H2O";
@@ -1277,6 +1283,9 @@ function getCouncilReactionText(decreeId?: SceneFeedbackDetail["decreeId"]): str
 
 function getEventReactionText(choiceId?: SceneFeedbackDetail["eventChoiceId"]): string {
   if (!choiceId) return "Event!";
+  if (choiceId.includes("litter")) return "Clean!";
+  if (choiceId.includes("hidey")) return "Cozy";
+  if (choiceId.includes("traffic")) return "Run!";
   if (choiceId.includes("zoomies") || choiceId.includes("Zoomies")) return "Zoom!";
   if (choiceId.includes("hay") || choiceId.includes("Hay")) return "Hay!";
   if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return "Sip!";

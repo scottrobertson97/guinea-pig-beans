@@ -32,6 +32,15 @@ export type PoopType =
   | "cursed"
   | "messPile";
 export type RobotState = "wandering" | "sweeping";
+export type CageZoneId =
+  | "hayCorner"
+  | "waterBottle"
+  | "hideyZone"
+  | "playRun"
+  | "litterCorner"
+  | "openFleece"
+  | "royalCourt";
+export type CageZoneRole = "care" | "rest" | "play" | "cleanup" | "open" | "prestige";
 export type FurnitureId =
   | "hideyHouse"
   | "tunnel"
@@ -64,7 +73,10 @@ export type EventId =
   | "bottleJam"
   | "cageInspection"
   | "compostBloom"
-  | "greatWheeking";
+  | "greatWheeking"
+  | "litterRevolt"
+  | "hideySquabble"
+  | "zoomieTraffic";
 export type EventChoiceId =
   | "zoomiesGuide"
   | "zoomiesChaos"
@@ -86,7 +98,16 @@ export type EventChoiceId =
   | "compostFuel"
   | "wheekingAnswer"
   | "wheekingConduct"
-  | "wheekingEcho";
+  | "wheekingEcho"
+  | "litterScrub"
+  | "litterCompost"
+  | "litterCircuit"
+  | "hideyQuiet"
+  | "hideyTreaty"
+  | "hideyRebond"
+  | "trafficLanes"
+  | "trafficSprint"
+  | "trafficTunnel";
 export type ObjectiveId =
   | "cleanBurst"
   | "keepClean"
@@ -104,7 +125,10 @@ export type PigRequestId =
   | "zoomieFavor"
   | "snackFavor"
   | "furnitureFavor"
-  | "compostFavor";
+  | "compostFavor"
+  | "favoriteCornerFavor"
+  | "quietZoneFavor"
+  | "bondSupportFavor";
 export type PigRequestProgressKind =
   | "clean"
   | "hayRefill"
@@ -112,7 +136,31 @@ export type PigRequestProgressKind =
   | "combo"
   | "ability"
   | "furniture"
-  | "compost";
+  | "compost"
+  | "ecologyClean"
+  | "bondedZone";
+
+export interface CageZoneMetrics {
+  id: CageZoneId;
+  label: string;
+  role: CageZoneRole;
+  x: number;
+  y: number;
+  radius: number;
+  mess: number;
+  comfort: number;
+  traffic: number;
+  appeal: number;
+  pigIds: number[];
+  status: string;
+  action: string;
+}
+
+export interface CageEcologyState {
+  zones: CageZoneMetrics[];
+  averageStress: number;
+  dominantStressZone: CageZoneId | null;
+}
 
 export interface Pig {
   id: number;
@@ -135,6 +183,8 @@ export interface Pig {
   energy: number;
   goal: PigGoal;
   goalTimer: number;
+  favoriteZone: CageZoneId;
+  stress: number;
   legendary: boolean;
   bondedPigId: number | null;
 }
@@ -224,6 +274,7 @@ export interface GameState {
     socialization: number;
     space: number;
   };
+  ecology: CageEcologyState;
   furniture: Record<FurnitureId, boolean>;
   abilities: Record<AbilityId, number>;
   automation: {

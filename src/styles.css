@@ -957,7 +957,21 @@ button.action-success {
   margin-top: 4px;
 }
 
+.ecology-list {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
 .synergy-list ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ecology-list ul {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -977,12 +991,38 @@ button.action-success {
   font-size: 0.78rem;
 }
 
+.ecology-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  padding: 7px 9px;
+  border: 1px solid rgba(23, 32, 26, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.6);
+  color: #4f594f;
+  font-size: 0.78rem;
+}
+
 .synergy-list li.complete {
   border-color: rgba(126, 168, 109, 0.3);
   background: rgba(217, 234, 208, 0.58);
 }
 
+.ecology-list li.complete {
+  border-color: rgba(126, 168, 109, 0.3);
+  background: rgba(217, 234, 208, 0.58);
+}
+
+.ecology-list li.attention {
+  border-color: rgba(164, 135, 45, 0.34);
+  background: rgba(255, 246, 207, 0.64);
+}
+
 .synergy-list li span {
+  font-weight: 800;
+}
+
+.ecology-list li span {
   font-weight: 800;
 }
 
@@ -994,7 +1034,30 @@ button.action-success {
   text-align: right;
 }
 
+.ecology-list li strong {
+  max-width: 12rem;
+  overflow-wrap: anywhere;
+  color: #314033;
+  font-size: 0.74rem;
+  text-align: right;
+}
+
+.ecology-list li small {
+  grid-column: 1 / -1;
+  color: #5f6a5e;
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
 .synergy-list li em {
+  grid-column: 1 / -1;
+  color: #5f6a5e;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 600;
+}
+
+.ecology-list li em {
   grid-column: 1 / -1;
   color: #5f6a5e;
   font-size: 0.72rem;

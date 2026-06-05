@@ -1,4 +1,5 @@
 import { CAGE_PADDING, getCageDimensions, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
+import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, isPigComfortableInFavoriteZone } from "./ecology";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
 
 const pigNames = [
@@ -95,6 +96,7 @@ export function createInitialState(): GameState {
       socialization: 0,
       space: 100,
     },
+    ecology: createInitialEcologyState(cageDimensions.width, cageDimensions.height),
     furniture: {
       hideyHouse: false,
       tunnel: false,
@@ -262,6 +264,8 @@ function createPig(state: GameState, legendary: boolean): Pig {
     energy: randomBetween(58, 94),
     goal: "roam",
     goalTimer: 0,
+    favoriteZone: chooseFavoriteZoneForPig({ id: nextPigId, trait }, index),
+    stress: 0,
     legendary,
     bondedPigId: state.pigs.length > 0 && state.pigs.length % 2 === 1 ? state.pigs[state.pigs.length - 1].id : null,
   };
@@ -323,8 +327,9 @@ export function chooseTarget(state: GameState, pig: Pig): void {
     return;
   }
 
-  pig.targetX = randomBetween(CAGE_PADDING, state.cage.width - CAGE_PADDING);
-  pig.targetY = randomBetween(CAGE_PADDING, state.cage.height - CAGE_PADDING);
+  const target = getPreferredRoamTarget(state, pig);
+  pig.targetX = target.x;
+  pig.targetY = target.y;
 }
 
 export function setPigGoal(state: GameState, pig: Pig, goal: PigGoal): void {
@@ -542,6 +547,8 @@ function getStartingSpeed(breed: PigBreed, trait: PigTrait): number {
 function choosePoopType(state: GameState, pig: Pig): PoopType {
   const enrichmentBonus = Math.min(0.06, state.cage.enrichment / 1200);
   const happinessBonus = state.cage.happiness >= 90 ? 0.04 : state.cage.happiness >= 75 ? 0.02 : 0;
+  const favoriteZoneBonus = isPigComfortableInFavoriteZone(state, pig) ? 0.022 : 0;
+  const stressRarePenalty = pig.stress >= 70 ? -0.018 : pig.stress >= 50 ? -0.01 : 0;
   const eventBonus = state.event.active?.id === "greatWheeking" ? 0.08 : 0;
   const abilityBonus = state.abilities.snackTime > 0 ? 0.05 : 0;
   const recipeRareBonus = state.recipes.beanBlessing ? 0.025 : 0;
@@ -553,6 +560,8 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     enrichmentBonus +
     eventBonus +
     happinessBonus +
+    favoriteZoneBonus +
+    stressRarePenalty +
     recipeRareBonus +
     wisdomRareBonus +
     goldenNoseBonus;
@@ -571,12 +580,13 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     (state.wisdom.royalMemory && state.furniture.royalThrone ? 0.025 : 0) +
     (royalCompostCourt ? 0.018 : 0);
   const cursedChance = state.lateGame.beanSingularity || state.cage.cleanliness < 20 ? 0.025 : 0.004;
+  const stressStinkyBonus = pig.stress >= 70 ? 0.1 : pig.stress >= 50 ? 0.055 : 0;
   const stinkyChance =
-    pig.trait === "Gremlin" && state.cage.cleanliness < 60
+    (pig.trait === "Gremlin" && state.cage.cleanliness < 60
       ? 0.24
       : pig.trait === "Neat Freak"
         ? 0.08
-        : 0.14;
+        : 0.14) + stressStinkyBonus;
   const roll = Math.random();
   if (roll < goldenChance) return "golden";
   if (roll < goldenChance + blessedChance) return "blessed";

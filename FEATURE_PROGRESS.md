@@ -22,6 +22,7 @@
 - Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds a branching Wisdom tree.
 - Late-game mythos: Hay Dimension, Bean Exchange, Cavy Council, Squeak Choir, and Bean Singularity have first-pass unlocks.
 - Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent perks.
+- Cage ecology: Fixed zones now track mess, comfort, traffic, appeal, pig occupants, and next actions; pigs have favorite zones and stress, and habitat pressure affects happiness, movement, production, bean odds, events, and requests.
 
 ## Current Early Goals
 
@@ -54,9 +55,9 @@
 
 ## First-Pass Implemented, Needs Depth
 
-- Cage zones are fixed regions, not yet player-placeable tiles.
+- Cage zones now have derived ecology, but they are still fixed regions rather than player-placeable tiles.
 - Furniture is auto-placed at fixed locations as one-time unlocks, not freely placed with footprints.
-- Random events are timer-based, not yet driven by quest chains or event decks.
+- Random events are ecology-weighted and interactive, but not yet driven by quest chains or event decks.
 - Wisdom perks now use a first-pass branching tree with prerequisites; the next step is deeper presentation and tuning.
 - Late-game systems unlock passive effects, but they need deeper dedicated interfaces and decisions.
 - Minigames are still intentionally deferred until the main loop has more tuning data.
@@ -98,6 +99,9 @@
 - Rotating objectives provide timed short-term tasks with Bean rewards.
 - Active events expose three Care-modal response choices with light resource tradeoffs.
 - Early costs and initial poop timing were lowered to hit the first upgrades and second pig sooner.
+- Fixed cage zones now create ecology pressure: dirty, crowded, or uncomfortable zones can stress pigs and surface habitat actions in the Furniture modal.
+- Pig favorite zones and stress make individual pigs respond differently to the same cage state; comfortable favorite zones slightly improve output, while stress slows production and raises messy outcomes.
+- Ecology incidents such as Litter Revolt, Hidey Squabble, and Zoomie Traffic reuse the event response UI with zone-specific tradeoffs.
 
 ## Polish Backlog Tickets
 
