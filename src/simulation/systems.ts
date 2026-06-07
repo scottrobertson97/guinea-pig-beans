@@ -1,6 +1,6 @@
 import { cleanPoopsInRadius } from "./actions";
 import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } from "./balance";
-import { getZoneMetrics, refreshEcology, updatePigEcology } from "./ecology";
+import { getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
@@ -22,6 +22,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateCombo(state, deltaSeconds);
   updateAbilities(state, deltaSeconds);
   updateAutomation(state, deltaSeconds);
+  updateHabitatStewardship(state, deltaSeconds);
   updateDerivedCageStats(state);
   refreshEcology(state);
   updateEvent(state, deltaSeconds);

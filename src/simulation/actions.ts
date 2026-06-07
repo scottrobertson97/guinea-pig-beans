@@ -11,7 +11,16 @@ import {
   getWisdomCost,
   getWisdomPerk,
 } from "./balance";
-import { adjustHerdStress, adjustPigStressInZone, getCageZoneName, getPoopZoneId, getZoneMetrics, refreshEcology } from "./ecology";
+import {
+  adjustHerdStress,
+  adjustPigStressInZone,
+  getCageZoneName,
+  getPigZoneId,
+  getPoopZoneId,
+  getZoneMetrics,
+  getZoneStewardship,
+  refreshEcology,
+} from "./ecology";
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
 import { addLegendaryPig, addLog, addPig, spawnEventPoop, syncCageDimensionsToLevel } from "./state";
@@ -24,6 +33,7 @@ import type {
   EventId,
   FurnitureId,
   GameState,
+  CageZoneId,
   PoopType,
   WisdomPerkId,
 } from "./types";
@@ -363,6 +373,62 @@ export function buyFurniture(state: GameState, id: FurnitureId): boolean {
   advanceObjective(state, "unlockFurniture", 1);
   advancePigRequest(state, "furniture", 1);
   addLog(state, `${getFurnitureName(id)} unlocked and placed in the cage.`);
+  updateMilestones(state);
+  return true;
+}
+
+export function canTendHabitatZone(state: GameState, zoneId: CageZoneId): boolean {
+  if (getZoneStewardship(state, zoneId).cooldown > 0) return false;
+  const cost = getHabitatTendCost(state, zoneId);
+  return cost.resource === "compost" ? state.compost >= cost.amount : state.beans >= cost.amount;
+}
+
+export function getHabitatTendStatus(state: GameState, zoneId: CageZoneId): string {
+  const stewardship = getZoneStewardship(state, zoneId);
+  if (stewardship.cooldown > 0) return `Cooldown ${Math.ceil(stewardship.cooldown)}s`;
+
+  const cost = getHabitatTendCost(state, zoneId);
+  if (zoneId === "litterCorner" && state.compost < 4 && state.beans < 18) return "Need 4 Compost or 18 Beans";
+  if (cost.resource === "compost" && state.compost < cost.amount) return formatNeed(state.compost, cost.amount, "Compost", "Compost");
+  if (cost.resource === "beans" && state.beans < cost.amount) return formatNeed(state.beans, cost.amount, "Bean");
+  return cost.resource === "compost" ? `Tend ${cost.amount} Compost` : `Tend ${cost.amount} Beans`;
+}
+
+export function tendHabitatZone(state: GameState, zoneId: CageZoneId): boolean {
+  if (!canTendHabitatZone(state, zoneId)) return false;
+
+  const cost = getHabitatTendCost(state, zoneId);
+  if (cost.resource === "compost") {
+    state.compost -= cost.amount;
+  } else {
+    state.beans -= cost.amount;
+  }
+
+  const zone = getZoneMetrics(state, zoneId);
+  const stewardship = getZoneStewardship(state, zoneId);
+  const bottleWasJammed = zoneId === "waterBottle" && state.event.bottleJammed;
+  stewardship.care = Math.min(100, stewardship.care + 22);
+  stewardship.cooldown = 8;
+  stewardship.lastAction = `Tended ${zone.label}`;
+  state.ecology.stewardship[zoneId] = stewardship;
+
+  for (const pig of state.pigs) {
+    if (getPigZoneId(state, pig) === zoneId || pig.favoriteZone === zoneId) {
+      pig.stress = Math.max(0, pig.stress - 8);
+    }
+  }
+
+  if (zoneId === "hayCorner") {
+    state.needs.hay = Math.min(100, state.needs.hay + 12);
+  } else if (zoneId === "waterBottle") {
+    if (state.event.bottleJammed) state.event.bottleJammed = false;
+    state.needs.water = Math.min(100, state.needs.water + 12);
+  } else if (zoneId === "litterCorner") {
+    cleanPoopsInRadius(state, zone.x, zone.y, zone.radius * 0.55);
+  }
+
+  refreshEcology(state);
+  addLog(state, getHabitatTendLog(zoneId, cost, bottleWasJammed));
   updateMilestones(state);
   return true;
 }
@@ -956,6 +1022,24 @@ function applyMysteryBean(state: GameState): void {
 function awardBeans(state: GameState, amount: number): void {
   state.beans += amount;
   state.stats.lifetimeBeans += amount;
+}
+
+function getHabitatTendCost(state: GameState, zoneId: CageZoneId): { resource: "beans" | "compost"; amount: number } {
+  if (zoneId === "litterCorner") return state.compost >= 4 ? { resource: "compost", amount: 4 } : { resource: "beans", amount: 18 };
+  if (zoneId === "hayCorner" || zoneId === "waterBottle") return { resource: "beans", amount: 10 };
+  return { resource: "beans", amount: 14 };
+}
+
+function getHabitatTendLog(zoneId: CageZoneId, cost: { resource: "beans" | "compost"; amount: number }, bottleWasJammed: boolean): string {
+  const costText = cost.resource === "compost" ? `${cost.amount} Compost` : `${cost.amount} Beans`;
+  if (zoneId === "hayCorner") return `Hay Corner tended for ${costText}. Hay rose and the corner feels cared for.`;
+  if (zoneId === "waterBottle") {
+    return bottleWasJammed
+      ? `Water Bottle tended for ${costText}. The bottle is flowing and the zone feels calmer.`
+      : `Water Bottle tended for ${costText}. Water rose and the zone feels calmer.`;
+  }
+  if (zoneId === "litterCorner") return `Litter Corner tended for ${costText}. Nearby beans were scooped and the corner settled.`;
+  return `${getCageZoneName(zoneId)} tended for ${costText}. The habitat feels a little more intentional.`;
 }
 
 function spawnBeansNearPigs(state: GameState, type: PoopType, count: number): void {

@@ -3,6 +3,7 @@ import {
   buyCageUpgrade,
   buyFurniture,
   buyWisdomPerk,
+  canTendHabitatZone,
   canUnlockBeanRecipe,
   buyPig,
   buyRarePig,
@@ -17,10 +18,12 @@ import {
   canUseEventChoice,
   getEventChoiceStatus,
   getEventChoices,
+  getHabitatTendStatus,
   prestige,
   refillHay,
   refillWater,
   respondToEventChoice,
+  tendHabitatZone,
   unlockBeanRecipe,
   unlockLateGameSystem,
   useCouncilDecree,
@@ -58,6 +61,7 @@ import type {
   FurnitureId,
   GameState,
   Pig,
+  CageZoneId,
   WisdomPerkId,
 } from "../simulation/types";
 import { emitPlayerAction, emitUiSound, type PlayerActionId, type SceneFeedbackDetail, type UiSoundId } from "./events";
@@ -232,6 +236,7 @@ export class Hud {
   private previousObjectivePulseState: ObjectivePulseState | null = null;
   private previousGoalSignature: string | null = null;
   private previousLogSignature: string | null = null;
+  private previousEcologySignature: string | null = null;
   private previousCompletedQuestIds: Set<string> | null = null;
   private previousCompletedAchievementIds: Set<string> | null = null;
   private hasGoalUpdate = false;
@@ -1210,9 +1215,13 @@ export class Hud {
   private renderEcologyZones(): void {
     const list = document.querySelector<HTMLUListElement>("#ecology-zone-list");
     if (!list) return;
+    const signature = getEcologyRenderSignature(this.state);
+    if (signature === this.previousEcologySignature) return;
+    this.previousEcologySignature = signature;
 
     const items = this.state.ecology.zones.map((zone) => {
       const item = document.createElement("li");
+      item.dataset.zoneId = zone.id;
       if (zone.mess >= 55 || zone.traffic >= 72 || zone.comfort <= 32) item.classList.add("attention");
       if (zone.appeal >= 78 && zone.pigIds.length > 0) item.classList.add("complete");
 
@@ -1220,15 +1229,45 @@ export class Hud {
       const status = document.createElement("strong");
       const metrics = document.createElement("small");
       const action = document.createElement("em");
+      const controls = document.createElement("div");
+      const tendButton = document.createElement("button");
+      const tendStatus = document.createElement("small");
       title.textContent = zone.label;
       status.textContent = zone.status;
-      metrics.textContent = `Comfort ${zone.comfort} - Mess ${zone.mess} - Traffic ${zone.traffic}`;
+      const stewardshipCare = this.state.ecology.stewardship[zone.id]?.care ?? 0;
+      metrics.textContent = `Comfort ${zone.comfort} - Mess ${zone.mess} - Traffic ${zone.traffic} - Care ${Math.round(stewardshipCare)}`;
       action.textContent = `${zone.action}${zone.pigIds.length > 0 ? ` - ${zone.pigIds.length} pig${zone.pigIds.length === 1 ? "" : "s"}` : ""}`;
-      item.append(title, status, metrics, action);
+      controls.className = "ecology-actions";
+      tendButton.type = "button";
+      tendButton.className = "zone-tend-button";
+      tendButton.textContent = "Tend";
+      tendButton.disabled = !canTendHabitatZone(this.state, zone.id);
+      tendStatus.textContent = getHabitatTendStatus(this.state, zone.id);
+      tendButton.addEventListener("click", () => this.runHabitatTend(zone.id, tendButton));
+      controls.append(tendButton, tendStatus);
+      item.append(title, status, metrics, action, controls);
       return item;
     });
 
     list.replaceChildren(...items);
+  }
+
+  private runHabitatTend(zoneId: CageZoneId, button: HTMLButtonElement): void {
+    const zone = this.state.ecology.zones.find((candidate) => candidate.id === zoneId);
+    this.runAction(
+      () => tendHabitatZone(this.state, zoneId),
+      button,
+      {
+        category: "habitat",
+        target: "zone",
+        zoneId,
+        label: `${zone?.label ?? getCageZoneName(zoneId)} Tended`,
+        resourceText: "+Care",
+        color: getHabitatFeedbackColor(zoneId),
+      },
+      "purchase",
+      "event",
+    );
   }
 
   private renderAbilityStatuses(): void {
@@ -1578,6 +1617,15 @@ function getEventChoiceFeedbackColor(choiceId: EventChoiceId): number {
   return 0x7db46a;
 }
 
+function getHabitatFeedbackColor(zoneId: CageZoneId): number {
+  if (zoneId === "hayCorner") return 0xd7c74b;
+  if (zoneId === "waterBottle") return 0x86d9f0;
+  if (zoneId === "litterCorner") return 0x8a6e4d;
+  if (zoneId === "royalCourt") return 0xb965d2;
+  if (zoneId === "playRun") return 0xf0d56b;
+  return 0x7db46a;
+}
+
 function isCompletedButton(button: HTMLButtonElement): boolean {
   const status = button.querySelector("strong")?.textContent?.trim().toLowerCase() ?? "";
   return status === "active" || status === "unlocked" || status === "learned";
@@ -1591,6 +1639,28 @@ function getBeanRecipeName(id: BeanRecipeId): string {
 
 function getLogSignature(state: GameState): string {
   return state.log.join("|");
+}
+
+function getEcologyRenderSignature(state: GameState): string {
+  return state.ecology.zones
+    .map((zone) => {
+      const stewardship = state.ecology.stewardship[zone.id];
+      return [
+        zone.id,
+        zone.status,
+        zone.action,
+        zone.comfort,
+        zone.mess,
+        zone.traffic,
+        zone.appeal,
+        zone.pigIds.length,
+        Math.round(stewardship?.care ?? 0),
+        Math.ceil(stewardship?.cooldown ?? 0),
+        getHabitatTendStatus(state, zone.id),
+        Number(canTendHabitatZone(state, zone.id)),
+      ].join(":");
+    })
+    .join("|");
 }
 
 function setText(id: string, text: string): void {

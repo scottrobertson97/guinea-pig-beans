@@ -103,6 +103,110 @@
 - Pig favorite zones and stress make individual pigs respond differently to the same cage state; comfortable favorite zones slightly improve output, while stress slows production and raises messy outcomes.
 - Ecology incidents such as Litter Revolt, Hidey Squabble, and Zoomie Traffic reuse the event response UI with zone-specific tradeoffs.
 
+## Systems Backlog Tickets
+
+Status default: not started. These tickets should deepen system interdependence while keeping the cage, pigs, and cozy management loop at the center.
+
+### SYS-001: Habitat Stewardship
+
+Status: First pass implemented.
+
+Description: Turn fixed ecology zones into player-tended habitat areas with contextual actions, short cooldowns, and visible zone improvements.
+
+Acceptance criteria:
+
+- Zone rows show actionable stewardship controls.
+- Stewardship actions affect comfort, appeal, pig stress, care resources, or cleanup.
+- Effects are visible in the Furniture modal, status line, cage log, and scene feedback.
+- Old saves hydrate safely when stewardship state is missing.
+
+### SYS-002: Pig Relationship Web
+
+Status: Not started.
+
+Description: Expand bonded pairs into lightweight herd relationships such as buddies, nap partners, shy followers, and rivals.
+
+Acceptance criteria:
+
+- Relationships affect socialization, requests, stress, and zone preferences.
+- The Herd modal explains each visible relationship state.
+- At least one request or event uses relationship state.
+
+### SYS-003: Furniture Wear And Care
+
+Status: Not started.
+
+Description: Let high-use furniture become overworked or well-loved, creating care tasks without harsh durability failure.
+
+Acceptance criteria:
+
+- Furniture can gain positive or negative condition states.
+- Condition affects ecology, pig behavior, or automation.
+- Modal copy explains upkeep and current condition.
+- Tending restores or improves furniture condition.
+
+### SYS-004: Event Chains
+
+Status: Not started.
+
+Description: Upgrade random events into short stateful arcs where choices influence later event weights and rewards.
+
+Acceptance criteria:
+
+- At least one multi-step event chain exists.
+- Prior choices alter follow-up choices, weights, or rewards.
+- Goals or Log surface chain progress.
+- Ordinary events still work without entering a chain.
+
+### SYS-005: Bean Orders Or Contracts
+
+Status: Not started.
+
+Description: Add optional orders that ask for specific cleanup, rare bean, combo, or care outcomes.
+
+Acceptance criteria:
+
+- Orders have clear requirements and rewards.
+- Orders connect rare beans, abilities, recipes, or ecology.
+- Completion feedback appears in HUD and Log.
+
+### SYS-006: Automation Directives
+
+Status: Not started.
+
+Description: Give Roomba and Litter Tray simple selectable priorities, such as protect cleanliness, clear litter, or preserve rare beans.
+
+Acceptance criteria:
+
+- Automation has at least three modes.
+- Mode changes affect targeting behavior.
+- UI shows the current directive.
+- Mode choice has visible tradeoffs.
+
+### SYS-007: Recipe Families
+
+Status: Not started.
+
+Description: Group recipes into strategic families that reward particular cage styles, such as Compost Care, Royal Herd, or Gentle Automation.
+
+Acceptance criteria:
+
+- Recipe families track progress.
+- At least one family bonus affects events, requests, or rare odds.
+- Recipes modal explains each family direction.
+
+### SYS-008: Wisdom Specializations
+
+Status: Not started.
+
+Description: Add late-Wisdom caretaker philosophies that flavor future runs after the current tree is learned.
+
+Acceptance criteria:
+
+- Specializations unlock after tier-3 Wisdom.
+- Choices provide distinct permanent bonuses.
+- Prestige or Wisdom UI explains the tradeoff.
+
 ## Polish Backlog Tickets
 
 Status default: not started. Prioritize P1 tickets first because they make the repeated clean-buy-care loop feel better without changing the core simulation.

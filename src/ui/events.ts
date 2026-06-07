@@ -23,6 +23,7 @@ export type UiSoundId =
 
 export type SceneFeedbackCategory =
   | "care"
+  | "habitat"
   | "purchase"
   | "unlock"
   | "trade"
@@ -43,6 +44,7 @@ export type SceneFeedbackTarget =
   | "furniture"
   | "herd"
   | "ability"
+  | "zone"
   | "center";
 
 export interface SceneFeedbackDetail {
@@ -56,6 +58,7 @@ export interface SceneFeedbackDetail {
   tradeId?: import("../simulation/types").BeanExchangeTradeId;
   decreeId?: import("../simulation/types").CouncilDecreeId;
   eventChoiceId?: import("../simulation/types").EventChoiceId;
+  zoneId?: import("../simulation/types").CageZoneId;
   milestoneKind?: "quest" | "achievement";
 }
 

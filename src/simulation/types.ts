@@ -156,10 +156,17 @@ export interface CageZoneMetrics {
   action: string;
 }
 
+export interface CageZoneStewardship {
+  care: number;
+  cooldown: number;
+  lastAction: string | null;
+}
+
 export interface CageEcologyState {
   zones: CageZoneMetrics[];
   averageStress: number;
   dominantStressZone: CageZoneId | null;
+  stewardship: Partial<Record<CageZoneId, CageZoneStewardship>>;
 }
 
 export interface Pig {

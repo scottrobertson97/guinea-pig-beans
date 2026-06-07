@@ -1,6 +1,6 @@
 import Phaser from "phaser";
 import { assetPath } from "../assetPaths";
-import { isPigComfortableInFavoriteZone } from "../simulation/ecology";
+import { getZoneMetrics, isPigComfortableInFavoriteZone } from "../simulation/ecology";
 import { getScoopRadius } from "../simulation/balance";
 import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simulation/actions";
 import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
@@ -555,6 +555,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (detail.category === "habitat") {
+      this.playHabitatFeedback(detail);
+      return;
+    }
+
     if (detail.category === "trade") {
       this.playCenterFeedback(detail.label ?? "Trade", detail.resourceText, detail.color ?? 0xe4b83b, "Trade!");
       return;
@@ -631,6 +636,17 @@ export class GameScene extends Phaser.Scene {
     this.playImageGlow(source, label, color);
     if (detail.resourceText) this.addFloatingText(source.x, source.y + 38, detail.resourceText, color, 0.94);
     this.reactPigsNear(source.x, source.y, isWater ? "Sip!" : "Hay!", 170, 3);
+  }
+
+  private playHabitatFeedback(detail: SceneFeedbackDetail): void {
+    const zone = detail.zoneId ? getZoneMetrics(this.state, detail.zoneId) : null;
+    const x = zone?.x ?? this.state.cage.width / 2;
+    const y = zone?.y ?? this.state.cage.height / 2;
+    const color = detail.color ?? 0x7db46a;
+    this.addFloatingText(x, y - 34, detail.label ?? "Habitat Tended", color, 1, true);
+    if (detail.resourceText) this.addFloatingText(x, y - 8, detail.resourceText, color, 0.92, true);
+    this.reactPigsNear(x, y, "Cozy!", zone?.radius ?? 160, 3);
+    if (!this.prefersReducedMotion) this.addBurst(x, y, color, 7);
   }
 
   private playCenterFeedback(label: string, resourceText: string | undefined, color: number, herdThought: string): void {

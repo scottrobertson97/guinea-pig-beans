@@ -1,5 +1,5 @@
 import { hasFurnitureSynergy } from "./balance";
-import type { CageEcologyState, CageZoneId, CageZoneMetrics, CageZoneRole, GameState, Pig, Poop } from "./types";
+import type { CageEcologyState, CageZoneId, CageZoneMetrics, CageZoneRole, CageZoneStewardship, GameState, Pig, Poop } from "./types";
 
 interface CageZoneDefinition {
   id: CageZoneId;
@@ -59,10 +59,12 @@ export function createInitialEcologyState(width: number, height: number): CageEc
     })),
     averageStress: 0,
     dominantStressZone: null,
+    stewardship: createInitialStewardshipState(),
   };
 }
 
 export function refreshEcology(state: GameState): CageEcologyState {
+  const stewardship = normalizeStewardshipState(state.ecology?.stewardship);
   const definitions = getZoneDefinitions(state.cage.width, state.cage.height);
   const zones = definitions.map((definition) => buildZoneMetrics(state, definition));
   const averageStress =
@@ -73,8 +75,45 @@ export function refreshEcology(state: GameState): CageEcologyState {
     zones,
     averageStress: Math.round(averageStress),
     dominantStressZone,
+    stewardship,
   };
   return state.ecology;
+}
+
+export function createInitialStewardshipState(): Record<CageZoneId, CageZoneStewardship> {
+  return Object.fromEntries(CAGE_ZONE_IDS.map((id) => [id, createStewardshipEntry()])) as Record<CageZoneId, CageZoneStewardship>;
+}
+
+export function normalizeStewardshipState(value: unknown): Record<CageZoneId, CageZoneStewardship> {
+  const saved = isRecord(value) ? value : {};
+  return Object.fromEntries(
+    CAGE_ZONE_IDS.map((id) => {
+      const entry = isRecord(saved[id]) ? saved[id] : {};
+      return [
+        id,
+        {
+          care: normalizePercent(entry.care, 0),
+          cooldown: normalizeTimer(entry.cooldown),
+          lastAction: typeof entry.lastAction === "string" ? entry.lastAction : null,
+        },
+      ];
+    }),
+  ) as Record<CageZoneId, CageZoneStewardship>;
+}
+
+export function getZoneStewardship(state: GameState, id: CageZoneId): CageZoneStewardship {
+  state.ecology.stewardship = normalizeStewardshipState(state.ecology.stewardship);
+  return state.ecology.stewardship[id] ?? createStewardshipEntry();
+}
+
+export function updateHabitatStewardship(state: GameState, deltaSeconds: number): void {
+  const stewardship = normalizeStewardshipState(state.ecology.stewardship);
+  for (const id of CAGE_ZONE_IDS) {
+    const entry = stewardship[id];
+    entry.cooldown = Math.max(0, entry.cooldown - deltaSeconds);
+    entry.care = Math.max(0, entry.care - 0.12 * deltaSeconds);
+  }
+  state.ecology.stewardship = stewardship;
 }
 
 export function getCageZoneName(id: CageZoneId): string {
@@ -125,6 +164,8 @@ export function getZoneTarget(state: GameState, id: CageZoneId, radius?: number)
 
 export function updatePigEcology(state: GameState, pig: Pig, deltaSeconds: number): void {
   const zone = getZoneMetrics(state, getPigZoneId(state, pig));
+  const zoneStewardship = getZoneStewardship(state, zone.id);
+  const favoriteStewardship = getZoneStewardship(state, pig.favoriteZone);
   const partner = state.pigs.find((candidate) => candidate.id === pig.bondedPigId);
   const partnerSameZone = partner ? getPigZoneId(state, partner) === zone.id : false;
   const favoriteComfort = zone.id === pig.favoriteZone && zone.comfort >= 55 ? 13 : 0;
@@ -136,7 +177,13 @@ export function updatePigEcology(state: GameState, pig: Pig, deltaSeconds: numbe
       ? 18
       : 0;
   const targetStress = clamp(
-    zone.mess * 0.34 + Math.max(0, zone.traffic - 48) * 0.42 + Math.max(0, 62 - zone.comfort) * 0.36 + eventPressure - favoriteComfort - partnerComfort,
+    zone.mess * 0.34 +
+      Math.max(0, zone.traffic - 48) * 0.42 +
+      Math.max(0, 62 - zone.comfort) * 0.36 +
+      eventPressure -
+      favoriteComfort -
+      partnerComfort -
+      Math.max(zoneStewardship.care, favoriteStewardship.care) * 0.1,
     0,
     100,
   );
@@ -207,8 +254,14 @@ function buildZoneMetrics(state: GameState, definition: CageZoneDefinition): Cag
   const poops = state.poops.filter((poop) => getCageZoneIdAt(state, poop.x, poop.y) === definition.id);
   const mess = getZoneMess(state, definition, poops);
   const traffic = getZoneTraffic(state, definition, pigIds.length, poops.length);
-  const comfort = getZoneComfort(state, definition, mess, traffic);
-  const appeal = clamp(Math.round(comfort - mess * 0.48 - Math.max(0, traffic - 45) * 0.24 + getRoleAppealBonus(state, definition)), 0, 100);
+  const baseComfort = getZoneComfort(state, definition, mess, traffic);
+  const stewardship = getZoneStewardship(state, definition.id);
+  const comfort = clamp(Math.round(baseComfort + stewardship.care * 0.18), 0, 100);
+  const appeal = clamp(
+    Math.round(comfort - mess * 0.48 - Math.max(0, traffic - 45) * 0.24 + getRoleAppealBonus(state, definition) + stewardship.care * 0.14),
+    0,
+    100,
+  );
 
   return {
     ...definition,
@@ -373,6 +426,26 @@ function getZoneDefinitions(width: number, height: number): CageZoneDefinition[]
 
 function normalizeStress(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? clamp(value, 0, 100) : 0;
+}
+
+function createStewardshipEntry(): CageZoneStewardship {
+  return {
+    care: 0,
+    cooldown: 0,
+    lastAction: null,
+  };
+}
+
+function normalizePercent(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? clamp(value, 0, 100) : fallback;
+}
+
+function normalizeTimer(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function randomBetween(min: number, max: number): number {

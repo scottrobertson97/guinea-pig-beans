@@ -712,6 +712,22 @@ Some furniture pairs create extra bonuses:
 
 Furniture should make the cage feel more like a living habitat, not just a stat shop.
 
+### Habitat Stewardship
+
+The Furniture section also exposes fixed-zone Habitat Stewardship. Each cage zone can be tended with a small contextual cost.
+
+Stewardship is a light caretaking action, not a placement system. It lets the player respond directly to ecology pressure without leaving the cozy management loop.
+
+Current stewardship rules:
+
+- Hay Corner and Water Bottle tending costs Beans and restores a little Hay or Water.
+- Water Bottle tending also clears Bottle Jam when needed.
+- Litter Corner tending can spend Compost, or Beans when Compost is unavailable, and cleans nearby beans.
+- Rest, play, open, and royal zones cost Beans and mainly improve comfort.
+- Tended zones gain temporary care, which improves comfort and appeal.
+- Pigs in or fond of a tended zone lose stress.
+- Stewardship has a short cooldown per zone.
+
 ## Automation
 
 ### Litter Tray
@@ -1227,6 +1243,11 @@ These are current design areas that are intentionally first-pass or still need d
 - Wisdom perks are non-exclusive. Future versions may add mutually exclusive choices.
 - Special bean aging currently mixes reward and cleanliness pressure. Future tuning should decide how much the game should reward waiting.
 - Late-game Mythos systems have first-pass effects but need deeper dedicated decisions and interfaces.
+- Pig relationships could expand beyond bonded pairs into buddies, rivals, nap partners, or shy followers.
+- Furniture could develop well-loved or overworked condition states that create care tasks.
+- Orders or contracts could ask for specific bean, care, combo, ecology, or rare-resource outcomes.
+- Automation could support player-chosen directives instead of only cleaning the nearest bean.
+- Recipe families and Wisdom specializations could make long-term runs feel more distinct.
 - Minigames are deferred until the main management loop is more tuned.
 
 ## Design Principles For Future Changes
