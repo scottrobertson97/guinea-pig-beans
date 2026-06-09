@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "tsc && vite build",
+    "smoke:polish": "node scripts/polish-smoke.mjs",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {

@@ -21,11 +21,20 @@ import {
   getZoneStewardship,
   refreshEcology,
 } from "./ecology";
+import {
+  FURNITURE_IDS,
+  createInitialFurnitureCareState,
+  getFurnitureCareEntry,
+  getFurnitureCareZoneId,
+  getFurnitureConditionEffectText,
+  getFurnitureConditionLabel,
+} from "./furnitureCare";
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
 import { addLegendaryPig, addLog, addPig, spawnEventPoop, syncCageDimensionsToLevel } from "./state";
 import type {
   AbilityId,
+  AutomationDirectiveId,
   BeanExchangeTradeId,
   BeanRecipeId,
   CouncilDecreeId,
@@ -34,6 +43,7 @@ import type {
   FurnitureId,
   GameState,
   CageZoneId,
+  Poop,
   PoopType,
   WisdomPerkId,
 } from "./types";
@@ -52,6 +62,7 @@ export interface CleanResult {
 
 interface CleanOptions {
   advanceRequests?: boolean;
+  shouldClean?: (poop: Poop) => boolean;
 }
 
 export interface BeanExchangeTradeDefinition {
@@ -65,6 +76,23 @@ export interface CouncilDecreeDefinition {
   id: CouncilDecreeId;
   label: string;
   description: string;
+}
+
+export interface AutomationDirectiveDefinition {
+  id: AutomationDirectiveId;
+  label: string;
+  description: string;
+}
+
+export interface FurnitureCareView {
+  id: FurnitureId;
+  label: string;
+  condition: number;
+  conditionLabel: string;
+  status: string;
+  effect: string;
+  canCare: boolean;
+  zoneId: CageZoneId;
 }
 
 const BEAN_EXCHANGE_TRADES: BeanExchangeTradeDefinition[] = [
@@ -109,6 +137,29 @@ const COUNCIL_DECREES: CouncilDecreeDefinition[] = [
     id: "herdCharter",
     label: "Herd Charter",
     description: "Spend 10 Squeaks to grant +75 Beans and +1 Golden Bean to a large, happy herd.",
+  },
+];
+
+const AUTOMATION_DIRECTIVES: AutomationDirectiveDefinition[] = [
+  {
+    id: "balanced",
+    label: "Balanced Sweep",
+    description: "Roomba and tray use their normal nearest-bean behavior.",
+  },
+  {
+    id: "cleanliness",
+    label: "Protect Cleanliness",
+    description: "Automation hunts the messiest beans first to stabilize the cage.",
+  },
+  {
+    id: "litterFocus",
+    label: "Litter Focus",
+    description: "Automation patrols the litter corner and gives tray cleaning extra reach.",
+  },
+  {
+    id: "rareGuard",
+    label: "Rare Guard",
+    description: "Automation avoids special beans so the player can clean them manually.",
   },
 ];
 
@@ -217,7 +268,7 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
 
   state.poops = state.poops.filter((poop) => {
     const hit = Math.hypot(poop.x - x, poop.y - y) <= radius;
-    if (!hit) return true;
+    if (!hit || (options.shouldClean && !options.shouldClean(poop))) return true;
 
     if (poop.hitsRemaining > 1) {
       poop.hitsRemaining -= 1;
@@ -369,10 +420,78 @@ export function buyFurniture(state: GameState, id: FurnitureId): boolean {
   if (state.beans < cost) return false;
   state.beans -= cost;
   state.furniture[id] = true;
+  const care = getFurnitureCareEntry(state, id);
+  care.condition = Math.max(care.condition, 72);
+  care.cooldown = 0;
+  state.furnitureCare[id] = care;
   state.stats.furnitureBought += 1;
   advanceObjective(state, "unlockFurniture", 1);
   advancePigRequest(state, "furniture", 1);
   addLog(state, `${getFurnitureName(id)} unlocked and placed in the cage.`);
+  updateMilestones(state);
+  return true;
+}
+
+export function getFurnitureCareViews(state: GameState): FurnitureCareView[] {
+  return FURNITURE_IDS.filter((id) => state.furniture[id]).map((id) => {
+    const care = getFurnitureCareEntry(state, id);
+    return {
+      id,
+      label: getFurnitureName(id),
+      condition: Math.round(care.condition),
+      conditionLabel: getFurnitureConditionLabel(care.condition),
+      status: getFurnitureCareStatus(state, id),
+      effect: getFurnitureConditionEffectText(state, id),
+      canCare: canCareForFurniture(state, id),
+      zoneId: getFurnitureCareZoneId(id),
+    };
+  });
+}
+
+export function canCareForFurniture(state: GameState, id: FurnitureId): boolean {
+  if (!state.furniture[id]) return false;
+  const care = getFurnitureCareEntry(state, id);
+  if (care.cooldown > 0 || care.condition >= 100) return false;
+  const cost = getFurnitureCareCost(state, id);
+  return cost.resource === "compost" ? state.compost >= cost.amount : state.beans >= cost.amount;
+}
+
+export function getFurnitureCareStatus(state: GameState, id: FurnitureId): string {
+  if (!state.furniture[id]) return "Unlock first";
+  const care = getFurnitureCareEntry(state, id);
+  if (care.cooldown > 0) return `Cooldown ${Math.ceil(care.cooldown)}s`;
+  if (care.condition >= 100) return "Fully cared";
+  const cost = getFurnitureCareCost(state, id);
+  if (cost.resource === "compost" && state.compost < cost.amount) return formatNeed(state.compost, cost.amount, "Compost", "Compost");
+  if (cost.resource === "beans" && state.beans < cost.amount) return formatNeed(state.beans, cost.amount, "Bean");
+  return cost.resource === "compost" ? `Care ${cost.amount} Compost` : `Care ${cost.amount} Beans`;
+}
+
+export function careForFurniture(state: GameState, id: FurnitureId): boolean {
+  if (!canCareForFurniture(state, id)) return false;
+
+  const cost = getFurnitureCareCost(state, id);
+  if (cost.resource === "compost") {
+    state.compost -= cost.amount;
+  } else {
+    state.beans -= cost.amount;
+  }
+
+  const care = getFurnitureCareEntry(state, id);
+  const previousCondition = care.condition;
+  care.condition = Math.min(100, care.condition + 30);
+  care.cooldown = 10;
+  care.lastCare = `Cared for ${getFurnitureName(id)}`;
+  state.furnitureCare[id] = care;
+
+  const zoneId = getFurnitureCareZoneId(id);
+  const stewardship = getZoneStewardship(state, zoneId);
+  stewardship.care = Math.min(100, stewardship.care + 8);
+  stewardship.lastAction = `${getFurnitureName(id)} cared for`;
+  state.ecology.stewardship[zoneId] = stewardship;
+  adjustPigStressInZone(state, zoneId, -4);
+  refreshEcology(state);
+  addLog(state, getFurnitureCareLog(id, cost, previousCondition, care.condition));
   updateMilestones(state);
   return true;
 }
@@ -570,6 +689,32 @@ export function fuelAutomation(state: GameState): boolean {
   addLog(state, `Compost fuel spent. Automation overdrive active for ${Math.ceil(state.automation.overdrive)}s.`);
   updateMilestones(state);
   return true;
+}
+
+export function getAutomationDirectives(): AutomationDirectiveDefinition[] {
+  return AUTOMATION_DIRECTIVES;
+}
+
+export function canSetAutomationDirective(state: GameState, id: AutomationDirectiveId): boolean {
+  return hasAutomationTool(state) && state.automation.directive !== id;
+}
+
+export function getAutomationDirectiveStatus(state: GameState, id: AutomationDirectiveId): string {
+  if (!hasAutomationTool(state)) return "Needs automation";
+  if (state.automation.directive === id) return "Active";
+  return "Select";
+}
+
+export function setAutomationDirective(state: GameState, id: AutomationDirectiveId): boolean {
+  if (!canSetAutomationDirective(state, id)) return false;
+  state.automation.directive = id;
+  addLog(state, `Automation directive set to ${getAutomationDirectiveName(id)}.`);
+  updateMilestones(state);
+  return true;
+}
+
+export function getAutomationDirectiveName(id: AutomationDirectiveId): string {
+  return AUTOMATION_DIRECTIVES.find((directive) => directive.id === id)?.label ?? "Balanced Sweep";
 }
 
 export function unlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
@@ -909,6 +1054,7 @@ export function prestige(state: GameState): boolean {
   state.poops = [];
   state.robot = null;
   state.automation.overdrive = 0;
+  state.automation.directive = "balanced";
   state.pigs.splice(2);
   while (state.pigs.length < 2) addPig(state);
   state.upgrades.feedLevel = 0;
@@ -922,6 +1068,7 @@ export function prestige(state: GameState): boolean {
   state.cage.socialization = 0;
   state.cage.space = 100;
   for (const id of Object.keys(state.furniture) as FurnitureId[]) state.furniture[id] = false;
+  state.furnitureCare = createInitialFurnitureCareState();
   state.recipes.beanBlessing = false;
   state.recipes.compostCatalyst = false;
   state.recipes.royalAccord = false;
@@ -992,6 +1139,10 @@ function getAbilityName(id: AbilityId): string {
   return names[id];
 }
 
+function hasAutomationTool(state: GameState): boolean {
+  return Boolean(state.robot) || state.furniture.litterTray;
+}
+
 function getBeanRecipeName(id: BeanRecipeId): string {
   const names: Record<BeanRecipeId, string> = {
     beanBlessing: "Bean Blessing",
@@ -1030,6 +1181,14 @@ function getHabitatTendCost(state: GameState, zoneId: CageZoneId): { resource: "
   return { resource: "beans", amount: 14 };
 }
 
+function getFurnitureCareCost(state: GameState, id: FurnitureId): { resource: "beans" | "compost"; amount: number } {
+  if (id === "litterTray" && state.compost >= 3) return { resource: "compost", amount: 3 };
+  const condition = getFurnitureCareEntry(state, id).condition;
+  if (condition < 32) return { resource: "beans", amount: 18 };
+  if (condition < 58) return { resource: "beans", amount: 14 };
+  return { resource: "beans", amount: 10 };
+}
+
 function getHabitatTendLog(zoneId: CageZoneId, cost: { resource: "beans" | "compost"; amount: number }, bottleWasJammed: boolean): string {
   const costText = cost.resource === "compost" ? `${cost.amount} Compost` : `${cost.amount} Beans`;
   if (zoneId === "hayCorner") return `Hay Corner tended for ${costText}. Hay rose and the corner feels cared for.`;
@@ -1040,6 +1199,17 @@ function getHabitatTendLog(zoneId: CageZoneId, cost: { resource: "beans" | "comp
   }
   if (zoneId === "litterCorner") return `Litter Corner tended for ${costText}. Nearby beans were scooped and the corner settled.`;
   return `${getCageZoneName(zoneId)} tended for ${costText}. The habitat feels a little more intentional.`;
+}
+
+function getFurnitureCareLog(
+  id: FurnitureId,
+  cost: { resource: "beans" | "compost"; amount: number },
+  previousCondition: number,
+  nextCondition: number,
+): string {
+  const costText = cost.resource === "compost" ? `${cost.amount} Compost` : `${cost.amount} Beans`;
+  const condition = getFurnitureConditionLabel(nextCondition);
+  return `${getFurnitureName(id)} cared for ${costText}. Condition ${Math.round(previousCondition)} -> ${Math.round(nextCondition)} (${condition}).`;
 }
 
 function spawnBeansNearPigs(state: GameState, type: PoopType, count: number): void {

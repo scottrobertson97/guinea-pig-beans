@@ -1,5 +1,6 @@
 import { CAGE_PADDING, getCageDimensions, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, isPigComfortableInFavoriteZone } from "./ecology";
+import { createInitialFurnitureCareState } from "./furnitureCare";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
 
 const pigNames = [
@@ -106,6 +107,7 @@ export function createInitialState(): GameState {
       cardboardCastle: false,
       royalThrone: false,
     },
+    furnitureCare: createInitialFurnitureCareState(),
     abilities: {
       wheekCall: 0,
       treatBag: 0,
@@ -116,6 +118,7 @@ export function createInitialState(): GameState {
     },
     automation: {
       overdrive: 0,
+      directive: "balanced",
     },
     recipes: {
       beanBlessing: false,

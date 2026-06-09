@@ -712,6 +712,21 @@ Some furniture pairs create extra bonuses:
 
 Furniture should make the cage feel more like a living habitat, not just a stat shop.
 
+### Furniture Care
+
+Owned furniture has a light condition loop. Pieces start ready, can become well-loved through care, and can become overworked after heavy cage use.
+
+Condition states are gentle:
+
+| State | Meaning |
+| --- | --- |
+| Well-loved | Adds a small bonus to the matching habitat zone or automation behavior. |
+| Ready | Keeps the normal furniture bonus. |
+| Overworked | Slightly weakens the matching zone or Litter Tray automation. |
+| Needs care | Makes the condition penalty more noticeable, but furniture does not break. |
+
+The Furniture section shows current condition, the affected zone, short effect copy, and a Care action. Caring for a piece costs a small amount of Beans, or Compost for the Litter Tray when Compost is available. It restores condition, adds a little stewardship care to the matching zone, lowers stress for pigs connected to that zone, logs the action, and plays cage feedback over the furniture.
+
 ### Habitat Stewardship
 
 The Furniture section also exposes fixed-zone Habitat Stewardship. Each cage zone can be tended with a small contextual cost.
@@ -755,6 +770,21 @@ Roomba performance improves with:
 - Automation overdrive.
 - Cleanup Circuit.
 - Compost fuel systems.
+
+### Automation Directives
+
+Once the player has a Roomba or Litter Tray, automation can be given a directive. Directives are free mode choices, not upgrades.
+
+Current directives:
+
+| Directive | Behavior |
+| --- | --- |
+| Balanced Sweep | Roomba and tray use normal nearest-bean behavior. |
+| Protect Cleanliness | Automation prioritizes high-mess beans and messier zones. |
+| Litter Focus | Roomba patrols the Litter Corner, and the tray gets stronger cleaning reach. |
+| Rare Guard | Automation avoids special beans so the player can claim them manually. |
+
+Directives are meant to create a management tradeoff: protect the cage, clean a problem zone, or preserve valuable beans for active play.
 
 ## Active Abilities
 
@@ -1244,9 +1274,9 @@ These are current design areas that are intentionally first-pass or still need d
 - Special bean aging currently mixes reward and cleanliness pressure. Future tuning should decide how much the game should reward waiting.
 - Late-game Mythos systems have first-pass effects but need deeper dedicated decisions and interfaces.
 - Pig relationships could expand beyond bonded pairs into buddies, rivals, nap partners, or shy followers.
-- Furniture could develop well-loved or overworked condition states that create care tasks.
+- Furniture care could later gain piece-specific events, pig preferences, or recipe-family hooks.
 - Orders or contracts could ask for specific bean, care, combo, ecology, or rare-resource outcomes.
-- Automation could support player-chosen directives instead of only cleaning the nearest bean.
+- Automation directives could later gain deeper mode-specific upgrades or event interactions.
 - Recipe families and Wisdom specializations could make long-term runs feel more distinct.
 - Minigames are deferred until the main management loop is more tuned.
 

@@ -1,7 +1,9 @@
 import { UI_SOUND_EVENT, type UiSoundDetail, type UiSoundId } from "./events";
 
 const SFX_MUTED_KEY = "gpb-sfx-muted";
-const MASTER_GAIN = 0.032;
+const MASTER_GAIN = 0.028;
+const BURST_WINDOW_MS = 850;
+const BURST_LIMIT = 7;
 
 type AudioContextConstructor = typeof AudioContext;
 type WebAudioWindow = Window &
@@ -15,6 +17,8 @@ export class AudioManager {
   private failed = false;
   private lastSpecificSoundAt = 0;
   private lastPlayed = new Map<UiSoundId, number>();
+  private lastGroupPlayed = new Map<string, number>();
+  private recentSounds: number[] = [];
   private readonly toggle: HTMLButtonElement | null;
   private readonly handleUiSound = (event: Event): void => {
     const sound = (event as CustomEvent<UiSoundDetail>).detail?.sound;
@@ -77,7 +81,10 @@ export class AudioManager {
     const now = performance.now();
     const cooldown = getCooldown(sound);
     if (!bypassCooldown && now - (this.lastPlayed.get(sound) ?? 0) < cooldown) return;
+    if (!bypassCooldown && !this.canPlayGroup(sound, now)) return;
+    if (!bypassCooldown && !this.canPlayBurst(now)) return;
     this.lastPlayed.set(sound, now);
+    this.lastGroupPlayed.set(getSoundGroup(sound), now);
 
     await this.unlock();
     if (!this.context || this.context.state !== "running") return;
@@ -155,12 +162,39 @@ export class AudioManager {
     this.toggle.setAttribute("aria-pressed", String(this.muted));
     this.toggle.setAttribute("aria-label", this.muted ? "Unmute sound effects" : "Mute sound effects");
   }
+
+  private canPlayGroup(sound: UiSoundId, now: number): boolean {
+    const group = getSoundGroup(sound);
+    const cooldown = getGroupCooldown(group);
+    return now - (this.lastGroupPlayed.get(group) ?? 0) >= cooldown;
+  }
+
+  private canPlayBurst(now: number): boolean {
+    this.recentSounds = this.recentSounds.filter((playedAt) => now - playedAt < BURST_WINDOW_MS);
+    if (this.recentSounds.length >= BURST_LIMIT) return false;
+    this.recentSounds.push(now);
+    return true;
+  }
 }
 
 function getCooldown(sound: UiSoundId): number {
-  if (sound === "button") return 75;
-  if (sound === "pig") return 180;
-  if (sound === "clean" || sound === "rareClean") return 55;
+  if (sound === "button") return 95;
+  if (sound === "pig") return 220;
+  if (sound === "clean" || sound === "rareClean") return 70;
+  if (sound === "modalOpen" || sound === "modalClose") return 150;
+  return 115;
+}
+
+function getSoundGroup(sound: UiSoundId): string {
+  if (sound === "clean" || sound === "rareClean") return "cleanup";
+  if (sound === "modalOpen" || sound === "modalClose" || sound === "button") return "ui";
+  return sound;
+}
+
+function getGroupCooldown(group: string): number {
+  if (group === "cleanup") return 62;
+  if (group === "ui") return 80;
+  if (group === "pig") return 220;
   return 90;
 }
 

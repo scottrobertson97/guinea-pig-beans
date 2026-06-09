@@ -23,6 +23,8 @@
 - Late-game mythos: Hay Dimension, Bean Exchange, Cavy Council, Squeak Choir, and Bean Singularity have first-pass unlocks.
 - Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent perks.
 - Cage ecology: Fixed zones now track mess, comfort, traffic, appeal, pig occupants, and next actions; pigs have favorite zones and stress, and habitat pressure affects happiness, movement, production, bean odds, events, and requests.
+- Automation directives: Roomba and Litter Tray can be switched between Balanced Sweep, Protect Cleanliness, Litter Focus, and Rare Guard modes.
+- Furniture care: Owned furniture now tracks condition, can become well-loved or overworked, and can be tended from the Furniture modal for zone and automation benefits.
 
 ## Current Early Goals
 
@@ -134,7 +136,7 @@ Acceptance criteria:
 
 ### SYS-003: Furniture Wear And Care
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Let high-use furniture become overworked or well-loved, creating care tasks without harsh durability failure.
 
@@ -172,7 +174,7 @@ Acceptance criteria:
 
 ### SYS-006: Automation Directives
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Give Roomba and Litter Tray simple selectable priorities, such as protect cleanliness, clear litter, or preserve rare beans.
 
@@ -765,7 +767,7 @@ Implementation notes:
 
 Priority: P2
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Add subtle dimension to the Phaser-rendered cage so the rim, bedding, shadows, and ambient details feel cohesive with the pig and bean sprites.
 
@@ -809,7 +811,7 @@ Implementation notes:
 
 Priority: P2
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Make modal content faster to scan once opened. Available actions, disabled actions, purchased states, and empty sections should each have distinct visual treatment.
 
@@ -831,7 +833,7 @@ Implementation notes:
 
 Priority: P2
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Add a repeatable lightweight verification workflow for polish slices. Visual changes need quick build, browser, console, screenshot, and interaction checks so regressions are caught before the next pass.
 
@@ -853,7 +855,7 @@ Implementation notes:
 
 Priority: P2
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Refine repeated action sounds and button microinteractions so the game feels warm without becoming noisy during rapid cleanup or modal use.
 

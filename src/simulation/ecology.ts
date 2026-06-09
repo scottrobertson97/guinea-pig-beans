@@ -1,4 +1,5 @@
 import { hasFurnitureSynergy } from "./balance";
+import { getFurnitureEcologyBonus } from "./furnitureCare";
 import type { CageEcologyState, CageZoneId, CageZoneMetrics, CageZoneRole, CageZoneStewardship, GameState, Pig, Poop } from "./types";
 
 interface CageZoneDefinition {
@@ -305,15 +306,20 @@ function getZoneComfort(state: GameState, definition: CageZoneDefinition, mess: 
       40 +
       (state.furniture.hideyHouse ? 24 : 0) +
       (state.furniture.snuggleSack ? 10 : 0) +
+      getFurnitureEcologyBonus(state, "hideyHouse") +
+      getFurnitureEcologyBonus(state, "snuggleSack") +
       (hasFurnitureSynergy(state, "cozyCorner") ? 18 : 0),
     playRun:
       38 +
       (state.furniture.tunnel ? 18 : 0) +
       (state.furniture.chewToy ? 18 : 0) +
+      getFurnitureEcologyBonus(state, "tunnel") +
+      getFurnitureEcologyBonus(state, "chewToy") +
       (hasFurnitureSynergy(state, "zoomiePlayground") ? 16 : 0),
     litterCorner:
       35 +
       (state.furniture.litterTray ? 26 : 0) +
+      getFurnitureEcologyBonus(state, "litterTray") +
       (state.wisdom.trayAffinity ? 8 : 0) +
       (hasFurnitureSynergy(state, "cleanupCircuit") ? 17 : 0),
     openFleece: 50 + state.cage.space * 0.22 + state.upgrades.cageLevel * 2,
@@ -321,6 +327,8 @@ function getZoneComfort(state: GameState, definition: CageZoneDefinition, mess: 
       32 +
       (state.furniture.royalThrone ? 27 : 0) +
       (state.furniture.cardboardCastle ? 14 : 0) +
+      getFurnitureEcologyBonus(state, "royalThrone") +
+      getFurnitureEcologyBonus(state, "cardboardCastle") +
       (hasFurnitureSynergy(state, "royalCompostCourt") ? 18 : 0),
   };
   const crowdPenalty = Math.max(0, traffic - 58) * (definition.id === "playRun" && hasFurnitureSynergy(state, "zoomiePlayground") ? 0.14 : 0.24);

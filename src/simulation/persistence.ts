@@ -1,5 +1,6 @@
 import { addLog, createInitialState, syncCageDimensionsToLevel, syncEntityIdCounters } from "./state";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, normalizeCageZoneId, normalizeStewardshipState, refreshEcology } from "./ecology";
+import { normalizeFurnitureCareState } from "./furnitureCare";
 import type { GameState, Pig, PigGoal } from "./types";
 
 export const SAVE_KEY = "gpb-save-v1";
@@ -127,6 +128,8 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
   const hydrated = mergeDefaults(defaultState, savedState) as GameState;
   hydrated.ecology = hydrated.ecology ?? createInitialEcologyState(hydrated.cage.width, hydrated.cage.height);
   hydrated.ecology.stewardship = normalizeStewardshipState(hydrated.ecology.stewardship);
+  hydrated.furnitureCare = normalizeFurnitureCareState(hydrated.furnitureCare);
+  hydrated.automation.directive = normalizeAutomationDirective(hydrated.automation.directive);
   hydrated.pigs = hydrated.pigs.map((pig, index) => hydratePigLifeState(pig, index));
   refreshEcology(hydrated);
   return hydrated;
@@ -155,6 +158,10 @@ function normalizeTimer(value: unknown): number {
 
 function normalizePigGoal(value: unknown): PigGoal {
   return value === "eat" || value === "drink" || value === "sleep" || value === "roam" ? value : "roam";
+}
+
+function normalizeAutomationDirective(value: unknown): GameState["automation"]["directive"] {
+  return value === "balanced" || value === "cleanliness" || value === "litterFocus" || value === "rareGuard" ? value : "balanced";
 }
 
 function mergeDefaults(defaultValue: unknown, savedValue: unknown): unknown {

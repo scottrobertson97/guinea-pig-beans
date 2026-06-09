@@ -1,10 +1,11 @@
 import { cleanPoopsInRadius } from "./actions";
 import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } from "./balance";
-import { getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
+import { getPoopZoneId, getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
+import { getFurnitureAutomationMultiplier, getFurnitureStatBonus, updateFurnitureCare } from "./furnitureCare";
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
-import type { GameState, Pig, PigMood, Poop, Robot } from "./types";
+import type { AutomationDirectiveId, GameState, Pig, PigMood, Poop, Robot } from "./types";
 
 const DEATH_CHECK_INTERVAL = 12;
 const MAX_DEATH_CHANCE_PER_CHECK = 0.35;
@@ -23,6 +24,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateAbilities(state, deltaSeconds);
   updateAutomation(state, deltaSeconds);
   updateHabitatStewardship(state, deltaSeconds);
+  updateFurnitureCare(state, deltaSeconds);
   updateDerivedCageStats(state);
   refreshEcology(state);
   updateEvent(state, deltaSeconds);
@@ -128,6 +130,10 @@ function updateDerivedCageStats(state: GameState): void {
     Number(state.furniture.snuggleSack) * 24 +
     Number(state.furniture.cardboardCastle) * 18 +
     Number(state.furniture.tunnel) * 12 +
+    getFurnitureStatBonus(state, "chewToy") +
+    getFurnitureStatBonus(state, "snuggleSack") +
+    getFurnitureStatBonus(state, "cardboardCastle") +
+    getFurnitureStatBonus(state, "tunnel") +
     (hasFurnitureSynergy(state, "zoomiePlayground") ? 6 : 0) +
     (state.wisdom.rareInstinct ? 5 : 0);
   state.cage.socialization = Math.max(
@@ -136,6 +142,9 @@ function updateDerivedCageStats(state: GameState): void {
       Number(state.furniture.hideyHouse) * 8 +
       Number(state.furniture.tunnel) * 4 +
       Number(state.furniture.snuggleSack) * 3 +
+      getFurnitureStatBonus(state, "hideyHouse") +
+      getFurnitureStatBonus(state, "tunnel") +
+      getFurnitureStatBonus(state, "snuggleSack") +
       (hasFurnitureSynergy(state, "cozyCorner") ? 8 : 0) +
       bondBonus -
       unsupportedPenalty +
@@ -468,15 +477,24 @@ function updateLitterTrays(state: GameState, deltaSeconds: number): void {
   if (!state.furniture.litterTray) return;
 
   const tray = getStaticFurniturePlacement(state, "litterTray");
+  const directive = state.automation.directive;
   const overdriveBonus = state.automation.overdrive > 0 ? 0.14 : 0;
   const wisdomBonus = state.wisdom.trayAffinity ? 0.12 : 0;
   const synergyBonus = hasFurnitureSynergy(state, "cleanupCircuit") ? 0.08 : 0;
-  if (Math.random() > (0.18 + overdriveBonus + wisdomBonus + synergyBonus) * deltaSeconds) return;
-  const trayRadius = (state.wisdom.trayAffinity ? 56 : 42) + (hasFurnitureSynergy(state, "cleanupCircuit") ? 8 : 0);
-  const poop = state.poops.find((candidate) => Math.hypot(candidate.x - tray.x, candidate.y - tray.y) <= trayRadius);
+  const careMultiplier = getFurnitureAutomationMultiplier(state, "litterTray");
+  const directiveBonus =
+    directive === "litterFocus" ? 0.11 : directive === "cleanliness" && state.cage.cleanliness < 72 ? 0.06 : 0;
+  if (Math.random() > (0.18 + overdriveBonus + wisdomBonus + synergyBonus + directiveBonus) * careMultiplier * deltaSeconds) return;
+  const trayRadius =
+    ((state.wisdom.trayAffinity ? 56 : 42) +
+      (hasFurnitureSynergy(state, "cleanupCircuit") ? 8 : 0) +
+      (directive === "litterFocus" ? 12 : 0)) *
+    careMultiplier;
+  const poop = chooseAutomationPoop(state, state.poops.filter((candidate) => Math.hypot(candidate.x - tray.x, candidate.y - tray.y) <= trayRadius), directive, tray);
   if (!poop) return;
-  const result = cleanPoopsInRadius(state, poop.x, poop.y, 18);
-  if (result.cleaned > 0) addLog(state, `Litter Tray auto-cleaned ${result.cleaned} bean for +${result.earned}.`);
+  const cleanupRadius = directive === "rareGuard" ? 10 : 18;
+  const result = cleanPoopsInRadius(state, poop.x, poop.y, cleanupRadius, getAutomationCleanOptions(directive));
+  if (result.cleaned > 0) addLog(state, `Litter Tray ${getAutomationDirectiveVerb(directive)} ${result.cleaned} bean for +${result.earned}.`);
 }
 
 function updateRobot(state: GameState, deltaSeconds: number): void {
@@ -498,39 +516,84 @@ function updateRobot(state: GameState, deltaSeconds: number): void {
     }
   }
 
-  moveRobot(robot, deltaSeconds, state.automation.overdrive > 0 ? 1.55 : 1);
+  moveRobot(robot, deltaSeconds, getRobotSpeedMultiplier(state));
 
-  const sweepRadius = robot.sweepRadius + (hasFurnitureSynergy(state, "cleanupCircuit") ? 6 : 0);
-  const result = cleanPoopsInRadius(state, robot.x, robot.y, sweepRadius);
+  const sweepRadius =
+    robot.sweepRadius +
+    (hasFurnitureSynergy(state, "cleanupCircuit") ? 6 : 0) +
+    (state.automation.directive === "cleanliness" ? 3 : 0) -
+    (state.automation.directive === "rareGuard" ? 5 : 0);
+  const result = cleanPoopsInRadius(state, robot.x, robot.y, sweepRadius, getAutomationCleanOptions(state.automation.directive));
   if (result.cleaned > 0 && robot.cleanLogCooldown <= 0) {
     robot.cleanLogCooldown = state.automation.overdrive > 0 ? 1.8 : 3;
     const noun = result.cleaned === 1 ? "bean" : "beans";
-    addLog(state, `Poop Roomba swept ${result.cleaned} ${noun} for +${result.earned}.`);
+    addLog(state, `Poop Roomba ${getAutomationDirectiveVerb(state.automation.directive)} ${result.cleaned} ${noun} for +${result.earned}.`);
     updateMilestones(state);
   }
 }
 
 function getNearestPoopInRange(state: GameState, robot: Robot): Poop | null {
-  let nearestPoop: Poop | null = null;
-  let nearestDistance =
+  const directive = state.automation.directive;
+  const nearestDistance =
     robot.sensorRadius *
     (state.automation.overdrive > 0 ? 1.45 : 1) *
-    (hasFurnitureSynergy(state, "cleanupCircuit") ? 1.18 : 1);
+    (hasFurnitureSynergy(state, "cleanupCircuit") ? 1.18 : 1) *
+    (directive === "cleanliness" ? 1.08 : directive === "litterFocus" ? 1.05 : 1);
+  const candidates = state.poops.filter((poop) => Math.hypot(poop.x - robot.x, poop.y - robot.y) <= nearestDistance);
+  return chooseAutomationPoop(state, candidates, directive, robot);
+}
 
-  for (const poop of state.poops) {
-    const distance = Math.hypot(poop.x - robot.x, poop.y - robot.y);
-    if (distance <= nearestDistance) {
-      nearestDistance = distance;
-      nearestPoop = poop;
-    }
+function chooseAutomationPoop(
+  state: GameState,
+  candidates: Poop[],
+  directive: AutomationDirectiveId,
+  source: Pick<Robot, "x" | "y">,
+): Poop | null {
+  const available = directive === "rareGuard" ? candidates.filter((poop) => !isRareGuardProtected(poop)) : candidates;
+  let best: { poop: Poop; score: number } | null = null;
+  for (const poop of available) {
+    const distance = Math.hypot(poop.x - source.x, poop.y - source.y);
+    const mess = getPoopMessPressure(poop);
+    const litterBonus = getPoopZoneId(state, poop) === "litterCorner" ? 120 : 0;
+    const score =
+      directive === "cleanliness"
+        ? mess * 11 + poop.age * 0.08 - distance * 0.32
+        : directive === "litterFocus"
+          ? litterBonus + mess * 6 - distance * 0.36
+          : directive === "rareGuard"
+            ? mess * 8 - distance * 0.28
+            : -distance;
+    if (!best || score > best.score) best = { poop, score };
   }
-
-  return nearestPoop;
+  return best?.poop ?? null;
 }
 
 function chooseRobotTarget(state: GameState, robot: Robot): void {
+  if (state.automation.directive === "litterFocus") {
+    const litter = getZoneMetrics(state, "litterCorner");
+    robot.targetX = litter.x + randomBetween(-28, 28);
+    robot.targetY = litter.y + randomBetween(-22, 22);
+    return;
+  }
+
+  if (state.automation.directive === "cleanliness") {
+    const messiestZone = state.ecology.zones.reduce((best, zone) => (zone.mess > best.mess ? zone : best), state.ecology.zones[0]);
+    if (messiestZone.mess >= 18) {
+      robot.targetX = messiestZone.x + randomBetween(-Math.min(32, messiestZone.radius * 0.25), Math.min(32, messiestZone.radius * 0.25));
+      robot.targetY = messiestZone.y + randomBetween(-Math.min(28, messiestZone.radius * 0.22), Math.min(28, messiestZone.radius * 0.22));
+      return;
+    }
+  }
+
   robot.targetX = randomBetween(CAGE_PADDING, state.cage.width - CAGE_PADDING);
   robot.targetY = randomBetween(CAGE_PADDING, state.cage.height - CAGE_PADDING);
+}
+
+function getRobotSpeedMultiplier(state: GameState): number {
+  const overdrive = state.automation.overdrive > 0 ? 1.55 : 1;
+  const directive = state.automation.directive;
+  const directiveSpeed = directive === "litterFocus" ? 1.06 : directive === "rareGuard" ? 0.92 : 1;
+  return overdrive * directiveSpeed;
 }
 
 function moveRobot(robot: Robot, deltaSeconds: number, speedMultiplier: number): void {
@@ -542,6 +605,29 @@ function moveRobot(robot: Robot, deltaSeconds: number, speedMultiplier: number):
   const travel = Math.min(distance, robot.speed * speedMultiplier * deltaSeconds);
   robot.x += (dx / distance) * travel;
   robot.y += (dy / distance) * travel;
+}
+
+function getPoopMessPressure(poop: Poop): number {
+  if (poop.type === "messPile") return 13;
+  if (poop.type === "cursed") return 11;
+  if (poop.type === "stinky") return 8;
+  if (poop.type === "blessed") return 3;
+  return 5.5;
+}
+
+function getAutomationCleanOptions(directive: AutomationDirectiveId) {
+  return directive === "rareGuard" ? { shouldClean: (poop: Poop) => !isRareGuardProtected(poop) } : {};
+}
+
+function isRareGuardProtected(poop: Poop): boolean {
+  return poop.type !== "normal" && poop.type !== "stinky" && poop.type !== "messPile";
+}
+
+function getAutomationDirectiveVerb(directive: AutomationDirectiveId): string {
+  if (directive === "cleanliness") return "stabilized";
+  if (directive === "litterFocus") return "patrolled";
+  if (directive === "rareGuard") return "guard-cleaned";
+  return "swept";
 }
 
 function updateCleanliness(state: GameState): void {

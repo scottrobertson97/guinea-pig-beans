@@ -3,6 +3,8 @@ import {
   buyCageUpgrade,
   buyFurniture,
   buyWisdomPerk,
+  careForFurniture,
+  canSetAutomationDirective,
   canTendHabitatZone,
   canUnlockBeanRecipe,
   buyPig,
@@ -18,11 +20,16 @@ import {
   canUseEventChoice,
   getEventChoiceStatus,
   getEventChoices,
+  getAutomationDirectiveName,
+  getAutomationDirectiveStatus,
+  getAutomationDirectives,
+  getFurnitureCareViews,
   getHabitatTendStatus,
   prestige,
   refillHay,
   refillWater,
   respondToEventChoice,
+  setAutomationDirective,
   tendHabitatZone,
   unlockBeanRecipe,
   unlockLateGameSystem,
@@ -54,6 +61,7 @@ import { SAVE_STATUS_EVENT, type SaveStatusDetail } from "../simulation/persiste
 import { getActivePigRequestView } from "../simulation/pigRequests";
 import type {
   AbilityId,
+  AutomationDirectiveId,
   BeanExchangeTradeId,
   BeanRecipeId,
   CouncilDecreeId,
@@ -72,6 +80,10 @@ type ButtonId =
   | "better-scoop"
   | "poop-roomba"
   | "fuel-automation"
+  | "automation-balanced"
+  | "automation-cleanliness"
+  | "automation-litter-focus"
+  | "automation-rare-guard"
   | "bigger-cage"
   | "rare-pig"
   | "refill-hay"
@@ -211,6 +223,13 @@ const COUNCIL_DECREE_BUTTONS: Record<CouncilDecreeId, ButtonId> = {
   herdCharter: "council-herd-charter",
 };
 
+const AUTOMATION_DIRECTIVE_BUTTONS: Record<AutomationDirectiveId, ButtonId> = {
+  balanced: "automation-balanced",
+  cleanliness: "automation-cleanliness",
+  litterFocus: "automation-litter-focus",
+  rareGuard: "automation-rare-guard",
+};
+
 export class Hud {
   private buttons: Record<ButtonId, HTMLButtonElement>;
   private quickButtons: Record<QuickCareButtonId, HTMLButtonElement>;
@@ -236,6 +255,7 @@ export class Hud {
   private previousObjectivePulseState: ObjectivePulseState | null = null;
   private previousGoalSignature: string | null = null;
   private previousLogSignature: string | null = null;
+  private previousFurnitureCareSignature: string | null = null;
   private previousEcologySignature: string | null = null;
   private previousCompletedQuestIds: Set<string> | null = null;
   private previousCompletedAchievementIds: Set<string> | null = null;
@@ -267,6 +287,10 @@ export class Hud {
       "better-scoop": getButton("better-scoop"),
       "poop-roomba": getButton("poop-roomba"),
       "fuel-automation": getButton("fuel-automation"),
+      "automation-balanced": getButton("automation-balanced"),
+      "automation-cleanliness": getButton("automation-cleanliness"),
+      "automation-litter-focus": getButton("automation-litter-focus"),
+      "automation-rare-guard": getButton("automation-rare-guard"),
       "bigger-cage": getButton("bigger-cage"),
       "rare-pig": getButton("rare-pig"),
       "refill-hay": getButton("refill-hay"),
@@ -424,6 +448,18 @@ export class Hud {
     this.buttons["fuel-automation"].addEventListener("click", () =>
       this.runAction(() => fuelAutomation(this.state), this.buttons["fuel-automation"], "robot", "purchase", "purchase"),
     );
+    for (const directive of getAutomationDirectives()) {
+      const button = this.buttons[AUTOMATION_DIRECTIVE_BUTTONS[directive.id]];
+      button.addEventListener("click", () =>
+        this.runAction(
+          () => setAutomationDirective(this.state, directive.id),
+          button,
+          { category: "purchase", target: "robot", label: directive.label, resourceText: "Directive", color: getAutomationDirectiveColor(directive.id) },
+          "purchase",
+          "button",
+        ),
+      );
+    }
     this.buttons["bigger-cage"].addEventListener("click", () =>
       this.runAction(() => buyCageUpgrade(this.state), this.buttons["bigger-cage"], "cage", "purchase", "purchase"),
     );
@@ -640,10 +676,12 @@ export class Hud {
     setText("scoop-cost", getBeanCostStatusText(this.state, costs.scoop, `${costs.scoop} Beans`));
     setText("robot-cost", getRobotStatusText(this.state, costs.robot));
     setText("fuel-automation-status", getAutomationFuelText(this.state));
+    this.renderAutomationDirectiveStatuses();
     setText("cage-cost", getBiggerCageStatusText(this.state, costs.cage, pigCapacity));
     setText("rare-pig-cost", getRarePigStatusText(this.state, costs.rarePig, pigCapacity));
     this.renderFurnitureCosts(costs.furniture);
     this.renderFurnitureSynergies();
+    this.renderFurnitureCare();
     this.renderEcologyZones();
     this.renderAbilityStatuses();
     this.renderRecipeStatuses();
@@ -668,6 +706,7 @@ export class Hud {
     this.buttons["poop-roomba"].disabled = Boolean(this.state.robot) || this.state.beans < costs.robot;
     this.buttons["fuel-automation"].disabled =
       !this.state.robot || this.state.compost < getAutomationFuelCost(this.state);
+    this.updateAutomationDirectiveDisabled();
     this.buttons["bigger-cage"].disabled = this.state.beans < costs.cage;
     this.buttons["rare-pig"].disabled = isAtPigCapacity || this.state.beans < costs.rarePig || this.state.goldenBeans < 1;
     this.buttons["event-response"].disabled = !this.state.event.active || !this.state.event.responseReady;
@@ -974,6 +1013,10 @@ export class Hud {
       "better-scoop",
       "poop-roomba",
       "fuel-automation",
+      "automation-balanced",
+      "automation-cleanliness",
+      "automation-litter-focus",
+      "automation-rare-guard",
       "bigger-cage",
       "rare-pig",
     ]), "available");
@@ -1110,6 +1153,13 @@ export class Hud {
     for (const button of Object.values(this.eventChoiceButtons)) {
       this.setActionVisualState(button, button.hidden ? "locked" : getActionVisualState(button));
     }
+    for (const button of document.querySelectorAll<HTMLButtonElement>(".zone-tend-button")) {
+      this.setActionVisualState(button, getActionVisualState(button));
+    }
+    for (const button of document.querySelectorAll<HTMLButtonElement>(".furniture-care-button")) {
+      this.setActionVisualState(button, getActionVisualState(button));
+    }
+    this.updateModalScanStates();
   }
 
   private setActionVisualState(button: HTMLButtonElement, state: ActionVisualState): void {
@@ -1117,6 +1167,21 @@ export class Hud {
     button.classList.toggle("locked-now", state === "locked");
     button.classList.toggle("completed-now", state === "completed");
     button.classList.toggle("attention-now", state === "attention");
+  }
+
+  private updateModalScanStates(): void {
+    for (const panel of Object.values(this.panels)) {
+      const buttons = [...panel.querySelectorAll<HTMLButtonElement>("button")].filter((button) => !button.hidden);
+      const available = buttons.filter((button) => getActionVisualState(button) === "available").length;
+      const completed = buttons.filter((button) => getActionVisualState(button) === "completed").length;
+      const locked = buttons.filter((button) => getActionVisualState(button) === "locked").length;
+      panel.classList.toggle("has-available-actions", available > 0);
+      panel.classList.toggle("has-completed-actions", completed > 0);
+      panel.classList.toggle("has-locked-actions", locked > 0);
+      panel.dataset.availableActions = String(available);
+      panel.dataset.completedActions = String(completed);
+      panel.dataset.lockedActions = String(locked);
+    }
   }
 
   private bindFurnitureButton(buttonId: ButtonId, furnitureId: FurnitureId): void {
@@ -1189,6 +1254,14 @@ export class Hud {
     setText("royal-throne-cost", getFurnitureStatusText(this.state, costs, "royalThrone"));
   }
 
+  private renderAutomationDirectiveStatuses(): void {
+    setText("automation-directive-current", getAutomationDirectiveName(this.state.automation.directive));
+    for (const directive of getAutomationDirectives()) {
+      const buttonId = AUTOMATION_DIRECTIVE_BUTTONS[directive.id];
+      setText(`${buttonId}-status`, getAutomationDirectiveStatus(this.state, directive.id));
+    }
+  }
+
   private renderFurnitureSynergies(): void {
     const list = document.querySelector<HTMLUListElement>("#furniture-synergy-list");
     if (!list) return;
@@ -1206,6 +1279,53 @@ export class Hud {
       status.textContent = active ? "Active" : `Needs ${missing.map(getFurnitureName).join(" + ")}`;
       description.textContent = synergy.description;
       item.append(title, status, description);
+      return item;
+    });
+
+    list.replaceChildren(...items);
+  }
+
+  private renderFurnitureCare(): void {
+    const list = document.querySelector<HTMLUListElement>("#furniture-care-list");
+    if (!list) return;
+
+    const signature = getFurnitureCareRenderSignature(this.state);
+    if (signature === this.previousFurnitureCareSignature) return;
+    this.previousFurnitureCareSignature = signature;
+
+    const views = getFurnitureCareViews(this.state);
+    if (views.length === 0) {
+      list.replaceChildren(createEmptyStateItem("Unlock furniture to start caring for well-loved cage pieces."));
+      return;
+    }
+
+    const items = views.map((view) => {
+      const item = document.createElement("li");
+      const conditionClass = view.condition >= 88 ? "complete" : view.condition < 58 ? "attention" : "";
+      if (conditionClass) item.classList.add(conditionClass);
+      if (view.status.startsWith("Cooldown")) item.classList.add("cooldown");
+
+      const title = document.createElement("span");
+      const status = document.createElement("strong");
+      const metrics = document.createElement("small");
+      const effect = document.createElement("em");
+      const controls = document.createElement("div");
+      const careButton = document.createElement("button");
+      const careStatus = document.createElement("small");
+
+      title.textContent = view.label;
+      status.textContent = view.conditionLabel;
+      metrics.textContent = `Condition ${view.condition} - ${getCageZoneName(view.zoneId)}`;
+      effect.textContent = view.effect;
+      controls.className = "furniture-care-actions";
+      careButton.type = "button";
+      careButton.className = "furniture-care-button";
+      careButton.textContent = "Care";
+      careButton.disabled = !view.canCare;
+      careStatus.textContent = view.status;
+      careButton.addEventListener("click", () => this.runFurnitureCare(view.id, view.label, view.zoneId, careButton));
+      controls.append(careButton, careStatus);
+      item.append(title, status, metrics, effect, controls);
       return item;
     });
 
@@ -1235,6 +1355,8 @@ export class Hud {
       title.textContent = zone.label;
       status.textContent = zone.status;
       const stewardshipCare = this.state.ecology.stewardship[zone.id]?.care ?? 0;
+      const stewardshipCooldown = this.state.ecology.stewardship[zone.id]?.cooldown ?? 0;
+      if (stewardshipCooldown > 0) item.classList.add("cooldown");
       metrics.textContent = `Comfort ${zone.comfort} - Mess ${zone.mess} - Traffic ${zone.traffic} - Care ${Math.round(stewardshipCare)}`;
       action.textContent = `${zone.action}${zone.pigIds.length > 0 ? ` - ${zone.pigIds.length} pig${zone.pigIds.length === 1 ? "" : "s"}` : ""}`;
       controls.className = "ecology-actions";
@@ -1263,6 +1385,24 @@ export class Hud {
         zoneId,
         label: `${zone?.label ?? getCageZoneName(zoneId)} Tended`,
         resourceText: "+Care",
+        color: getHabitatFeedbackColor(zoneId),
+      },
+      "purchase",
+      "event",
+    );
+  }
+
+  private runFurnitureCare(furnitureId: FurnitureId, label: string, zoneId: CageZoneId, button: HTMLButtonElement): void {
+    this.runAction(
+      () => careForFurniture(this.state, furnitureId),
+      button,
+      {
+        category: "habitat",
+        target: "furniture",
+        furnitureId,
+        zoneId,
+        label: `${label} Cared`,
+        resourceText: "+Condition",
         color: getHabitatFeedbackColor(zoneId),
       },
       "purchase",
@@ -1392,6 +1532,12 @@ export class Hud {
     this.buttons["snuggle-sack"].disabled = !this.canBuyFurniture(costs, "snuggleSack");
     this.buttons["cardboard-castle"].disabled = !this.canBuyFurniture(costs, "cardboardCastle");
     this.buttons["royal-throne"].disabled = !this.canBuyFurniture(costs, "royalThrone");
+  }
+
+  private updateAutomationDirectiveDisabled(): void {
+    for (const directive of getAutomationDirectives()) {
+      this.buttons[AUTOMATION_DIRECTIVE_BUTTONS[directive.id]].disabled = !canSetAutomationDirective(this.state, directive.id);
+    }
   }
 
   private updateAbilityDisabled(): void {
@@ -1626,6 +1772,13 @@ function getHabitatFeedbackColor(zoneId: CageZoneId): number {
   return 0x7db46a;
 }
 
+function getAutomationDirectiveColor(id: AutomationDirectiveId): number {
+  if (id === "cleanliness") return 0x86d9f0;
+  if (id === "litterFocus") return 0x8a6e4d;
+  if (id === "rareGuard") return 0xb965d2;
+  return 0x7db46a;
+}
+
 function isCompletedButton(button: HTMLButtonElement): boolean {
   const status = button.querySelector("strong")?.textContent?.trim().toLowerCase() ?? "";
   return status === "active" || status === "unlocked" || status === "learned";
@@ -1639,6 +1792,21 @@ function getBeanRecipeName(id: BeanRecipeId): string {
 
 function getLogSignature(state: GameState): string {
   return state.log.join("|");
+}
+
+function getFurnitureCareRenderSignature(state: GameState): string {
+  return getFurnitureCareViews(state)
+    .map((view) =>
+      [
+        view.id,
+        view.condition,
+        view.conditionLabel,
+        view.status,
+        view.effect,
+        Number(view.canCare),
+      ].join(":"),
+    )
+    .join("|");
 }
 
 function getEcologyRenderSignature(state: GameState): string {
@@ -1676,7 +1844,10 @@ function setMeter(id: string, value: number): void {
 function getStatusLine(state: GameState): string {
   const ecologyLine = getEcologyStatusLine(state);
   if (ecologyLine) return ecologyLine;
+  const careNeed = getFurnitureCareViews(state).find((view) => view.condition < 58);
+  if (careNeed) return `${careNeed.label} is ${careNeed.conditionLabel.toLowerCase()}. Open Furniture Care to tend it.`;
   if (state.automation.overdrive > 0) return `Automation overdrive is sweeping faster for ${Math.ceil(state.automation.overdrive)}s.`;
+  if (state.robot || state.furniture.litterTray) return `Automation directive: ${getAutomationDirectiveName(state.automation.directive)}.`;
   if (state.event.active && state.event.responseReady)
     return `${state.event.active.name} is active. Use Event to choose a response.`;
   if (state.event.active) return `${state.event.active.name} is active for ${Math.ceil(state.event.active.timer)}s.`;

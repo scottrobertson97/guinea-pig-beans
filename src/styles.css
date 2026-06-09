@@ -875,6 +875,11 @@ button.action-success {
   padding: 10px 12px;
   border: 1px solid transparent;
   text-align: left;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 120ms ease;
 }
 
 .shop button span {
@@ -895,6 +900,7 @@ button.action-success {
 
 .shop button.locked-now:disabled {
   background: rgba(238, 232, 218, 0.88);
+  opacity: 0.76;
 }
 
 .shop button.locked-now:disabled strong {
@@ -913,6 +919,12 @@ button.action-success {
 .shop button.attention-now:not(:disabled) {
   border-color: rgba(164, 135, 45, 0.5);
   background: linear-gradient(180deg, #fff6cf 0%, #f2dfa0 100%);
+}
+
+.shop button.available-now:not(:disabled):active,
+.event-choice-list button.available-now:not(:disabled):active,
+.zone-tend-button.available-now:not(:disabled):active {
+  transform: translateY(1px);
 }
 
 .shop button strong {
@@ -936,6 +948,30 @@ button.action-success {
   line-height: 1.25;
 }
 
+.automation-directives {
+  display: grid;
+  gap: 7px;
+  padding: 9px;
+  border: 1px solid rgba(126, 168, 109, 0.24);
+  border-radius: 8px;
+  background: rgba(245, 251, 238, 0.68);
+}
+
+.automation-directives h2,
+.automation-directives p {
+  margin: 0;
+}
+
+.automation-directives p {
+  color: #5f6a5e;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.automation-directives p strong {
+  color: #314033;
+}
+
 .compact-shop {
   gap: 7px;
 }
@@ -954,7 +990,8 @@ button.action-success {
   margin-top: 2px;
 }
 
-.synergy-list {
+.synergy-list,
+.furniture-care-list {
   display: grid;
   gap: 7px;
   margin-top: 4px;
@@ -966,7 +1003,8 @@ button.action-success {
   margin-top: 8px;
 }
 
-.synergy-list ul {
+.synergy-list ul,
+.furniture-care-list ul {
   display: grid;
   gap: 6px;
   margin: 0;
@@ -982,7 +1020,8 @@ button.action-success {
   list-style: none;
 }
 
-.synergy-list li {
+.synergy-list li,
+.furniture-care-list li {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 3px 10px;
@@ -1016,12 +1055,33 @@ button.action-success {
   background: rgba(217, 234, 208, 0.58);
 }
 
+.furniture-care-list li.complete {
+  border-color: rgba(126, 168, 109, 0.3);
+  background: rgba(217, 234, 208, 0.58);
+}
+
 .ecology-list li.attention {
   border-color: rgba(164, 135, 45, 0.34);
   background: rgba(255, 246, 207, 0.64);
 }
 
-.synergy-list li span {
+.furniture-care-list li.attention {
+  border-color: rgba(164, 135, 45, 0.34);
+  background: rgba(255, 246, 207, 0.64);
+}
+
+.ecology-list li.cooldown {
+  border-color: rgba(126, 168, 109, 0.34);
+  background: rgba(239, 249, 232, 0.72);
+}
+
+.furniture-care-list li.cooldown {
+  border-color: rgba(126, 168, 109, 0.34);
+  background: rgba(239, 249, 232, 0.72);
+}
+
+.synergy-list li span,
+.furniture-care-list li span {
   font-weight: 800;
 }
 
@@ -1037,7 +1097,8 @@ button.action-success {
   text-align: right;
 }
 
-.ecology-list li strong {
+.ecology-list li strong,
+.furniture-care-list li strong {
   max-width: 12rem;
   overflow-wrap: anywhere;
   color: #314033;
@@ -1045,7 +1106,8 @@ button.action-success {
   text-align: right;
 }
 
-.ecology-list li small {
+.ecology-list li small,
+.furniture-care-list li small {
   grid-column: 1 / -1;
   color: #5f6a5e;
   font-size: 0.7rem;
@@ -1060,7 +1122,8 @@ button.action-success {
   font-weight: 600;
 }
 
-.ecology-list li em {
+.ecology-list li em,
+.furniture-care-list li em {
   grid-column: 1 / -1;
   color: #5f6a5e;
   font-size: 0.72rem;
@@ -1068,7 +1131,8 @@ button.action-success {
   font-weight: 600;
 }
 
-.ecology-actions {
+.ecology-actions,
+.furniture-care-actions {
   grid-column: 1 / -1;
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1076,15 +1140,35 @@ button.action-success {
   gap: 7px;
 }
 
-.ecology-actions .zone-tend-button {
+.ecology-actions .zone-tend-button,
+.furniture-care-actions .furniture-care-button {
   min-height: 30px;
   width: 74px;
   padding: 5px 8px;
   border-radius: 7px;
   font-size: 0.72rem;
+  transition:
+    background 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 120ms ease;
 }
 
-.ecology-actions small {
+.ecology-actions .zone-tend-button.available-now:not(:disabled),
+.furniture-care-actions .furniture-care-button.available-now:not(:disabled) {
+  border-color: rgba(126, 168, 109, 0.46);
+  background: linear-gradient(180deg, #edf8e7 0%, #dbeecf 100%);
+  color: #315b2a;
+}
+
+.ecology-actions .zone-tend-button.locked-now:disabled,
+.furniture-care-actions .furniture-care-button.locked-now:disabled {
+  background: rgba(238, 232, 218, 0.9);
+  color: #736a5d;
+}
+
+.ecology-actions small,
+.furniture-care-actions small {
   grid-column: auto;
   color: #5f6a5e;
   font-size: 0.7rem;
@@ -1125,7 +1209,7 @@ button.action-success {
 #event-log li.empty-state {
   display: block;
   color: #687365;
-  background: rgba(255, 255, 255, 0.48);
+  background: rgba(255, 255, 255, 0.58);
   border: 1px dashed rgba(23, 32, 26, 0.14);
   font-size: 0.8rem;
   font-weight: 650;
@@ -1287,6 +1371,22 @@ button.action-success {
 
 .section-panel[hidden] {
   display: none !important;
+}
+
+.section-panel.has-available-actions {
+  position: relative;
+}
+
+.section-panel.has-available-actions::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 58px;
+  height: 3px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(126, 168, 109, 0), rgba(126, 168, 109, 0.78));
+  pointer-events: none;
 }
 
 .section-panel > h2:first-child {

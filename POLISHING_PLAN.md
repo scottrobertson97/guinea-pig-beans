@@ -253,6 +253,7 @@ Run this after every polish implementation slice:
 
 - `npm run build`
 - Start or reuse strict local server for this checkout: `npm run dev -- --port 5176 --strictPort`
+- Run the automated smoke from another shell: `npm run smoke:polish`
 - Open `http://127.0.0.1:5176/`
 - Confirm page title is `Guinea Pig Beans`
 - Confirm no console errors or warnings

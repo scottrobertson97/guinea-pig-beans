@@ -223,8 +223,12 @@ export class GameScene extends Phaser.Scene {
     const { width, height } = this.state.cage;
 
     this.cageBacking.clear();
+    this.cageBacking.fillStyle(0x6f5135, 0.22);
+    this.cageBacking.fillRoundedRect(9, 13, width - 8, height - 8, 24);
     this.cageBacking.fillStyle(0xcdb58d, 1);
     this.cageBacking.fillRoundedRect(0, 0, width, height, 22);
+    this.cageBacking.lineStyle(3, 0xffebbf, 0.18);
+    this.cageBacking.strokeRoundedRect(3, 3, width - 12, height - 14, 20);
 
     this.cageFloor
       .setPosition(width / 2, height / 2)
@@ -238,8 +242,18 @@ export class GameScene extends Phaser.Scene {
       .setDisplaySize(width - 28, height - 28);
 
     this.cageRim.clear();
+    this.cageRim.lineStyle(18, 0x5a402b, 0.2);
+    this.cageRim.strokeRoundedRect(10, 12, width - 18, height - 18, 22);
     this.cageRim.lineStyle(14, 0x8a6e4d, 1);
     this.cageRim.strokeRoundedRect(7, 7, width - 14, height - 14, 20);
+    this.cageRim.lineStyle(4, 0xd5b27c, 0.58);
+    this.cageRim.strokeRoundedRect(9, 7, width - 20, height - 20, 18);
+    this.cageRim.lineStyle(3, 0xffedc8, 0.42);
+    this.cageRim.lineBetween(30, 12, width - 34, 12);
+    this.cageRim.lineBetween(12, 30, 12, height - 34);
+    this.cageRim.lineStyle(3, 0x4f3828, 0.26);
+    this.cageRim.lineBetween(34, height - 12, width - 30, height - 12);
+    this.cageRim.lineBetween(width - 12, 34, width - 12, height - 30);
     this.lastCageWidth = width;
     this.lastCageHeight = height;
   }
@@ -247,6 +261,8 @@ export class GameScene extends Phaser.Scene {
   private drawAmbientCageDetails(width: number, height: number): void {
     const details = this.cageDetails;
     details.clear();
+
+    this.drawBeddingDepth(details, width, height);
 
     details.fillStyle(0xffffff, 0.045);
     for (const patch of BEDDING_VARIATIONS) {
@@ -277,6 +293,8 @@ export class GameScene extends Phaser.Scene {
 
     details.lineStyle(3, 0xfff2cf, 0.18);
     details.strokeRoundedRect(20, 20, width - 40, height - 40, 16);
+    details.lineStyle(1, 0x8b7655, 0.1);
+    details.strokeRoundedRect(31, 31, width - 62, height - 62, 14);
     details.lineStyle(2, 0x6e543b, 0.28);
     for (const mark of RIM_CHEW_MARKS) {
       const x = width * mark.x;
@@ -284,6 +302,25 @@ export class GameScene extends Phaser.Scene {
       details.lineBetween(x - mark.width / 2, y, x + mark.width / 2, y);
       details.lineBetween(x - mark.width / 4, y + (mark.y > 0 ? 3 : -3), x + mark.width / 4, y);
     }
+  }
+
+  private drawBeddingDepth(details: Phaser.GameObjects.Graphics, width: number, height: number): void {
+    const floorX = 14;
+    const floorY = 14;
+    const floorWidth = width - 28;
+    const floorHeight = height - 28;
+
+    details.lineStyle(5, 0x7e6649, 0.13);
+    details.strokeRoundedRect(floorX + 2, floorY + 3, floorWidth - 4, floorHeight - 5, 18);
+    details.lineStyle(3, 0xfff5d7, 0.14);
+    details.lineBetween(floorX + 22, floorY + 10, width - 38, floorY + 10);
+    details.lineBetween(floorX + 10, floorY + 24, floorX + 10, height - 42);
+    details.fillStyle(0x5f4631, 0.055);
+    details.fillRect(floorX + 4, height - 46, floorWidth - 8, 26);
+    details.fillRect(width - 46, floorY + 4, 24, floorHeight - 8);
+    details.fillStyle(0xfff4d5, 0.035);
+    details.fillRect(floorX + 22, floorY + 6, floorWidth - 44, 20);
+    details.fillRect(floorX + 6, floorY + 24, 20, floorHeight - 48);
   }
 
   private syncViews(): void {
@@ -639,14 +676,27 @@ export class GameScene extends Phaser.Scene {
   }
 
   private playHabitatFeedback(detail: SceneFeedbackDetail): void {
-    const zone = detail.zoneId ? getZoneMetrics(this.state, detail.zoneId) : null;
-    const x = zone?.x ?? this.state.cage.width / 2;
-    const y = zone?.y ?? this.state.cage.height / 2;
+    const furniturePlacement =
+      detail.target === "furniture" && detail.furnitureId ? getStaticFurniturePlacement(this.state, detail.furnitureId) : null;
+    const zone = !furniturePlacement && detail.zoneId ? getZoneMetrics(this.state, detail.zoneId) : null;
+    const x = furniturePlacement?.x ?? zone?.x ?? this.state.cage.width / 2;
+    const y = furniturePlacement?.y ?? zone?.y ?? this.state.cage.height / 2;
     const color = detail.color ?? 0x7db46a;
     this.addFloatingText(x, y - 34, detail.label ?? "Habitat Tended", color, 1, true);
     if (detail.resourceText) this.addFloatingText(x, y - 8, detail.resourceText, color, 0.92, true);
     this.reactPigsNear(x, y, "Cozy!", zone?.radius ?? 160, 3);
-    if (!this.prefersReducedMotion) this.addBurst(x, y, color, 7);
+    if (this.prefersReducedMotion) return;
+    this.addBurst(x, y, color, 7);
+    const furnitureView = detail.furnitureId ? this.furnitureViews.get(detail.furnitureId) : null;
+    if (furnitureView) {
+      this.tweens.add({
+        targets: furnitureView,
+        scale: 1.08,
+        duration: 130,
+        yoyo: true,
+        ease: "Sine.easeOut",
+      });
+    }
   }
 
   private playCenterFeedback(label: string, resourceText: string | undefined, color: number, herdThought: string): void {

@@ -32,6 +32,7 @@ export type PoopType =
   | "cursed"
   | "messPile";
 export type RobotState = "wandering" | "sweeping";
+export type AutomationDirectiveId = "balanced" | "cleanliness" | "litterFocus" | "rareGuard";
 export type CageZoneId =
   | "hayCorner"
   | "waterBottle"
@@ -169,6 +170,12 @@ export interface CageEcologyState {
   stewardship: Partial<Record<CageZoneId, CageZoneStewardship>>;
 }
 
+export interface FurnitureCareState {
+  condition: number;
+  cooldown: number;
+  lastCare: string | null;
+}
+
 export interface Pig {
   id: number;
   name: string;
@@ -283,9 +290,11 @@ export interface GameState {
   };
   ecology: CageEcologyState;
   furniture: Record<FurnitureId, boolean>;
+  furnitureCare: Partial<Record<FurnitureId, FurnitureCareState>>;
   abilities: Record<AbilityId, number>;
   automation: {
     overdrive: number;
+    directive: AutomationDirectiveId;
   };
   recipes: Record<BeanRecipeId, boolean>;
   wisdom: Record<WisdomPerkId, boolean>;
