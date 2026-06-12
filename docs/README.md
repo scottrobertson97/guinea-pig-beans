@@ -7,6 +7,10 @@ Use this folder for long-form project references, planning notes, and production
 - [DESIGN_DOC.md](DESIGN_DOC.md): player-facing design shape, current mechanics, and system rules.
 - [FEATURE_PROGRESS.md](FEATURE_PROGRESS.md): implemented systems, current progression records, backlog, and implementation notes.
 
+## Developer Tooling
+
+- Constants editor: while Vite is running in dev mode, open `http://127.0.0.1:5176/constants` to tune selected literal values from `src/simulation/balance.ts`. Save writes the source file itself, so changes persist through server restarts and should be reviewed as code.
+
 ## Planning And Backlog
 
 - [PROJECT_TICKETS.md](PROJECT_TICKETS.md): durable Project Manager ticket queue for broad work.

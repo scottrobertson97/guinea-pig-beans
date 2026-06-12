@@ -110,12 +110,22 @@ Review the current Guinea Pig Beans changes for bugs, regressions, missing tests
 ## Commands
 
 - `npm run dev`: start Vite on `127.0.0.1`.
+- `npm run dev -- --port 5176 --strictPort`: start the preferred local review server for this checkout, then open `http://127.0.0.1:5176/`.
+- `http://127.0.0.1:5176/constants`: dev-only constants editor served by Vite during `npm run dev`; it edits literal values in `src/simulation/balance.ts` and is not available from production builds or the game dock.
 - `npm run build`: run TypeScript and Vite production build.
 - `npm run preview`: serve the production build locally.
 - There is no dedicated test script. For gameplay/UI changes, use build plus a focused browser smoke check.
 - If PowerShell cannot find `npm`, run local tools through bundled Node:
   - `C:\Users\scott\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe node_modules\typescript\bin\tsc`
   - `C:\Users\scott\.cache\codex-runtimes\codex-primary-runtime\dependencies\node\bin\node.exe node_modules\vite\bin\vite.js build`
+
+## Constants Editor
+
+- Use `/constants` only as local dev tooling for balance tuning. Do not add runtime mutable constants or a player-facing link.
+- The editor exposes scalar literals from `src/simulation/balance.ts`, including top-level numeric constants and selected object leaves such as pig activity weights, lifecycle thresholds, furniture space costs, ability Squeak costs, and furniture base costs.
+- Each row saves one source literal. A successful save rewrites `balance.ts`, so changes persist through dev-server restarts and should be reviewed like ordinary code.
+- If the editor reports a stale source hash, refresh `/constants` before saving again; another process or agent changed `balance.ts`.
+- After changing constants, run `npm run build` and a focused smoke check for the affected mechanic.
 
 ## Verification Baseline
 
