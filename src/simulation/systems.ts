@@ -9,6 +9,8 @@ import {
   hasSingularityExperimentEffect,
   hasSqueakChoirEffect,
   hasWisdomSpecialization,
+  PIG_ACTIVITY_WEIGHTS,
+  PIG_LIFECYCLE_THRESHOLDS,
 } from "./balance";
 import { advanceContractProgress, updateContracts } from "./contracts";
 import { getPoopZoneId, getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
@@ -16,16 +18,16 @@ import { getFurnitureAutomationMultiplier, getFurnitureStatBonus, updateFurnitur
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
-import type { AutomationDirectiveId, GameState, Pig, PigMood, Poop, Robot } from "./types";
+import type { AutomationDirectiveId, GameState, Pig, PigGoal, PigMood, Poop, Robot } from "./types";
 import { clamp, pickWeighted, randomBetween } from "./utils";
 
 const DEATH_CHECK_INTERVAL = 12;
 const MAX_DEATH_CHANCE_PER_CHECK = 0.35;
-const HUNGER_GOAL_THRESHOLD = 38;
-const THIRST_GOAL_THRESHOLD = 35;
-const ENERGY_GOAL_THRESHOLD = 28;
-const NEED_SATISFIED_THRESHOLD = 86;
-const ENERGY_RESTED_THRESHOLD = 88;
+const HUNGER_GOAL_THRESHOLD = PIG_LIFECYCLE_THRESHOLDS.hungerUrgent;
+const THIRST_GOAL_THRESHOLD = PIG_LIFECYCLE_THRESHOLDS.thirstUrgent;
+const ENERGY_GOAL_THRESHOLD = PIG_LIFECYCLE_THRESHOLDS.energyUrgent;
+const NEED_SATISFIED_THRESHOLD = PIG_LIFECYCLE_THRESHOLDS.needSatisfied;
+const ENERGY_RESTED_THRESHOLD = PIG_LIFECYCLE_THRESHOLDS.energyRested;
 const HAY_X = 88;
 const HAY_Y = 88;
 const WATER_X_OFFSET = 90;
@@ -307,36 +309,21 @@ function updatePigs(state: GameState, deltaSeconds: number): void {
   for (const pig of state.pigs) {
     updatePigNeeds(pig, deltaSeconds);
     updatePigEcology(state, pig, deltaSeconds);
-    updatePigGoal(state, pig);
+    updatePigGoal(state, pig, deltaSeconds);
     pig.mood = getPigMood(state, pig);
 
-    const dx = pig.targetX - pig.x;
-    const dy = pig.targetY - pig.y;
-    const distance = Math.hypot(dx, dy);
-
-    if (pig.goal === "sleep" && distance < 8) {
+    if (pig.goal === "playWithPig") {
+      updateSocialPlayingPig(state, pig, deltaSeconds);
+    } else if (pig.goal === "sleep" && isNearTarget(pig, PIG_LIFECYCLE_THRESHOLDS.sleepDistance)) {
       updateSleepingPig(state, pig, deltaSeconds);
-    } else if (pig.goal === "eat" && distance < 10) {
+    } else if (pig.goal === "eat" && isNearHay(pig)) {
       updateEatingPig(state, pig, deltaSeconds);
-    } else if (pig.goal === "drink" && distance < 10) {
+    } else if (pig.goal === "drink" && isNearWater(state, pig)) {
       updateDrinkingPig(state, pig, deltaSeconds);
-    } else if (distance < 6) {
-      chooseTarget(state, pig);
+    } else if (pig.goal === "playWithFurniture" && isNearTarget(pig, PIG_LIFECYCLE_THRESHOLDS.playDistance)) {
+      updateFurniturePlayingPig(state, pig, deltaSeconds);
     } else {
-      const eventSpeed =
-        state.event.active?.id === "zoomies"
-          ? hasFurnitureSynergy(state, "zoomiePlayground")
-            ? 2.15
-            : 2
-          : state.abilities.zoomieMode > 0
-            ? 1.8
-            : 1;
-      const tunnelSpeed = state.furniture.tunnel ? 1.1 : 1;
-      const goalSpeed = pig.goal === "sleep" ? 0.72 : pig.goal === "eat" || pig.goal === "drink" ? 1.08 : 1;
-      const speedMultiplier = (pig.mood === "content" ? 1 : pig.mood === "messy" ? 0.82 : 0.9) * eventSpeed * tunnelSpeed * goalSpeed;
-      const travel = Math.min(distance, pig.speed * speedMultiplier * deltaSeconds);
-      pig.x += (dx / distance) * travel;
-      pig.y += (dy / distance) * travel;
+      movePigTowardTarget(state, pig, deltaSeconds);
     }
 
     pig.poopTimer -= deltaSeconds;
@@ -344,6 +331,39 @@ function updatePigs(state: GameState, deltaSeconds: number): void {
       spawnPoop(state, pig);
     }
   }
+}
+
+function movePigTowardTarget(state: GameState, pig: Pig, deltaSeconds: number): void {
+  const dx = pig.targetX - pig.x;
+  const dy = pig.targetY - pig.y;
+  const distance = Math.hypot(dx, dy);
+
+  if (distance < 6) {
+    chooseTarget(state, pig);
+    return;
+  }
+
+  const eventSpeed =
+    state.event.active?.id === "zoomies"
+      ? hasFurnitureSynergy(state, "zoomiePlayground")
+        ? 2.15
+        : 2
+      : state.abilities.zoomieMode > 0
+        ? 1.8
+        : 1;
+  const tunnelSpeed = state.furniture.tunnel ? 1.1 : 1;
+  const goalSpeed =
+    pig.goal === "sleep" || pig.goal === "seekSleep"
+      ? 0.72
+      : isFoodGoal(pig.goal) || isWaterGoal(pig.goal)
+        ? 1.08
+        : isPlayGoal(pig.goal)
+          ? 1.12
+          : 1;
+  const speedMultiplier = (pig.mood === "content" ? 1 : pig.mood === "messy" ? 0.82 : 0.9) * eventSpeed * tunnelSpeed * goalSpeed;
+  const travel = Math.min(distance, pig.speed * speedMultiplier * deltaSeconds);
+  pig.x += (dx / distance) * travel;
+  pig.y += (dy / distance) * travel;
 }
 
 function updatePigNeeds(pig: Pig, deltaSeconds: number): void {
@@ -355,27 +375,209 @@ function updatePigNeeds(pig: Pig, deltaSeconds: number): void {
   if (pig.goal !== "sleep") pig.energy = clampNeed(pig.energy - energyDrain);
 }
 
-function updatePigGoal(state: GameState, pig: Pig): void {
-  if (pig.goal === "eat" && (pig.hunger < NEED_SATISFIED_THRESHOLD || state.needs.hay <= 0)) return;
-  if (pig.goal === "drink" && (pig.thirst < NEED_SATISFIED_THRESHOLD || state.needs.water <= 0 || state.event.bottleJammed)) return;
-  if (pig.goal === "sleep" && pig.energy < ENERGY_RESTED_THRESHOLD) return;
-
-  if (pig.hunger <= HUNGER_GOAL_THRESHOLD && state.needs.hay > 0) {
-    setPigGoal(state, pig, "eat");
+function updatePigGoal(state: GameState, pig: Pig, deltaSeconds: number): void {
+  if (pig.goal === "eat") {
+    if (pig.hunger >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
+    else if (!isNearHay(pig) || state.needs.hay <= 0) setPigGoal(state, pig, "seekFood");
     return;
   }
 
-  if (pig.thirst <= THIRST_GOAL_THRESHOLD && state.needs.water > 0 && !state.event.bottleJammed) {
-    setPigGoal(state, pig, "drink");
+  if (pig.goal === "seekFood") {
+    if (pig.hunger >= NEED_SATISFIED_THRESHOLD) returnToRoam(state, pig);
+    else if (isNearHay(pig) && state.needs.hay > 0) setPigGoal(state, pig, "eat");
     return;
   }
 
-  if (pig.energy <= ENERGY_GOAL_THRESHOLD) {
-    setPigGoal(state, pig, "sleep");
+  if (pig.goal === "drink") {
+    if (pig.thirst >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
+    else if (!isNearWater(state, pig) || state.needs.water <= 0 || state.event.bottleJammed) setPigGoal(state, pig, "seekWater");
     return;
   }
 
-  if (pig.goal !== "roam") setPigGoal(state, pig, "roam");
+  if (pig.goal === "seekWater") {
+    if (pig.thirst >= NEED_SATISFIED_THRESHOLD) returnToRoam(state, pig);
+    else if (isNearWater(state, pig) && state.needs.water > 0 && !state.event.bottleJammed) setPigGoal(state, pig, "drink");
+    return;
+  }
+
+  if (pig.goal === "sleep") {
+    if (pig.energy >= ENERGY_RESTED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
+    else if (!isNearTarget(pig, PIG_LIFECYCLE_THRESHOLDS.sleepDistance)) setPigGoal(state, pig, "seekSleep");
+    return;
+  }
+
+  if (pig.goal === "seekSleep") {
+    if (pig.energy >= ENERGY_RESTED_THRESHOLD) returnToRoam(state, pig);
+    else if (isNearTarget(pig, PIG_LIFECYCLE_THRESHOLDS.sleepDistance)) setPigGoal(state, pig, "sleep");
+    return;
+  }
+
+  if (pig.goal === "seekPlay") {
+    updateSeekingPlayPig(state, pig, deltaSeconds);
+    return;
+  }
+
+  if (pig.goal === "playWithPig" || pig.goal === "playWithFurniture") return;
+
+  pig.goalTimer = Math.max(0, pig.goalTimer - deltaSeconds);
+  if (pig.goalTimer > 0) return;
+
+  chooseWeightedPigActivity(state, pig);
+}
+
+type PigActivity = "roam" | "food" | "water" | "sleep" | "play";
+
+function chooseWeightedPigActivity(state: GameState, pig: Pig): void {
+  const urgentActivity = getUrgentActivity(pig);
+  if (urgentActivity) {
+    startPigActivity(state, pig, urgentActivity);
+    return;
+  }
+
+  const activity = pickWeighted<PigActivity>([
+    { id: "roam", weight: PIG_ACTIVITY_WEIGHTS.roam },
+    { id: "food", weight: getFoodActivityWeight(pig) },
+    { id: "water", weight: getWaterActivityWeight(pig) },
+    { id: "sleep", weight: getSleepActivityWeight(pig) },
+    { id: "play", weight: getPlayActivityWeight(state, pig) },
+  ]);
+  startPigActivity(state, pig, activity);
+}
+
+function getUrgentActivity(pig: Pig): PigActivity | null {
+  const hungry = pig.hunger <= HUNGER_GOAL_THRESHOLD;
+  const thirsty = pig.thirst <= THIRST_GOAL_THRESHOLD;
+  if (hungry && thirsty) return pig.thirst <= pig.hunger ? "water" : "food";
+  if (thirsty) return "water";
+  if (hungry) return "food";
+  if (pig.energy <= ENERGY_GOAL_THRESHOLD) return "sleep";
+  return null;
+}
+
+function startPigActivity(state: GameState, pig: Pig, activity: PigActivity): void {
+  if (activity === "food") {
+    if (pig.hunger >= NEED_SATISFIED_THRESHOLD) returnToRoam(state, pig);
+    else setPigGoal(state, pig, "seekFood");
+    return;
+  }
+
+  if (activity === "water") {
+    if (pig.thirst >= NEED_SATISFIED_THRESHOLD) returnToRoam(state, pig);
+    else setPigGoal(state, pig, "seekWater");
+    return;
+  }
+
+  if (activity === "sleep") {
+    if (pig.energy >= ENERGY_RESTED_THRESHOLD) returnToRoam(state, pig);
+    else setPigGoal(state, pig, "seekSleep");
+    return;
+  }
+
+  if (activity === "play") {
+    setPigGoal(state, pig, "seekPlay");
+    pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.playSearchDuration;
+    return;
+  }
+
+  returnToRoam(state, pig);
+}
+
+function returnToRoam(state: GameState, pig: Pig): void {
+  setPigGoal(state, pig, "roam");
+  pig.goalTimer = randomBetween(PIG_LIFECYCLE_THRESHOLDS.roamDecisionMin, PIG_LIFECYCLE_THRESHOLDS.roamDecisionMax);
+}
+
+function getFoodActivityWeight(pig: Pig): number {
+  const desire = getNeedDesireWeight(
+    pig.hunger,
+    PIG_LIFECYCLE_THRESHOLDS.hungerDesire,
+    HUNGER_GOAL_THRESHOLD,
+    4.2,
+  );
+  const traitMultiplier = pig.trait === "Hay Goblin" ? 2.2 : pig.trait === "Chonker" ? 1.25 : 1;
+  return (PIG_ACTIVITY_WEIGHTS.food + desire) * traitMultiplier;
+}
+
+function getWaterActivityWeight(pig: Pig): number {
+  const desire = getNeedDesireWeight(
+    pig.thirst,
+    PIG_LIFECYCLE_THRESHOLDS.thirstDesire,
+    THIRST_GOAL_THRESHOLD,
+    4.4,
+  );
+  const traitMultiplier = pig.trait === "Drama Pig" ? 2.2 : 1;
+  return (PIG_ACTIVITY_WEIGHTS.water + desire) * traitMultiplier;
+}
+
+function getSleepActivityWeight(pig: Pig): number {
+  const desire = getNeedDesireWeight(
+    pig.energy,
+    PIG_LIFECYCLE_THRESHOLDS.energyDesire,
+    ENERGY_GOAL_THRESHOLD,
+    3.5,
+  );
+  const traitMultiplier = pig.trait === "Shy Beaner" ? 1.8 : pig.trait === "Zoomer" ? 0.82 : 1;
+  return (PIG_ACTIVITY_WEIGHTS.sleep + desire) * traitMultiplier;
+}
+
+function getPlayActivityWeight(state: GameState, pig: Pig): number {
+  const enrichmentNeed = Math.max(0, 42 - state.cage.enrichment) * 0.035;
+  const socialNeed = Math.max(0, 38 - state.cage.socialization) * 0.03;
+  const zoomieMultiplier =
+    state.event.active?.id === "zoomies" || state.event.active?.id === "zoomieTraffic" || state.abilities.zoomieMode > 0 ? 1.75 : 1;
+  const traitMultiplier = pig.trait === "Zoomer" ? 1.8 : pig.trait === "Shy Beaner" ? 0.86 : 1;
+  return (PIG_ACTIVITY_WEIGHTS.play + enrichmentNeed + socialNeed) * zoomieMultiplier * traitMultiplier;
+}
+
+function getNeedDesireWeight(value: number, desireStart: number, urgentThreshold: number, scale: number): number {
+  if (value >= desireStart) return 0;
+  const range = Math.max(1, desireStart - urgentThreshold);
+  return ((desireStart - value) / range) * scale;
+}
+
+function updateSeekingPlayPig(state: GameState, pig: Pig, deltaSeconds: number): void {
+  const partner = getNearbyPlayPartner(state, pig);
+  if (partner) {
+    startSocialPlay(state, pig, partner);
+    return;
+  }
+
+  pig.goalTimer -= deltaSeconds;
+  if (pig.goalTimer <= 0) {
+    setPigGoal(state, pig, "playWithFurniture");
+    pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.furniturePlayDuration;
+  }
+}
+
+function getNearbyPlayPartner(state: GameState, pig: Pig): Pig | null {
+  return (
+    state.pigs.find(
+      (candidate) =>
+        candidate.id !== pig.id &&
+        candidate.goal === "seekPlay" &&
+        Math.hypot(candidate.x - pig.x, candidate.y - pig.y) <= PIG_LIFECYCLE_THRESHOLDS.playPartnerDistance,
+    ) ?? null
+  );
+}
+
+function startSocialPlay(state: GameState, pig: Pig, partner: Pig): void {
+  setPigGoal(state, pig, "playWithPig");
+  setPigGoal(state, partner, "playWithPig");
+  pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.socialPlayDuration;
+  partner.goalTimer = PIG_LIFECYCLE_THRESHOLDS.socialPlayDuration;
+}
+
+function updateSocialPlayingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
+  pig.goalTimer -= deltaSeconds;
+  pig.stress = clampNeed(pig.stress - 2.4 * deltaSeconds);
+  if (pig.goalTimer <= 0) returnToRoam(state, pig);
+}
+
+function updateFurniturePlayingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
+  if (pig.goalTimer <= 0) pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.furniturePlayDuration;
+  pig.goalTimer -= deltaSeconds;
+  pig.stress = clampNeed(pig.stress - 1.6 * deltaSeconds);
+  if (pig.goalTimer <= 0) returnToRoam(state, pig);
 }
 
 function updateEatingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
@@ -385,7 +587,7 @@ function updateEatingPig(state: GameState, pig: Pig, deltaSeconds: number): void
   state.needs.hay = Math.max(0, state.needs.hay - intake);
   pig.hunger = clampNeed(pig.hunger + intake * (pig.trait === "Hay Goblin" ? 15 : 18));
   pig.goalTimer -= deltaSeconds;
-  if (pig.hunger >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) setPigGoal(state, pig, "roam");
+  if (pig.hunger >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
 }
 
 function updateDrinkingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
@@ -395,7 +597,7 @@ function updateDrinkingPig(state: GameState, pig: Pig, deltaSeconds: number): vo
   state.needs.water = Math.max(0, state.needs.water - intake);
   pig.thirst = clampNeed(pig.thirst + intake * 20);
   pig.goalTimer -= deltaSeconds;
-  if (pig.thirst >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) setPigGoal(state, pig, "roam");
+  if (pig.thirst >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
 }
 
 function updateSleepingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
@@ -403,7 +605,31 @@ function updateSleepingPig(state: GameState, pig: Pig, deltaSeconds: number): vo
   const restRate = (state.furniture.snuggleSack ? 18 : state.furniture.hideyHouse ? 15 : 13) * deltaSeconds;
   pig.energy = clampNeed(pig.energy + restRate);
   pig.goalTimer -= deltaSeconds;
-  if (pig.energy >= ENERGY_RESTED_THRESHOLD && pig.goalTimer <= 0) setPigGoal(state, pig, "roam");
+  if (pig.energy >= ENERGY_RESTED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
+}
+
+function isFoodGoal(goal: PigGoal): boolean {
+  return goal === "seekFood" || goal === "eat";
+}
+
+function isWaterGoal(goal: PigGoal): boolean {
+  return goal === "seekWater" || goal === "drink";
+}
+
+function isPlayGoal(goal: PigGoal): boolean {
+  return goal === "seekPlay" || goal === "playWithPig" || goal === "playWithFurniture";
+}
+
+function isNearHay(pig: Pig): boolean {
+  return Math.hypot(pig.x - HAY_X, pig.y - HAY_Y) <= PIG_LIFECYCLE_THRESHOLDS.eatDistance;
+}
+
+function isNearWater(state: GameState, pig: Pig): boolean {
+  return Math.hypot(pig.x - (state.cage.width - WATER_X_OFFSET), pig.y - WATER_Y) <= PIG_LIFECYCLE_THRESHOLDS.drinkDistance;
+}
+
+function isNearTarget(pig: Pig, distance: number): boolean {
+  return Math.hypot(pig.targetX - pig.x, pig.targetY - pig.y) <= distance;
 }
 
 function updatePoops(state: GameState, deltaSeconds: number): void {
@@ -624,8 +850,8 @@ function getPigMood(state: GameState, pig: Pig): PigMood {
   if (pig.stress >= 72) return "messy";
   if (state.cage.happiness < 35) return "messy";
   if (state.cage.cleanliness < 35) return "messy";
-  if (pig.hunger <= HUNGER_GOAL_THRESHOLD || (pig.goal === "eat" && state.needs.hay <= 0)) return "hungry";
-  if (pig.thirst <= THIRST_GOAL_THRESHOLD || (pig.goal === "drink" && (state.needs.water <= 0 || state.event.bottleJammed))) return "thirsty";
+  if (pig.hunger <= HUNGER_GOAL_THRESHOLD || (isFoodGoal(pig.goal) && state.needs.hay <= 0)) return "hungry";
+  if (pig.thirst <= THIRST_GOAL_THRESHOLD || (isWaterGoal(pig.goal) && (state.needs.water <= 0 || state.event.bottleJammed))) return "thirsty";
   if (state.cage.space < 55) return "messy";
   return "content";
 }

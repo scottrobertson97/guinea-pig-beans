@@ -1,5 +1,15 @@
 export type PigMood = "content" | "hungry" | "thirsty" | "messy";
-export type PigGoal = "roam" | "eat" | "drink" | "sleep";
+export type PigGoal =
+  | "roam"
+  | "seekFood"
+  | "eat"
+  | "seekWater"
+  | "drink"
+  | "seekSleep"
+  | "sleep"
+  | "seekPlay"
+  | "playWithPig"
+  | "playWithFurniture";
 export type PigBreed =
   | "American"
   | "Abyssinian"

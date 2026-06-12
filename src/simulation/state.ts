@@ -7,7 +7,7 @@ import {
   hasWisdomSpecialization,
   MAX_LOG_ITEMS,
 } from "./balance";
-import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, isPigComfortableInFavoriteZone } from "./ecology";
+import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, getZoneTarget, isPigComfortableInFavoriteZone } from "./ecology";
 import { createInitialFurnitureCareState } from "./furnitureCare";
 import { getFurnitureDefinition, getFurnitureName } from "./furnitureDefinitions";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
@@ -306,18 +306,36 @@ function createPig(state: GameState, legendary: boolean): Pig {
 }
 
 export function chooseTarget(state: GameState, pig: Pig): void {
-  if (pig.goal === "eat") {
+  if (pig.goal === "seekFood" || pig.goal === "eat") {
     targetNearFurniture(state, pig, "hayRack", 88, 88, 34);
     return;
   }
 
-  if (pig.goal === "drink") {
+  if (pig.goal === "seekWater" || pig.goal === "drink") {
     targetNearFurniture(state, pig, "waterBottle", state.cage.width - 90, 82, 30);
     return;
   }
 
-  if (pig.goal === "sleep") {
+  if (pig.goal === "seekSleep" || pig.goal === "sleep") {
     targetSleepSpot(state, pig);
+    return;
+  }
+
+  if (pig.goal === "seekPlay") {
+    const target = getZoneTarget(state, "playRun", 48);
+    pig.targetX = target.x;
+    pig.targetY = target.y;
+    return;
+  }
+
+  if (pig.goal === "playWithFurniture") {
+    targetPlayFurnitureSpot(state, pig);
+    return;
+  }
+
+  if (pig.goal === "playWithPig") {
+    pig.targetX = pig.x;
+    pig.targetY = pig.y;
     return;
   }
 
@@ -529,6 +547,27 @@ function targetSleepSpot(state: GameState, pig: Pig): void {
 
   pig.targetX = randomBetween(CAGE_PADDING + 24, state.cage.width - CAGE_PADDING - 24);
   pig.targetY = randomBetween(CAGE_PADDING + 24, state.cage.height - CAGE_PADDING - 24);
+}
+
+function targetPlayFurnitureSpot(state: GameState, pig: Pig): void {
+  if (state.furniture.chewToy) {
+    targetNearFurniture(state, pig, "chewToy", state.cage.width * 0.52, state.cage.height * 0.5, 34);
+    return;
+  }
+
+  if (state.furniture.tunnel) {
+    targetNearFurniture(state, pig, "tunnel", state.cage.width * 0.33, state.cage.height * 0.52, 42);
+    return;
+  }
+
+  if (state.furniture.cardboardCastle) {
+    targetNearFurniture(state, pig, "cardboardCastle", state.cage.width * 0.22, state.cage.height * 0.28, 46);
+    return;
+  }
+
+  const target = getZoneTarget(state, "playRun", 54);
+  pig.targetX = target.x;
+  pig.targetY = target.y;
 }
 
 function getStartingSpeed(breed: PigBreed, trait: PigTrait): number {

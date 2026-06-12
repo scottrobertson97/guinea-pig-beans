@@ -167,7 +167,18 @@ function hydratePigLifeState(pig: Pig, index: number): Pig {
 }
 
 function normalizePigGoal(value: unknown): PigGoal {
-  return value === "eat" || value === "drink" || value === "sleep" || value === "roam" ? value : "roam";
+  return value === "seekFood" ||
+    value === "eat" ||
+    value === "seekWater" ||
+    value === "drink" ||
+    value === "seekSleep" ||
+    value === "sleep" ||
+    value === "seekPlay" ||
+    value === "playWithPig" ||
+    value === "playWithFurniture" ||
+    value === "roam"
+    ? value
+    : "roam";
 }
 
 function normalizeAutomationDirective(value: unknown): GameState["automation"]["directive"] {

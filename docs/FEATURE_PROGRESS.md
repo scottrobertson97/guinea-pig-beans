@@ -17,6 +17,7 @@
 - Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger with three response choices each.
 - Pig requests: one pig at a time can ask for a short-lived favor tied to care, cleanup, abilities, furniture, combo, or Compost.
 - Pig social mechanics: bonded pairs are assigned as pigs join, and herd size contributes socialization.
+- Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode are available with cooldowns.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
 - Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds a branching Wisdom tree.
@@ -108,6 +109,7 @@
 - Fixed cage zones now create ecology pressure: dirty, crowded, or uncomfortable zones can stress pigs and surface habitat actions in the Furniture modal.
 - Pig favorite zones and stress make individual pigs respond differently to the same cage state; comfortable favorite zones slightly improve output, while stress slows production and raises messy outcomes.
 - Ecology incidents such as Litter Revolt, Hidey Squabble, and Zoomie Traffic reuse the event response UI with zone-specific tradeoffs.
+- Pig lifecycle choices now distinguish seeking from acting: hungry or thirsty pigs travel to the hay rack or water bottle before consuming, while play-seeking pigs look for a partner before falling back to play furniture or the Play Run.
 
 ## Systems Backlog Tickets
 

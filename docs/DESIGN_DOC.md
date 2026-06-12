@@ -311,9 +311,9 @@ Each pig tracks:
 - Thirst.
 - Energy.
 
-These needs drain over time. Pigs make decisions based on the weakest needs.
+These needs drain over time. Pigs normally choose activities through weighted behavior priorities, but urgent hunger and thirst override the weighted roll so care needs stay readable.
 
-Current goal thresholds:
+Current urgent thresholds:
 
 - Hunger at 38% or lower can trigger Eating if hay is available.
 - Thirst at 35% or lower can trigger Drinking if water is available and the bottle is not jammed.
@@ -329,16 +329,41 @@ Current satisfaction thresholds:
 Current goals:
 
 - Roam
+- Seek Food
 - Eat
+- Seek Water
 - Drink
+- Seek Sleep
 - Sleep
+- Seek Play
+- Play With Pig
+- Play With Furniture
 
-Pigs normally roam to target points. When a need crosses a threshold, the pig chooses a goal and moves toward the relevant area:
+Pigs normally roam to target points. When a pig is ready for a new activity, it rolls against code-controlled behavior weights for roaming, food, water, sleep, and play. Traits and current cage context modify those weights:
 
-- Eating targets the hay rack.
-- Drinking targets the water bottle.
-- Sleeping targets the Snuggle Sack or Hidey House when available, otherwise a normal cage spot.
-- Roaming can be biased by traits and furniture.
+- Hay Goblins lean toward food.
+- Drama Pigs lean toward water.
+- Zoomers lean toward play.
+- Shy Beaners lean toward rest.
+- Low enrichment or socialization makes play more likely.
+- Zoomies and Zoomie Mode make play more likely.
+
+Food and water are split into seeking and consuming:
+
+- Seeking Food targets the hay rack and stays active until the pig reaches the rack.
+- Eating starts only once the pig is near the hay rack and hay is available.
+- Seeking Water targets the water bottle and stays active until the pig reaches the bottle.
+- Drinking starts only once the pig is near the bottle, water is available, and the bottle is not jammed.
+- Empty hay, empty water, or a jammed bottle keeps the pig waiting near the relevant care object instead of consuming from across the cage.
+
+Sleep and play also use a seek-then-act pattern:
+
+- Seeking Sleep targets the Snuggle Sack or Hidey House when available, otherwise a normal cage spot.
+- Sleeping starts once the pig reaches the chosen rest spot.
+- Seeking Play sends pigs toward the Play Run.
+- Two nearby pigs that are both seeking play can play together.
+- If a pig does not find a play partner, it plays with Chew Toy, Tunnel, or Cardboard Castle when available, otherwise it plays in the Play Run.
+- Play lightly relieves stress and uses existing zone traffic/furniture systems through the pig's physical location.
 
 After satisfying a goal, the pig returns to roaming.
 

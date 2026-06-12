@@ -1941,9 +1941,15 @@ function getStatusLine(
 }
 
 function getPigGoalLabel(pig: Pig): string {
-  if (pig.goal === "eat") return "Eating";
+  if (pig.goal === "seekFood") return "Seeking hay";
+  if (pig.goal === "eat") return "Nibbling hay";
+  if (pig.goal === "seekWater") return "Seeking water";
   if (pig.goal === "drink") return "Drinking";
+  if (pig.goal === "seekSleep") return "Seeking a nap spot";
   if (pig.goal === "sleep") return "Sleeping";
+  if (pig.goal === "seekPlay") return "Looking for play";
+  if (pig.goal === "playWithPig") return "Playing together";
+  if (pig.goal === "playWithFurniture") return "Playing with furniture";
   return "Roaming";
 }
 

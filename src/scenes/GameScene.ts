@@ -374,7 +374,14 @@ export class GameScene extends Phaser.Scene {
 
       const dx = pig.targetX - pig.x;
       view.setPosition(pig.x, pig.y);
-      view.setRotation(pig.goal === "sleep" ? Math.sin(this.time.now / 480 + pig.id) * 0.015 : Math.sin(this.time.now / 220 + pig.id) * 0.035);
+      const activePlay = pig.goal === "playWithPig" || pig.goal === "playWithFurniture";
+      view.setRotation(
+        pig.goal === "sleep"
+          ? Math.sin(this.time.now / 480 + pig.id) * 0.015
+          : activePlay
+            ? Math.sin(this.time.now / 110 + pig.id) * 0.065
+            : Math.sin(this.time.now / 220 + pig.id) * 0.035,
+      );
       view.setScale(dx < 0 ? -1 : 1, 1);
       this.applyPigMood(view, pig);
       this.maybeShowPigThought(pig);
@@ -581,6 +588,9 @@ export class GameScene extends Phaser.Scene {
       displayWidth *= 1.08;
       displayHeight *= 0.9;
       sprite.setAlpha(Math.min(sprite.alpha, 0.88));
+    } else if (pig.goal === "playWithPig" || pig.goal === "playWithFurniture") {
+      displayWidth *= 1.06 + Math.abs(idleWiggle) * 1.8;
+      displayHeight *= 0.96 + Math.abs(idleWiggle);
     } else if (nearHay && this.state.needs.hay > 0) {
       displayWidth *= 1.04 + idleWiggle;
       displayHeight *= 0.98 - idleWiggle;

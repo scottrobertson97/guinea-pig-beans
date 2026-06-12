@@ -17,6 +17,33 @@ export const SINGULARITY_RECIPE_RARE_CLEANED = 25;
 export const SINGULARITY_RECIPE_CURSED_CLEANED = 1;
 export const SINGULARITY_EXPERIMENT_COMPOST_COST = 35;
 export const SINGULARITY_EXPERIMENT_SQUEAK_COST = 4;
+export const PIG_ACTIVITY_WEIGHTS = {
+  roam: 5,
+  play: 2.25,
+  food: 1,
+  water: 1,
+  sleep: 1.25,
+} as const;
+export const PIG_LIFECYCLE_THRESHOLDS = {
+  hungerDesire: 70,
+  thirstDesire: 70,
+  energyDesire: 60,
+  hungerUrgent: 38,
+  thirstUrgent: 35,
+  energyUrgent: 28,
+  needSatisfied: 86,
+  energyRested: 88,
+  roamDecisionMin: 2.6,
+  roamDecisionMax: 5.4,
+  playSearchDuration: 7,
+  socialPlayDuration: 3.4,
+  furniturePlayDuration: 3.8,
+  playPartnerDistance: 56,
+  eatDistance: 42,
+  drinkDistance: 38,
+  sleepDistance: 8,
+  playDistance: 14,
+} as const;
 const FURNITURE_SPACE_COSTS: Record<FurnitureId, number> = {
   hideyHouse: 2,
   tunnel: 2,

@@ -6,9 +6,15 @@ import type { SceneFeedbackDetail } from "../ui/events";
 export function getPigThoughtText(pig: Pig, state: GameState): string {
   if (pig.stress >= 72) return "Too much";
   if (pig.stress >= 48) return "Uneasy";
+  if (pig.goal === "seekFood") return "Hay?";
   if (pig.goal === "sleep") return "Zzz";
-  if (pig.goal === "eat") return state.needs.hay > 0 ? "Hay?" : "Hay!";
+  if (pig.goal === "seekSleep") return "Nap?";
+  if (pig.goal === "eat") return state.needs.hay > 0 ? "Nibble" : "Hay!";
+  if (pig.goal === "seekWater") return state.event.bottleJammed ? "Stuck?" : "Bottle?";
   if (pig.goal === "drink") return state.needs.water > 0 && !state.event.bottleJammed ? "Sip" : "H2O";
+  if (pig.goal === "seekPlay") return "Play?";
+  if (pig.goal === "playWithPig") return "Together";
+  if (pig.goal === "playWithFurniture") return "Toy!";
   if (isPigComfortableInFavoriteZone(state, pig)) return "Cozy";
   if (pig.goal === "roam" && Math.min(pig.hunger, pig.thirst, pig.energy) > 55) return "Roam";
   if (state.needs.hay < 25 || pig.mood === "hungry") return "Hay?";
