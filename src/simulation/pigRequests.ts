@@ -1,6 +1,8 @@
 import { addLog } from "./state";
+import { advanceContractProgress } from "./contracts";
 import { getCageZoneName, getPigZoneId, getZoneMetrics } from "./ecology";
 import type { GameState, Pig, PigRequestId, PigRequestProgressKind } from "./types";
+import { awardBeans, pickWeighted, randomBetween } from "./utils";
 
 export interface PigRequestView {
   pigName: string;
@@ -102,6 +104,7 @@ function completePigRequest(state: GameState): void {
 
   const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
   applyReward(state, active);
+  advanceContractProgress(state, "pigRequest", 1);
   requestState.completed += 1;
   requestState.lastResult = {
     pigId: active.pigId,
@@ -373,23 +376,4 @@ function ensurePigRequestState(state: GameState): GameState["pigRequest"] {
 
 function hasLockedFurniture(state: GameState): boolean {
   return Object.values(state.furniture).some((unlocked) => !unlocked);
-}
-
-function awardBeans(state: GameState, amount: number): void {
-  state.beans += amount;
-  state.stats.lifetimeBeans += amount;
-}
-
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
-function pickWeighted<T>(items: Array<{ id: T; weight: number }>): T {
-  const total = items.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
-  let roll = Math.random() * total;
-  for (const item of items) {
-    roll -= Math.max(0, item.weight);
-    if (roll <= 0) return item.id;
-  }
-  return items[items.length - 1].id;
 }

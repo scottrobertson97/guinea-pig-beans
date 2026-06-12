@@ -1,11 +1,23 @@
 import { cleanPoopsInRadius } from "./actions";
-import { CAGE_PADDING, getPigCapacity, getTotalWisdom, hasFurnitureSynergy } from "./balance";
+import {
+  CAGE_PADDING,
+  getCageDimensions,
+  getPigCapacity,
+  getTotalWisdom,
+  hasCavyCouncilEffect,
+  hasFurnitureSynergy,
+  hasSingularityExperimentEffect,
+  hasSqueakChoirEffect,
+  hasWisdomSpecialization,
+} from "./balance";
+import { advanceContractProgress, updateContracts } from "./contracts";
 import { getPoopZoneId, getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
 import { getFurnitureAutomationMultiplier, getFurnitureStatBonus, updateFurnitureCare } from "./furnitureCare";
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
 import type { AutomationDirectiveId, GameState, Pig, PigMood, Poop, Robot } from "./types";
+import { clamp, pickWeighted, randomBetween } from "./utils";
 
 const DEATH_CHECK_INTERVAL = 12;
 const MAX_DEATH_CHANCE_PER_CHECK = 0.35;
@@ -18,6 +30,7 @@ const HAY_X = 88;
 const HAY_Y = 88;
 const WATER_X_OFFSET = 90;
 const WATER_Y = 82;
+const BASE_CLEANLINESS_AREA = getCageDimensions(0).width * getCageDimensions(0).height;
 
 export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateCombo(state, deltaSeconds);
@@ -31,7 +44,6 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updatePigRequests(state, deltaSeconds);
   refreshEcology(state);
   updateHappiness(state);
-  updateObjective(state, deltaSeconds);
   updateNeeds(state, deltaSeconds);
   updateSurvival(state, deltaSeconds);
   updatePigs(state, deltaSeconds);
@@ -41,6 +53,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateRobot(state, deltaSeconds);
   updateCleanliness(state);
   updateHeldPigRequestProgress(state);
+  updateContracts(state, deltaSeconds);
   refreshEcology(state);
   updateMilestones(state);
 }
@@ -96,7 +109,7 @@ function startRandomEvent(state: GameState): void {
     { event: { id: "hideySquabble", name: "Hidey Squabble", timer: 18 }, weight: hideyZone.traffic > 62 || state.ecology.averageStress > 42 ? 2.1 : 0.35 },
     { event: { id: "zoomieTraffic", name: "Zoomie Traffic", timer: 16 }, weight: playZone.traffic > 62 || hasFurnitureSynergy(state, "zoomiePlayground") ? 1.8 : 0.4 },
   ];
-  const event = pickWeighted(events);
+  const event = pickWeighted(events, "event");
   const timerBonus = event.id === "zoomies" && hasFurnitureSynergy(state, "zoomiePlayground") ? 4 : 0;
   state.event.active = { ...event, timer: event.timer + timerBonus };
   state.event.responseReady = true;
@@ -112,6 +125,7 @@ function startRandomEvent(state: GameState): void {
 
 function updateDerivedCageStats(state: GameState): void {
   const pigCapacity = getPigCapacity(state);
+  const councilSeated = hasCavyCouncilEffect(state);
   const supportScore =
     Number(state.furniture.hideyHouse) * 2 +
     Number(state.furniture.tunnel) +
@@ -119,12 +133,12 @@ function updateDerivedCageStats(state: GameState): void {
     Number(state.furniture.cardboardCastle) * 2 +
     (state.recipes.royalAccord ? 2 : 0);
   const unsupportedPigs = Math.max(0, state.pigs.length - 2 - supportScore);
-  const unsupportedPenalty = Math.max(0, unsupportedPigs * 9 - (state.lateGame.cavyCouncil ? 4 : 0));
+  const unsupportedPenalty = Math.max(0, unsupportedPigs * 9 - (councilSeated ? 4 : 0));
   const bondedPigCount = state.pigs.filter((pig) => pig.bondedPigId !== null).length;
   const bondBonus =
     bondedPigCount * (2 + (state.wisdom.socialMemory ? 1 : 0)) +
     (state.wisdom.bondedBeginnings && bondedPigCount > 0 ? 4 : 0);
-  const councilSocialBonus = state.lateGame.cavyCouncil ? 12 : 0;
+  const councilSocialBonus = councilSeated ? 12 : 0;
   state.cage.enrichment =
     Number(state.furniture.chewToy) * 22 +
     Number(state.furniture.snuggleSack) * 24 +
@@ -174,7 +188,7 @@ function updateHappiness(state: GameState): void {
   const dramaPenalty =
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
   const lonePigPenalty = state.pigs.length === 1 ? 14 : 0;
-  const councilHappinessBonus = state.lateGame.cavyCouncil && state.pigs.length >= 8 ? 5 : 0;
+  const councilHappinessBonus = hasCavyCouncilEffect(state) ? 5 : 0;
   const ecologyStressPenalty = Math.min(16, state.ecology.averageStress * 0.18);
   const ecologyComfortBonus = state.ecology.zones.some((zone) => zone.appeal >= 80 && zone.pigIds.length > 0) ? 4 : 0;
   state.cage.happiness = Math.max(
@@ -268,53 +282,6 @@ function getPigDeathLogMessage(pig: Pig, cause: DeathCause): string {
   return `${pig.name} died after the herd stayed deeply unhappy.`;
 }
 
-function updateObjective(state: GameState, deltaSeconds: number): void {
-  const objective = state.objective;
-  objective.timer -= deltaSeconds;
-
-  if (objective.id === "keepClean" && state.cage.cleanliness >= 80) {
-    objective.progress = Math.min(objective.target, objective.progress + deltaSeconds);
-  }
-  if (objective.id === "herdHarmony" && state.pigs.length >= 3 && state.cage.happiness >= 78 && state.cage.space >= 65) {
-    objective.progress = Math.min(objective.target, objective.progress + deltaSeconds);
-  }
-  if (objective.id === "collectRare") objective.progress = Math.min(objective.target, state.stats.rarePoopsCleaned);
-  if (objective.id === "earnBeans") objective.progress = Math.min(objective.target, Math.floor(state.beans));
-  if (objective.id === "fuelAutomation") objective.progress = Math.min(objective.target, state.automation.overdrive > 0 ? 1 : 0);
-  if (objective.id === "unlockRecipe") objective.progress = Math.min(objective.target, state.stats.recipesUnlocked);
-
-  if (objective.progress >= objective.target) {
-    const reward = 8 + state.stats.objectivesCompleted * 3;
-    state.beans += reward;
-    state.stats.lifetimeBeans += reward;
-    state.stats.objectivesCompleted += 1;
-    addLog(state, `Objective complete: ${objective.title}. +${reward} Beans.`);
-    state.objective = createNextObjective(state);
-    return;
-  }
-
-  if (objective.timer <= 0) {
-    addLog(state, `Objective expired: ${objective.title}.`);
-    state.objective = createNextObjective(state);
-  }
-}
-
-function createNextObjective(state: GameState): GameState["objective"] {
-  const index = state.stats.objectivesCompleted % 9;
-  const objectives: GameState["objective"][] = [
-    { id: "cleanBurst", title: "Clean 5 beans quickly", progress: 0, target: 5, timer: 35 },
-    { id: "keepClean", title: "Keep clean above 80%", progress: 0, target: 20, timer: 45 },
-    { id: "collectRare", title: "Clean 2 more rare beans", progress: 0, target: state.stats.rarePoopsCleaned + 2, timer: 70 },
-    { id: "useAbility", title: "Use an active ability", progress: 0, target: 1, timer: 60 },
-    { id: "unlockFurniture", title: "Unlock furniture", progress: 0, target: 1, timer: 90 },
-    { id: "earnBeans", title: "Hold 75 Beans", progress: Math.min(state.beans, 75), target: 75, timer: 90 },
-    { id: "herdHarmony", title: "Keep a larger herd happy", progress: 0, target: 18, timer: 60 },
-    { id: "fuelAutomation", title: "Fuel automation with Compost", progress: 0, target: 1, timer: 80 },
-    { id: "unlockRecipe", title: "Unlock a bean recipe", progress: state.stats.recipesUnlocked, target: state.stats.recipesUnlocked + 1, timer: 110 },
-  ];
-  return objectives[index];
-}
-
 function updateNeeds(state: GameState, deltaSeconds: number): void {
   const pigCount = state.pigs.length;
   const hayDrainMultiplier =
@@ -322,13 +289,18 @@ function updateNeeds(state: GameState, deltaSeconds: number): void {
     (state.pigs.some((pig) => pig.trait === "Hay Goblin") ? 1.16 : 1) *
     (state.furniture.chewToy ? 0.9 : 1) *
     (state.lateGame.hayDimension ? 0.82 : 1) *
-    (state.wisdom.steadySupplies ? 0.9 : 1);
+    (state.wisdom.steadySupplies ? 0.9 : 1) *
+    (hasWisdomSpecialization(state, "gentleCare") ? 0.94 : 1);
   const totalWisdom = getTotalWisdom(state);
   const waterDrainMultiplier =
-    state.event.bottleJammed ? 0 : (totalWisdom > 0 ? 0.98 ** totalWisdom : 1) * (state.wisdom.steadySupplies ? 0.9 : 1);
+    state.event.bottleJammed
+      ? 0
+      : (totalWisdom > 0 ? 0.98 ** totalWisdom : 1) *
+        (state.wisdom.steadySupplies ? 0.9 : 1) *
+        (hasWisdomSpecialization(state, "gentleCare") ? 0.94 : 1);
   state.needs.hay = Math.max(0, state.needs.hay - 0.035 * pigCount * hayDrainMultiplier * deltaSeconds);
   state.needs.water = Math.max(0, state.needs.water - 0.02 * pigCount * waterDrainMultiplier * deltaSeconds);
-  if (state.lateGame.squeakChoir) state.squeaks += (state.wisdom.chorusTraining ? 0.035 : 0.02) * deltaSeconds;
+  if (hasSqueakChoirEffect(state)) state.squeaks += (state.wisdom.chorusTraining ? 0.035 : 0.02) * deltaSeconds;
 }
 
 function updatePigs(state: GameState, deltaSeconds: number): void {
@@ -454,7 +426,7 @@ function updatePoops(state: GameState, deltaSeconds: number): void {
     }
   }
 
-  if (state.lateGame.beanSingularity) {
+  if (hasSingularityExperimentEffect(state)) {
     for (const poop of state.poops) {
       poop.x += (state.cage.width / 2 - poop.x) * 0.03 * deltaSeconds;
       poop.y += (state.cage.height / 2 - poop.y) * 0.03 * deltaSeconds;
@@ -494,7 +466,10 @@ function updateLitterTrays(state: GameState, deltaSeconds: number): void {
   if (!poop) return;
   const cleanupRadius = directive === "rareGuard" ? 10 : 18;
   const result = cleanPoopsInRadius(state, poop.x, poop.y, cleanupRadius, getAutomationCleanOptions(directive));
-  if (result.cleaned > 0) addLog(state, `Litter Tray ${getAutomationDirectiveVerb(directive)} ${result.cleaned} bean for +${result.earned}.`);
+  if (result.cleaned > 0) {
+    advanceContractProgress(state, "automationClean", result.cleaned);
+    addLog(state, `Litter Tray ${getAutomationDirectiveVerb(directive)} ${result.cleaned} bean for +${result.earned}.`);
+  }
 }
 
 function updateRobot(state: GameState, deltaSeconds: number): void {
@@ -524,6 +499,7 @@ function updateRobot(state: GameState, deltaSeconds: number): void {
     (state.automation.directive === "cleanliness" ? 3 : 0) -
     (state.automation.directive === "rareGuard" ? 5 : 0);
   const result = cleanPoopsInRadius(state, robot.x, robot.y, sweepRadius, getAutomationCleanOptions(state.automation.directive));
+  if (result.cleaned > 0) advanceContractProgress(state, "automationClean", result.cleaned);
   if (result.cleaned > 0 && robot.cleanLogCooldown <= 0) {
     robot.cleanLogCooldown = state.automation.overdrive > 0 ? 1.8 : 3;
     const noun = result.cleaned === 1 ? "bean" : "beans";
@@ -631,15 +607,13 @@ function getAutomationDirectiveVerb(directive: AutomationDirectiveId): string {
 }
 
 function updateCleanliness(state: GameState): void {
+  const currentArea = Math.max(BASE_CLEANLINESS_AREA, state.cage.width * state.cage.height);
+  const cageSizeMessScale = BASE_CLEANLINESS_AREA / currentArea;
   const mess = Math.min(
     100,
-    state.poops.reduce((total, poop) => {
-      if (poop.type === "stinky") return total + 8;
-      if (poop.type === "cursed") return total + 11;
-      if (poop.type === "messPile") return total + 13;
-      if (poop.type === "blessed") return total + 3;
-      return total + 5.5;
-    }, 0) * (state.furniture.litterTray ? 0.9 : 1),
+    state.poops.reduce((total, poop) => total + getPoopMessPressure(poop), 0) *
+      (state.furniture.litterTray ? 0.9 : 1) *
+      cageSizeMessScale,
   );
   const inspectionBonus = state.event.active?.id === "cageInspection" && state.cage.cleanliness > 90 ? 5 : 0;
   const beddingBonus = (state.furniture.snuggleSack ? 2 : 0) + (state.wisdom.freshStart ? 3 : 0);
@@ -657,19 +631,5 @@ function getPigMood(state: GameState, pig: Pig): PigMood {
 }
 
 function clampNeed(value: number): number {
-  return Math.max(0, Math.min(100, value));
-}
-
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
-function pickWeighted<T>(items: Array<{ event: T; weight: number }>): T {
-  const total = items.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
-  let roll = Math.random() * total;
-  for (const item of items) {
-    roll -= Math.max(0, item.weight);
-    if (roll <= 0) return item.event;
-  }
-  return items[items.length - 1].event;
+  return clamp(value, 0, 100);
 }

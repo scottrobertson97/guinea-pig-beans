@@ -1,8 +1,19 @@
 import {
+  CAVY_COUNCIL_HERD_SIZE,
+  GOLDEN_SCOOP_MAGNET_MAX_STEP,
+  GOLDEN_SCOOP_MAGNET_RADIUS_BONUS,
+  GOLDEN_SCOOP_MAGNET_STRENGTH,
+  HAY_DIMENSION_FEED_LEVEL,
+  SINGULARITY_RECIPE_COMPOST_COST,
+  SINGULARITY_RECIPE_CURSED_CLEANED,
+  SINGULARITY_RECIPE_RARE_CLEANED,
   canBuyWisdomPerk,
+  canChooseWisdomSpecialization,
   getAbilityCost,
+  getAutomationFuelDuration,
   getAutomationFuelCost,
   getCosts,
+  getGoldenScoopCost,
   getPigCapacity,
   getPrestigeCost,
   getPrestigeProgress,
@@ -10,7 +21,14 @@ import {
   getScoopRadius,
   getWisdomCost,
   getWisdomPerk,
+  getWisdomSpecialization,
+  hasCavyCouncilEffect,
+  hasGoldenScoopEffect,
+  hasSingularityExperimentEffect,
+  hasWisdomSpecialization,
+  getSingularityExperimentCost,
 } from "./balance";
+import { advanceContractProgress, resetContracts } from "./contracts";
 import {
   adjustHerdStress,
   adjustPigStressInZone,
@@ -28,6 +46,7 @@ import {
   getFurnitureCareZoneId,
   getFurnitureConditionEffectText,
   getFurnitureConditionLabel,
+  getFurnitureName,
 } from "./furnitureCare";
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
@@ -46,7 +65,11 @@ import type {
   Poop,
   PoopType,
   WisdomPerkId,
+  WisdomSpecializationId,
 } from "./types";
+import { awardBeans, clamp, formatNeed, randomBetween } from "./utils";
+
+type LateGamePurchaseId = Exclude<keyof GameState["lateGame"], "hayDimension" | "squeakChoir" | "cavyCouncil" | "beanSingularity">;
 
 export interface CleanResult {
   cleaned: number;
@@ -212,7 +235,7 @@ const EVENT_CHOICES: Record<EventId, EventChoiceView[]> = {
   greatWheeking: [
     { id: "wheekingAnswer", eventId: "greatWheeking", label: "Answer the Chorus", description: "Gain Squeaks immediately." },
     { id: "wheekingConduct", eventId: "greatWheeking", label: "Conduct the Herd", description: "Spend Beans for happiness and Squeaks." },
-    { id: "wheekingEcho", eventId: "greatWheeking", label: "Echo Into Mythos", description: "Spend Squeaks to gain a Golden Bean." },
+    { id: "wheekingEcho", eventId: "greatWheeking", label: "Echo Into Gold", description: "Spend Squeaks to gain a Golden Bean." },
   ],
   litterRevolt: [
     { id: "litterScrub", eventId: "litterRevolt", label: "Scrub the Corner", description: "Clean the litter corner and calm tidy pigs." },
@@ -242,7 +265,6 @@ export function cleanAt(state: GameState, x: number, y: number): number {
 export function cleanAtWithResult(state: GameState, x: number, y: number): CleanResult {
   const result = cleanPoopsInRadius(state, x, y, getScoopRadius(state));
   if (result.cleaned > 0) {
-    advanceObjective(state, "cleanBurst", result.cleaned);
     addLog(
       state,
       getCleanLog(result.cleaned, result.earned, result.comboBonus, result.comboCount, result.golden, result.stinky),
@@ -251,6 +273,27 @@ export function cleanAtWithResult(state: GameState, x: number, y: number): Clean
   }
 
   return result;
+}
+
+export function magnetizePoopsTowardScoop(state: GameState, x: number, y: number): number {
+  if (!hasGoldenScoopEffect(state)) return 0;
+
+  const magnetRadius = getScoopRadius(state) + GOLDEN_SCOOP_MAGNET_RADIUS_BONUS;
+  let moved = 0;
+
+  for (const poop of state.poops) {
+    const dx = x - poop.x;
+    const dy = y - poop.y;
+    const distance = Math.hypot(dx, dy);
+    if (distance <= 0.1 || distance > magnetRadius) continue;
+
+    const step = Math.min(GOLDEN_SCOOP_MAGNET_MAX_STEP, distance * GOLDEN_SCOOP_MAGNET_STRENGTH);
+    poop.x = clamp(poop.x + (dx / distance) * step, 18, state.cage.width - 18);
+    poop.y = clamp(poop.y + (dy / distance) * step, 18, state.cage.height - 18);
+    moved += 1;
+  }
+
+  return moved;
 }
 
 export function cleanPoopsInRadius(state: GameState, x: number, y: number, radius: number, options: CleanOptions = {}): CleanResult {
@@ -316,6 +359,16 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
     state.stats.goldenCleaned += result.golden;
     state.stats.stinkyCleaned += result.stinky;
     state.stats.rarePoopsCleaned += result.rare;
+    advanceContractProgress(state, "clean", result.cleaned);
+    advanceContractProgress(state, "combo", comboCount);
+    if (result.rare > 0) advanceContractProgress(state, "rareClean", result.rare);
+    const recipeBeanCount = result.cleanedPoops.filter((poop) =>
+      poop.type === "compost" || poop.type === "blessed" || poop.type === "royal" || poop.type === "golden"
+    ).length;
+    if (recipeBeanCount > 0) advanceContractProgress(state, "recipeBeanClean", recipeBeanCount);
+    if (result.cleanedPoops.some((poop) => getPoopZoneId(state, poop) === "litterCorner")) {
+      advanceContractProgress(state, "litterAction", 1, "litterCorner");
+    }
     if (options.advanceRequests !== false) {
       advancePigRequest(state, "clean", result.cleaned);
       advancePigRequest(state, "combo", comboCount);
@@ -333,6 +386,7 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
 
 export function refillHay(state: GameState): void {
   state.needs.hay = 100;
+  advanceContractProgress(state, "refill", 1);
   advancePigRequest(state, "hayRefill", 1);
   addLog(state, "Hay rack refilled. The room has been judged acceptable.");
 }
@@ -343,6 +397,7 @@ export function refillWater(state: GameState): void {
     addLog(state, "Bottle jam fixed. The water bottle has resumed its duties.");
   }
   state.needs.water = 100;
+  advanceContractProgress(state, "refill", 1);
   advancePigRequest(state, "waterRefill", 1);
   addLog(state, "Water bottle topped up with dramatic precision.");
 }
@@ -382,6 +437,11 @@ export function buyFeedUpgrade(state: GameState): boolean {
   state.upgrades.feedLevel += 1;
   state.stats.feedUpgrades += 1;
   addLog(state, `Better Hay level ${state.upgrades.feedLevel} unlocked.`);
+  if (!state.lateGame.hayDimension && state.upgrades.feedLevel >= HAY_DIMENSION_FEED_LEVEL) {
+    state.lateGame.hayDimension = true;
+    refreshEcology(state);
+    addLog(state, "Better Hay opened the Hay Dimension: hay lasts longer, pigs produce faster, and the habitat gains room.");
+  }
   updateMilestones(state);
   return true;
 }
@@ -425,7 +485,7 @@ export function buyFurniture(state: GameState, id: FurnitureId): boolean {
   care.cooldown = 0;
   state.furnitureCare[id] = care;
   state.stats.furnitureBought += 1;
-  advanceObjective(state, "unlockFurniture", 1);
+  advanceContractProgress(state, "furnitureCareOrUnlock", 1);
   advancePigRequest(state, "furniture", 1);
   addLog(state, `${getFurnitureName(id)} unlocked and placed in the cage.`);
   updateMilestones(state);
@@ -480,7 +540,7 @@ export function careForFurniture(state: GameState, id: FurnitureId): boolean {
   const care = getFurnitureCareEntry(state, id);
   const previousCondition = care.condition;
   care.condition = Math.min(100, care.condition + 30);
-  care.cooldown = 10;
+  care.cooldown = hasWisdomSpecialization(state, "gentleCare") ? 7 : 10;
   care.lastCare = `Cared for ${getFurnitureName(id)}`;
   state.furnitureCare[id] = care;
 
@@ -489,7 +549,8 @@ export function careForFurniture(state: GameState, id: FurnitureId): boolean {
   stewardship.care = Math.min(100, stewardship.care + 8);
   stewardship.lastAction = `${getFurnitureName(id)} cared for`;
   state.ecology.stewardship[zoneId] = stewardship;
-  adjustPigStressInZone(state, zoneId, -4);
+  advanceContractProgress(state, "furnitureCareOrUnlock", 1);
+  adjustPigStressInZone(state, zoneId, hasWisdomSpecialization(state, "gentleCare") ? -7 : -4);
   refreshEcology(state);
   addLog(state, getFurnitureCareLog(id, cost, previousCondition, care.condition));
   updateMilestones(state);
@@ -507,7 +568,11 @@ export function getHabitatTendStatus(state: GameState, zoneId: CageZoneId): stri
   if (stewardship.cooldown > 0) return `Cooldown ${Math.ceil(stewardship.cooldown)}s`;
 
   const cost = getHabitatTendCost(state, zoneId);
-  if (zoneId === "litterCorner" && state.compost < 4 && state.beans < 18) return "Need 4 Compost or 18 Beans";
+  if (zoneId === "litterCorner" && state.compost < cost.amount && state.beans < cost.amount) {
+    return cost.resource === "compost"
+      ? `Need ${cost.amount} Compost or ${hasWisdomSpecialization(state, "gentleCare") ? 14 : 18} Beans`
+      : formatNeed(state.beans, cost.amount, "Bean");
+  }
   if (cost.resource === "compost" && state.compost < cost.amount) return formatNeed(state.compost, cost.amount, "Compost", "Compost");
   if (cost.resource === "beans" && state.beans < cost.amount) return formatNeed(state.beans, cost.amount, "Bean");
   return cost.resource === "compost" ? `Tend ${cost.amount} Compost` : `Tend ${cost.amount} Beans`;
@@ -526,14 +591,14 @@ export function tendHabitatZone(state: GameState, zoneId: CageZoneId): boolean {
   const zone = getZoneMetrics(state, zoneId);
   const stewardship = getZoneStewardship(state, zoneId);
   const bottleWasJammed = zoneId === "waterBottle" && state.event.bottleJammed;
-  stewardship.care = Math.min(100, stewardship.care + 22);
-  stewardship.cooldown = 8;
+  stewardship.care = Math.min(100, stewardship.care + (hasWisdomSpecialization(state, "gentleCare") ? 28 : 22));
+  stewardship.cooldown = hasWisdomSpecialization(state, "gentleCare") ? 6 : 8;
   stewardship.lastAction = `Tended ${zone.label}`;
   state.ecology.stewardship[zoneId] = stewardship;
 
   for (const pig of state.pigs) {
     if (getPigZoneId(state, pig) === zoneId || pig.favoriteZone === zoneId) {
-      pig.stress = Math.max(0, pig.stress - 8);
+      pig.stress = Math.max(0, pig.stress - (hasWisdomSpecialization(state, "gentleCare") ? 12 : 8));
     }
   }
 
@@ -546,6 +611,8 @@ export function tendHabitatZone(state: GameState, zoneId: CageZoneId): boolean {
     cleanPoopsInRadius(state, zone.x, zone.y, zone.radius * 0.55);
   }
 
+  advanceContractProgress(state, "zoneTend", 1, zoneId);
+  if (zoneId === "litterCorner") advanceContractProgress(state, "litterAction", 1, "litterCorner");
   refreshEcology(state);
   addLog(state, getHabitatTendLog(zoneId, cost, bottleWasJammed));
   updateMilestones(state);
@@ -569,34 +636,34 @@ export function buyRarePig(state: GameState): boolean {
   return true;
 }
 
-export function unlockLateGameSystem(state: GameState, id: keyof GameState["lateGame"]): boolean {
+export function unlockLateGameSystem(state: GameState, id: LateGamePurchaseId): boolean {
   if (state.lateGame[id]) return false;
 
-  const requirements: Record<keyof GameState["lateGame"], () => boolean> = {
-    hayDimension: () => state.beans >= 750 && state.compost >= 25,
+  const requirements: Record<LateGamePurchaseId, () => boolean> = {
     beanExchange: () => state.beans >= 1200 && state.goldenBeans >= 2,
-    cavyCouncil: () => state.pigs.length >= 8 && state.squeaks >= 10,
-    squeakChoir: () => state.squeaks >= 25,
-    beanSingularity: () => state.compost >= 100 && state.stats.rarePoopsCleaned >= 25,
+    goldenScoop: () => {
+      const cost = getGoldenScoopCost();
+      return state.beans >= cost.beans && state.goldenBeans >= cost.goldenBeans;
+    },
   };
 
   if (!requirements[id]()) return false;
-  if (id === "hayDimension") {
-    state.beans -= 750;
-    state.compost -= 25;
-  } else if (id === "beanExchange") {
+  if (id === "goldenScoop") {
+    const cost = getGoldenScoopCost();
+    state.beans -= cost.beans;
+    state.goldenBeans -= cost.goldenBeans;
+  } else {
     state.beans -= 1200;
     state.goldenBeans -= 2;
-  } else if (id === "cavyCouncil") {
-    state.squeaks -= 10;
-  } else if (id === "squeakChoir") {
-    state.squeaks -= 25;
-  } else {
-    state.compost -= 100;
   }
 
   state.lateGame[id] = true;
-  addLog(state, `${getLateGameName(id)} unlocked. The cage has become less normal.`);
+  addLog(
+    state,
+    id === "goldenScoop"
+      ? "Golden Scoop unlocked. Nearby beans now drift toward your cleanup path."
+      : `${getLateGameName(id)} unlocked. The cage has become less normal.`,
+  );
   updateMilestones(state);
   return true;
 }
@@ -667,7 +734,7 @@ export function useAbility(state: GameState, id: AbilityId): boolean {
   }
 
   state.stats.abilitiesUsed += 1;
-  advanceObjective(state, "useAbility", 1);
+  advanceContractProgress(state, "ability", 1);
   advancePigRequest(state, "ability", 1);
   updateMilestones(state);
   return true;
@@ -682,10 +749,8 @@ export function fuelAutomation(state: GameState): boolean {
   if (state.compost < cost) return false;
 
   state.compost -= cost;
-  const fuelSeconds =
-    18 + (state.recipes.compostCatalyst ? 8 : 0) + (state.wisdom.gentleAutomation ? 5 : 0) + (state.wisdom.compostEngine ? 4 : 0);
+  const fuelSeconds = getAutomationFuelDuration(state);
   state.automation.overdrive = Math.min(60, state.automation.overdrive + fuelSeconds);
-  advanceObjective(state, "fuelAutomation", 1);
   addLog(state, `Compost fuel spent. Automation overdrive active for ${Math.ceil(state.automation.overdrive)}s.`);
   updateMilestones(state);
   return true;
@@ -708,6 +773,7 @@ export function getAutomationDirectiveStatus(state: GameState, id: AutomationDir
 export function setAutomationDirective(state: GameState, id: AutomationDirectiveId): boolean {
   if (!canSetAutomationDirective(state, id)) return false;
   state.automation.directive = id;
+  if (id === "cleanliness" || id === "litterFocus") advanceContractProgress(state, "automationDirective", 1);
   addLog(state, `Automation directive set to ${getAutomationDirectiveName(id)}.`);
   updateMilestones(state);
   return true;
@@ -726,17 +792,60 @@ export function unlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
     state.squeaks -= 8;
   } else if (id === "compostCatalyst") {
     state.compost -= 40;
-  } else {
+  } else if (id === "royalAccord") {
     state.goldenBeans -= 1;
     state.squeaks -= 16;
+  } else {
+    state.compost -= SINGULARITY_RECIPE_COMPOST_COST;
   }
 
   state.recipes[id] = true;
   state.stats.recipesUnlocked += 1;
-  advanceObjective(state, "unlockRecipe", 1);
+  advanceContractProgress(state, "recipeUnlockOrCompostHold", 1);
   addLog(state, `${getBeanRecipeName(id)} unlocked. Bean chemistry now has consequences.`);
   updateMilestones(state);
   return true;
+}
+
+export function runSingularityExperiment(state: GameState): boolean {
+  if (!canRunSingularityExperiment(state)) return false;
+
+  const cost = getSingularityExperimentCost(state);
+  state.compost -= cost.compost;
+  state.squeaks -= cost.squeaks;
+  pullPoopsTowardCenter(state, 0.45);
+  state.contracts.rareEventBoost = Math.max(state.contracts.rareEventBoost, hasWisdomSpecialization(state, "rareBeanAlchemy") ? 3 : 2);
+  spawnEventPoop(
+    state,
+    "cursed",
+    state.cage.width / 2 + randomBetween(-18, 18),
+    state.cage.height / 2 + randomBetween(-14, 14),
+  );
+  advanceContractProgress(state, "recipeUnlockOrCompostHold", 1);
+  addLog(state, "Singularity Experiment ran: loose beans pulled inward and cursed bean pressure rose.");
+  updateMilestones(state);
+  return true;
+}
+
+export function canRunSingularityExperiment(state: GameState): boolean {
+  const cost = getSingularityExperimentCost(state);
+  return (
+    hasSingularityExperimentEffect(state) &&
+    state.compost >= cost.compost &&
+    state.squeaks >= cost.squeaks
+  );
+}
+
+export function getSingularityExperimentStatus(state: GameState): string {
+  if (!hasSingularityExperimentEffect(state)) return "Unlock recipe";
+  const cost = getSingularityExperimentCost(state);
+  if (state.compost < cost.compost) {
+    return formatNeed(state.compost, cost.compost, "Compost", "Compost");
+  }
+  if (state.squeaks < cost.squeaks) {
+    return formatNeed(state.squeaks, cost.squeaks, "Squeak");
+  }
+  return `${cost.compost}C + ${cost.squeaks}S`;
 }
 
 export function getBeanExchangeTrades(): BeanExchangeTradeDefinition[] {
@@ -808,12 +917,13 @@ export function useCouncilDecree(state: GameState, decreeId: CouncilDecreeId): b
     addLog(state, "Cavy Council ratified a Herd Charter for +75 Beans and +1 Golden Bean.");
   }
 
+  advanceContractProgress(state, "councilDecree", 1, decreeId);
   updateMilestones(state);
   return true;
 }
 
 export function getCouncilDecreeStatus(state: GameState, decreeId: CouncilDecreeId): string {
-  if (!state.lateGame.cavyCouncil) return "Unlock Cavy Council";
+  if (!hasCavyCouncilEffect(state)) return formatNeed(state.pigs.length, CAVY_COUNCIL_HERD_SIZE, "Pig");
   if (decreeId === "careMandate") {
     if (state.squeaks < 6) return formatNeed(state.squeaks, 6, "Squeak");
     return "Pass";
@@ -824,7 +934,7 @@ export function getCouncilDecreeStatus(state: GameState, decreeId: CouncilDecree
     return "Pass";
   }
   if (state.squeaks < 10) return formatNeed(state.squeaks, 10, "Squeak");
-  if (state.pigs.length < 8) return formatNeed(state.pigs.length, 8, "Pig");
+  if (state.pigs.length < CAVY_COUNCIL_HERD_SIZE) return formatNeed(state.pigs.length, CAVY_COUNCIL_HERD_SIZE, "Pig");
   if (state.cage.happiness < 70) return "Need 70% Happy";
   return "Pass";
 }
@@ -833,14 +943,22 @@ export function canUnlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean
   if (state.recipes[id]) return false;
   if (id === "beanBlessing") return state.goldenBeans >= 2 && state.squeaks >= 8 && state.stats.blessedCleaned >= 1;
   if (id === "compostCatalyst") return state.compost >= 40 && state.stats.compostCleaned >= 3 && state.stats.stinkyCleaned >= 2;
-  return state.goldenBeans >= 1 && state.squeaks >= 16 && (state.stats.royalCleaned >= 1 || state.stats.legendaryPigsAdopted >= 1);
+  if (id === "royalAccord") {
+    return state.goldenBeans >= 1 && state.squeaks >= 16 && (state.stats.royalCleaned >= 1 || state.stats.legendaryPigsAdopted >= 1);
+  }
+  return (
+    state.compost >= SINGULARITY_RECIPE_COMPOST_COST &&
+    state.stats.rarePoopsCleaned >= SINGULARITY_RECIPE_RARE_CLEANED &&
+    state.stats.cursedCleaned >= SINGULARITY_RECIPE_CURSED_CLEANED
+  );
 }
 
 export function getBeanRecipeStatus(state: GameState, id: BeanRecipeId): string {
-  if (state.recipes[id]) return "Active";
+  if (state.recipes[id] || (id === "singularityExperiment" && hasSingularityExperimentEffect(state))) return "Active";
   if (id === "beanBlessing") return "2G + 8S + Blessed";
   if (id === "compostCatalyst") return "40C + Compost/Stinky";
-  return "1G + 16S + Royal";
+  if (id === "royalAccord") return "1G + 16S + Royal";
+  return "100C + 25 rare + Cursed";
 }
 
 export function buyWisdomPerk(state: GameState, id: WisdomPerkId): boolean {
@@ -851,6 +969,15 @@ export function buyWisdomPerk(state: GameState, id: WisdomPerkId): boolean {
   state.wisdom[id] = true;
   state.stats.wisdomPerks += 1;
   addLog(state, `${getWisdomPerkName(id)} learned. Future cages will be less improvised.`);
+  updateMilestones(state);
+  return true;
+}
+
+export function chooseWisdomSpecialization(state: GameState, id: WisdomSpecializationId): boolean {
+  if (!canChooseWisdomSpecialization(state, id)) return false;
+  const specialization = getWisdomSpecialization(id);
+  state.wisdomSpecialization = id;
+  addLog(state, `Caretaker Philosophy chosen: ${specialization.label}. ${specialization.effect}`);
   updateMilestones(state);
   return true;
 }
@@ -983,7 +1110,7 @@ export function respondToEventChoice(state: GameState, id: EventChoiceId): boole
   } else if (id === "wheekingEcho") {
     state.squeaks -= 5;
     state.goldenBeans += 1;
-    addLog(state, "The Great Wheeking echoed into mythos. +1 Golden Bean.");
+    addLog(state, "The Great Wheeking echoed into gold. +1 Golden Bean.");
   } else if (id === "litterScrub") {
     const litter = getZoneMetrics(state, "litterCorner");
     const result = cleanPoopsInRadius(state, litter.x, litter.y, litter.radius * 0.92);
@@ -1074,6 +1201,7 @@ export function prestige(state: GameState): boolean {
   state.recipes.royalAccord = false;
   state.lateGame.hayDimension = false;
   state.lateGame.beanExchange = false;
+  state.lateGame.goldenScoop = false;
   state.lateGame.cavyCouncil = false;
   state.lateGame.squeakChoir = false;
   state.lateGame.beanSingularity = false;
@@ -1092,6 +1220,7 @@ export function prestige(state: GameState): boolean {
     target: 3,
     timer: 45,
   };
+  resetContracts(state);
   state.prestige.ascensions += 1;
   state.prestige.unlocked = Array.from(new Set([...state.prestige.unlocked, "Sacred Scoop", "Ancient Hay Lore"]));
   addLog(state, `The Great Composting grants ${wisdomGained} Cavy Wisdom.`);
@@ -1148,6 +1277,7 @@ function getBeanRecipeName(id: BeanRecipeId): string {
     beanBlessing: "Bean Blessing",
     compostCatalyst: "Compost Catalyst",
     royalAccord: "Royal Accord",
+    singularityExperiment: "Singularity Experiment",
   };
   return names[id];
 }
@@ -1170,23 +1300,23 @@ function applyMysteryBean(state: GameState): void {
   }
 }
 
-function awardBeans(state: GameState, amount: number): void {
-  state.beans += amount;
-  state.stats.lifetimeBeans += amount;
-}
-
 function getHabitatTendCost(state: GameState, zoneId: CageZoneId): { resource: "beans" | "compost"; amount: number } {
-  if (zoneId === "litterCorner") return state.compost >= 4 ? { resource: "compost", amount: 4 } : { resource: "beans", amount: 18 };
-  if (zoneId === "hayCorner" || zoneId === "waterBottle") return { resource: "beans", amount: 10 };
-  return { resource: "beans", amount: 14 };
+  const gentleCare = hasWisdomSpecialization(state, "gentleCare");
+  if (zoneId === "litterCorner") {
+    const compostCost = gentleCare ? 3 : 4;
+    return state.compost >= compostCost ? { resource: "compost", amount: compostCost } : { resource: "beans", amount: gentleCare ? 14 : 18 };
+  }
+  if (zoneId === "hayCorner" || zoneId === "waterBottle") return { resource: "beans", amount: gentleCare ? 8 : 10 };
+  return { resource: "beans", amount: gentleCare ? 11 : 14 };
 }
 
 function getFurnitureCareCost(state: GameState, id: FurnitureId): { resource: "beans" | "compost"; amount: number } {
-  if (id === "litterTray" && state.compost >= 3) return { resource: "compost", amount: 3 };
+  const discount = hasWisdomSpecialization(state, "gentleCare") ? 3 : 0;
+  if (id === "litterTray" && state.compost >= 3) return { resource: "compost", amount: Math.max(2, 3 - (discount > 0 ? 1 : 0)) };
   const condition = getFurnitureCareEntry(state, id).condition;
-  if (condition < 32) return { resource: "beans", amount: 18 };
-  if (condition < 58) return { resource: "beans", amount: 14 };
-  return { resource: "beans", amount: 10 };
+  if (condition < 32) return { resource: "beans", amount: Math.max(10, 18 - discount) };
+  if (condition < 58) return { resource: "beans", amount: Math.max(8, 14 - discount) };
+  return { resource: "beans", amount: Math.max(6, 10 - discount) };
 }
 
 function getHabitatTendLog(zoneId: CageZoneId, cost: { resource: "beans" | "compost"; amount: number }, bottleWasJammed: boolean): string {
@@ -1221,40 +1351,19 @@ function spawnBeansNearPigs(state: GameState, type: PoopType, count: number): vo
   }
 }
 
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
+function pullPoopsTowardCenter(state: GameState, strength: number): void {
+  const centerX = state.cage.width / 2;
+  const centerY = state.cage.height / 2;
+  for (const poop of state.poops) {
+    poop.x += (centerX - poop.x) * strength;
+    poop.y += (centerY - poop.y) * strength;
+  }
 }
 
-function formatNeed(current: number, required: number, singular: string, plural = `${singular}s`): string {
-  const missing = Math.max(1, Math.ceil(required - current));
-  return `Need ${missing} ${missing === 1 ? singular : plural}`;
-}
-
-function advanceObjective(state: GameState, id: GameState["objective"]["id"], amount: number): void {
-  if (state.objective.id !== id) return;
-  state.objective.progress = Math.min(state.objective.target, state.objective.progress + amount);
-}
-
-function getFurnitureName(id: FurnitureId): string {
-  const names: Record<FurnitureId, string> = {
-    hideyHouse: "Hidey House",
-    tunnel: "Tunnel",
-    litterTray: "Litter Tray",
-    chewToy: "Chew Toy",
-    snuggleSack: "Snuggle Sack",
-    cardboardCastle: "Cardboard Castle",
-    royalThrone: "Royal Throne",
-  };
-  return names[id];
-}
-
-function getLateGameName(id: keyof GameState["lateGame"]): string {
-  const names: Record<keyof GameState["lateGame"], string> = {
-    hayDimension: "The Hay Dimension",
+function getLateGameName(id: LateGamePurchaseId): string {
+  const names: Record<LateGamePurchaseId, string> = {
     beanExchange: "The Bean Exchange",
-    cavyCouncil: "Cavy Council",
-    squeakChoir: "Squeak Choir",
-    beanSingularity: "Bean Singularity",
+    goldenScoop: "Golden Scoop",
   };
   return names[id];
 }

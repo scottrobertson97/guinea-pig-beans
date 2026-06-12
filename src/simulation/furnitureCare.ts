@@ -1,34 +1,8 @@
 import type { CageZoneId, FurnitureCareState, FurnitureId, GameState } from "./types";
+import { FURNITURE_IDS, getFurnitureCareZoneId, getFurnitureName } from "./furnitureDefinitions";
+import { isRecord, normalizePercent, normalizeTimer } from "./utils";
 
-export const FURNITURE_IDS: FurnitureId[] = [
-  "hideyHouse",
-  "tunnel",
-  "litterTray",
-  "chewToy",
-  "snuggleSack",
-  "cardboardCastle",
-  "royalThrone",
-];
-
-const FURNITURE_NAMES: Record<FurnitureId, string> = {
-  hideyHouse: "Hidey House",
-  tunnel: "Tunnel",
-  litterTray: "Litter Tray",
-  chewToy: "Chew Toy",
-  snuggleSack: "Snuggle Sack",
-  cardboardCastle: "Cardboard Castle",
-  royalThrone: "Royal Throne",
-};
-
-const FURNITURE_CARE_ZONES: Record<FurnitureId, CageZoneId> = {
-  hideyHouse: "hideyZone",
-  tunnel: "playRun",
-  litterTray: "litterCorner",
-  chewToy: "playRun",
-  snuggleSack: "hideyZone",
-  cardboardCastle: "royalCourt",
-  royalThrone: "royalCourt",
-};
+export { FURNITURE_IDS, getFurnitureCareZoneId, getFurnitureName };
 
 export function createInitialFurnitureCareState(): Record<FurnitureId, FurnitureCareState> {
   return Object.fromEntries(FURNITURE_IDS.map((id) => [id, createFurnitureCareEntry()])) as Record<FurnitureId, FurnitureCareState>;
@@ -69,14 +43,6 @@ export function updateFurnitureCare(state: GameState, deltaSeconds: number): voi
     entry.condition = Math.max(0, entry.condition - getFurnitureWearRate(state, id) * deltaSeconds);
   }
   state.furnitureCare = care;
-}
-
-export function getFurnitureName(id: FurnitureId): string {
-  return FURNITURE_NAMES[id];
-}
-
-export function getFurnitureCareZoneId(id: FurnitureId): CageZoneId {
-  return FURNITURE_CARE_ZONES[id];
 }
 
 export function getFurnitureConditionLabel(condition: number): string {
@@ -170,16 +136,4 @@ function getFurnitureCareZoneName(id: FurnitureId): string {
     royalCourt: "Royal Court",
   };
   return names[getFurnitureCareZoneId(id)];
-}
-
-function normalizePercent(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : fallback;
-}
-
-function normalizeTimer(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

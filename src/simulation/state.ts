@@ -1,7 +1,17 @@
-import { CAGE_PADDING, getCageDimensions, getPigPoopInterval, hasFurnitureSynergy, MAX_LOG_ITEMS } from "./balance";
+import {
+  CAGE_PADDING,
+  getCageDimensions,
+  getPigPoopInterval,
+  hasFurnitureSynergy,
+  hasSingularityExperimentEffect,
+  hasWisdomSpecialization,
+  MAX_LOG_ITEMS,
+} from "./balance";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, isPigComfortableInFavoriteZone } from "./ecology";
 import { createInitialFurnitureCareState } from "./furnitureCare";
+import { getFurnitureDefinition, getFurnitureName } from "./furnitureDefinitions";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
+import { clamp, pickWeighted, randomBetween } from "./utils";
 
 const pigNames = [
   "Muffin",
@@ -124,6 +134,7 @@ export function createInitialState(): GameState {
       beanBlessing: false,
       compostCatalyst: false,
       royalAccord: false,
+      singularityExperiment: false,
     },
     wisdom: {
       roomyStart: false,
@@ -139,6 +150,7 @@ export function createInitialState(): GameState {
       goldenNose: false,
       royalMemory: false,
     },
+    wisdomSpecialization: null,
     event: {
       active: null,
       nextTimer: 24,
@@ -151,6 +163,16 @@ export function createInitialState(): GameState {
       progress: 0,
       target: 3,
       timer: 45,
+    },
+    contracts: {
+      active: null,
+      offers: [],
+      completed: 0,
+      expired: 0,
+      lastResult: null,
+      nextOfferSeed: 1,
+      rareEventBoost: 0,
+      completedTemplates: {},
     },
     pigRequest: {
       active: null,
@@ -170,6 +192,7 @@ export function createInitialState(): GameState {
     lateGame: {
       hayDimension: false,
       beanExchange: false,
+      goldenScoop: false,
       cavyCouncil: false,
       squeakChoir: false,
       beanSingularity: false,
@@ -422,16 +445,7 @@ export function getStaticFurniturePlacement(
   state: GameState,
   furnitureId: FurnitureId,
 ): { furnitureId: FurnitureId; x: number; y: number } {
-  const positions: Record<FurnitureId, { x: number; y: number }> = {
-    hideyHouse: { x: 0.17, y: 0.78 },
-    tunnel: { x: 0.33, y: 0.52 },
-    litterTray: { x: 0.83, y: 0.8 },
-    chewToy: { x: 0.52, y: 0.5 },
-    snuggleSack: { x: 0.5, y: 0.76 },
-    cardboardCastle: { x: 0.22, y: 0.28 },
-    royalThrone: { x: 0.82, y: 0.31 },
-  };
-  const position = positions[furnitureId];
+  const position = getFurnitureDefinition(furnitureId).placement;
   return {
     furnitureId,
     x: clamp(state.cage.width * position.x, CAGE_PADDING + 44, state.cage.width - CAGE_PADDING - 44),
@@ -450,14 +464,6 @@ export function getUnlockedFurniturePlacements(
 export function addLog(state: GameState, message: string): void {
   state.log.unshift(message);
   state.log = state.log.slice(0, MAX_LOG_ITEMS);
-}
-
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 function clampEntitiesToCage(state: GameState): void {
@@ -512,33 +518,17 @@ function targetSleepSpot(state: GameState, pig: Pig): void {
     { furnitureId: "snuggleSack", fallbackX: state.cage.width - 150, fallbackY: state.cage.height - 118, radius: 34, weight: state.furniture.snuggleSack ? 4 : 0 },
     { furnitureId: "hideyHouse", fallbackX: 116, fallbackY: state.cage.height - 108, radius: 42, weight: state.furniture.hideyHouse ? 3 : 0 },
   ];
-  const totalWeight = sleepOptions.reduce((total, option) => total + option.weight, 0);
-  if (totalWeight > 0) {
-    let roll = Math.random() * totalWeight;
-    for (const option of sleepOptions) {
-      roll -= option.weight;
-      if (roll <= 0) {
-        targetNearFurniture(state, pig, option.furnitureId, option.fallbackX, option.fallbackY, option.radius);
-        return;
-      }
+  if (sleepOptions.some((option) => option.weight > 0)) {
+    const option = pickWeighted(sleepOptions, "furnitureId");
+    const selected = sleepOptions.find((candidate) => candidate.furnitureId === option);
+    if (selected) {
+      targetNearFurniture(state, pig, selected.furnitureId, selected.fallbackX, selected.fallbackY, selected.radius);
+      return;
     }
   }
 
   pig.targetX = randomBetween(CAGE_PADDING + 24, state.cage.width - CAGE_PADDING - 24);
   pig.targetY = randomBetween(CAGE_PADDING + 24, state.cage.height - CAGE_PADDING - 24);
-}
-
-function getFurnitureName(id: FurnitureId): string {
-  const names: Record<FurnitureId, string> = {
-    hideyHouse: "Hidey House",
-    tunnel: "Tunnel",
-    litterTray: "Litter Tray",
-    chewToy: "Chew Toy",
-    snuggleSack: "Snuggle Sack",
-    cardboardCastle: "Cardboard Castle",
-    royalThrone: "Royal Throne",
-  };
-  return names[id];
 }
 
 function getStartingSpeed(breed: PigBreed, trait: PigTrait): number {
@@ -556,7 +546,9 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
   const abilityBonus = state.abilities.snackTime > 0 ? 0.05 : 0;
   const recipeRareBonus = state.recipes.beanBlessing ? 0.025 : 0;
   const wisdomRareBonus = state.wisdom.rareInstinct ? 0.025 : 0;
+  const alchemyRareBonus = hasWisdomSpecialization(state, "rareBeanAlchemy") ? 0.018 : 0;
   const goldenNoseBonus = state.wisdom.goldenNose ? 0.025 : 0;
+  const contractRareBonus = state.contracts.rareEventBoost > 0 ? 0.035 : 0;
   const royalCompostCourt = hasFurnitureSynergy(state, "royalCompostCourt");
   const goldenChance =
     (pig.breed === "Teddy" ? 0.1 : 0.075) +
@@ -567,7 +559,9 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     stressRarePenalty +
     recipeRareBonus +
     wisdomRareBonus +
-    goldenNoseBonus;
+    alchemyRareBonus +
+    goldenNoseBonus +
+    contractRareBonus;
   const blessedChance =
     pig.trait === "Compost Mystic" ? 0.07 + abilityBonus + recipeRareBonus : 0.015 + abilityBonus + recipeRareBonus;
   const compostChance = royalCompostCourt
@@ -582,7 +576,7 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     (pig.trait === "Royal Pig" || state.furniture.royalThrone || state.recipes.royalAccord ? 0.045 : 0) +
     (state.wisdom.royalMemory && state.furniture.royalThrone ? 0.025 : 0) +
     (royalCompostCourt ? 0.018 : 0);
-  const cursedChance = state.lateGame.beanSingularity || state.cage.cleanliness < 20 ? 0.025 : 0.004;
+  const cursedChance = hasSingularityExperimentEffect(state) || state.cage.cleanliness < 20 ? 0.025 : 0.004;
   const stressStinkyBonus = pig.stress >= 70 ? 0.1 : pig.stress >= 50 ? 0.055 : 0;
   const stinkyChance =
     (pig.trait === "Gremlin" && state.cage.cleanliness < 60
@@ -591,20 +585,20 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
         ? 0.08
         : 0.14) + stressStinkyBonus;
   const roll = Math.random();
-  if (roll < goldenChance) return "golden";
-  if (roll < goldenChance + blessedChance) return "blessed";
-  if (roll < goldenChance + blessedChance + megaChance) return "mega";
-  if (roll < goldenChance + blessedChance + megaChance + royalChance) return "royal";
-  if (roll < goldenChance + blessedChance + megaChance + royalChance + hayChance) return "hay";
-  if (roll < goldenChance + blessedChance + megaChance + royalChance + hayChance + compostChance) return "compost";
-  if (roll < goldenChance + blessedChance + megaChance + royalChance + hayChance + compostChance + mysteryChance)
-    return "mystery";
-  if (
+  let selected: PoopType = "normal";
+  if (roll < goldenChance) selected = "golden";
+  else if (roll < goldenChance + blessedChance) selected = "blessed";
+  else if (roll < goldenChance + blessedChance + megaChance) selected = "mega";
+  else if (roll < goldenChance + blessedChance + megaChance + royalChance) selected = "royal";
+  else if (roll < goldenChance + blessedChance + megaChance + royalChance + hayChance) selected = "hay";
+  else if (roll < goldenChance + blessedChance + megaChance + royalChance + hayChance + compostChance) selected = "compost";
+  else if (roll < goldenChance + blessedChance + megaChance + royalChance + hayChance + compostChance + mysteryChance) selected = "mystery";
+  else if (
     roll <
     goldenChance + blessedChance + megaChance + royalChance + hayChance + compostChance + mysteryChance + cursedChance
   )
-    return "cursed";
-  if (
+    selected = "cursed";
+  else if (
     roll <
     goldenChance +
       blessedChance +
@@ -616,8 +610,11 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
       cursedChance +
       stinkyChance
   )
-    return "stinky";
-  return "normal";
+    selected = "stinky";
+  if (state.contracts.rareEventBoost > 0 && selected !== "normal" && selected !== "stinky") {
+    state.contracts.rareEventBoost = Math.max(0, state.contracts.rareEventBoost - 1);
+  }
+  return selected;
 }
 
 function getStartingPoopValue(type: PoopType, pig?: Pig): number {

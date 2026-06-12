@@ -1,7 +1,10 @@
 import { addLog, createInitialState, syncCageDimensionsToLevel, syncEntityIdCounters } from "./state";
+import { HAY_DIMENSION_FEED_LEVEL } from "./balance";
+import { ensureContractOffers, normalizeContractsState } from "./contracts";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, normalizeCageZoneId, normalizeStewardshipState, refreshEcology } from "./ecology";
 import { normalizeFurnitureCareState } from "./furnitureCare";
-import type { GameState, Pig, PigGoal } from "./types";
+import type { GameState, Pig, PigGoal, WisdomSpecializationId } from "./types";
+import { isRecord, normalizePercent, normalizeTimer } from "./utils";
 
 export const SAVE_KEY = "gpb-save-v1";
 export const SAVE_STATUS_EVENT = "guinea-pig-save-status";
@@ -37,15 +40,19 @@ export function loadGameState(): LoadGameStateResult {
   try {
     const rawSave = localStorage.getItem(SAVE_KEY);
     if (!rawSave) {
+      freshState.contracts = normalizeContractsState(freshState.contracts);
+      ensureContractOffers(freshState);
       syncEntityIdCounters(freshState);
       lastSerializedState = serializeState(freshState);
       return { state: freshState, recovered: false };
     }
 
     const parsed = JSON.parse(rawSave) as Partial<SaveEnvelope>;
-    if (parsed.version !== SAVE_VERSION || !isObject(parsed.state)) {
+    if (parsed.version !== SAVE_VERSION || !isRecord(parsed.state)) {
       removeUnreadableSave();
       addLog(freshState, "Saved run could not be read, so a fresh cage moved in.");
+      freshState.contracts = normalizeContractsState(freshState.contracts);
+      ensureContractOffers(freshState);
       syncEntityIdCounters(freshState);
       lastSerializedState = serializeState(freshState);
       return { state: freshState, recovered: true };
@@ -60,6 +67,8 @@ export function loadGameState(): LoadGameStateResult {
   } catch {
     removeUnreadableSave();
     addLog(freshState, "Saved run could not be read, so a fresh cage moved in.");
+    freshState.contracts = normalizeContractsState(freshState.contracts);
+    ensureContractOffers(freshState);
     syncEntityIdCounters(freshState);
     lastSerializedState = serializeState(freshState);
     return { state: freshState, recovered: true };
@@ -129,31 +138,32 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
   hydrated.ecology = hydrated.ecology ?? createInitialEcologyState(hydrated.cage.width, hydrated.cage.height);
   hydrated.ecology.stewardship = normalizeStewardshipState(hydrated.ecology.stewardship);
   hydrated.furnitureCare = normalizeFurnitureCareState(hydrated.furnitureCare);
+  hydrated.contracts = normalizeContractsState(hydrated.contracts);
   hydrated.automation.directive = normalizeAutomationDirective(hydrated.automation.directive);
+  hydrated.wisdomSpecialization = normalizeWisdomSpecialization(hydrated.wisdomSpecialization);
+  if (hydrated.upgrades.feedLevel >= HAY_DIMENSION_FEED_LEVEL) hydrated.lateGame.hayDimension = true;
+  if (hydrated.lateGame.beanSingularity) hydrated.recipes.singularityExperiment = true;
   hydrated.pigs = hydrated.pigs.map((pig, index) => hydratePigLifeState(pig, index));
   refreshEcology(hydrated);
+  ensureContractOffers(hydrated);
   return hydrated;
+}
+
+function normalizeWisdomSpecialization(value: unknown): WisdomSpecializationId | null {
+  return value === "gentleCare" || value === "automationSteward" || value === "rareBeanAlchemy" ? value : null;
 }
 
 function hydratePigLifeState(pig: Pig, index: number): Pig {
   return {
     ...pig,
-    hunger: normalizeNeed(pig.hunger, 82),
-    thirst: normalizeNeed(pig.thirst, 84),
-    energy: normalizeNeed(pig.energy, 76),
+    hunger: normalizePercent(pig.hunger, 82),
+    thirst: normalizePercent(pig.thirst, 84),
+    energy: normalizePercent(pig.energy, 76),
     goal: normalizePigGoal(pig.goal),
     goalTimer: normalizeTimer(pig.goalTimer),
     favoriteZone: normalizeCageZoneId(pig.favoriteZone, chooseFavoriteZoneForPig(pig, index)),
-    stress: normalizeNeed(pig.stress, 0),
+    stress: normalizePercent(pig.stress, 0),
   };
-}
-
-function normalizeNeed(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : fallback;
-}
-
-function normalizeTimer(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
 }
 
 function normalizePigGoal(value: unknown): PigGoal {
@@ -166,8 +176,8 @@ function normalizeAutomationDirective(value: unknown): GameState["automation"]["
 
 function mergeDefaults(defaultValue: unknown, savedValue: unknown): unknown {
   if (Array.isArray(defaultValue)) return Array.isArray(savedValue) ? savedValue : defaultValue;
-  if (!isObject(defaultValue)) return savedValue ?? defaultValue;
-  if (!isObject(savedValue)) return defaultValue;
+  if (!isRecord(defaultValue)) return savedValue ?? defaultValue;
+  if (!isRecord(savedValue)) return defaultValue;
 
   const merged: Record<string, unknown> = { ...defaultValue };
   for (const [key, value] of Object.entries(savedValue)) {
@@ -178,10 +188,6 @@ function mergeDefaults(defaultValue: unknown, savedValue: unknown): unknown {
 
 function serializeState(state: GameState): string {
   return JSON.stringify(state);
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function emitSaveStatus(detail: SaveStatusDetail): void {

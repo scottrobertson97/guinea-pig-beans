@@ -27,6 +27,7 @@ export type SceneFeedbackCategory =
   | "purchase"
   | "unlock"
   | "trade"
+  | "experiment"
   | "decree"
   | "event"
   | "prestige"

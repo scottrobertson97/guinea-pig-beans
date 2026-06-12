@@ -1,6 +1,7 @@
 import { hasFurnitureSynergy } from "./balance";
 import { getFurnitureEcologyBonus } from "./furnitureCare";
 import type { CageEcologyState, CageZoneId, CageZoneMetrics, CageZoneRole, CageZoneStewardship, GameState, Pig, Poop } from "./types";
+import { clamp, isRecord, normalizePercent, normalizeTimer, pickWeighted, randomBetween } from "./utils";
 
 interface CageZoneDefinition {
   id: CageZoneId;
@@ -442,34 +443,4 @@ function createStewardshipEntry(): CageZoneStewardship {
     cooldown: 0,
     lastAction: null,
   };
-}
-
-function normalizePercent(value: unknown, fallback: number): number {
-  return typeof value === "number" && Number.isFinite(value) ? clamp(value, 0, 100) : fallback;
-}
-
-function normalizeTimer(value: unknown): number {
-  return typeof value === "number" && Number.isFinite(value) ? Math.max(0, value) : 0;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function randomBetween(min: number, max: number): number {
-  return min + Math.random() * (max - min);
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function pickWeighted<T>(items: Array<{ id: T; weight: number }>): T {
-  const total = items.reduce((sum, item) => sum + Math.max(0, item.weight), 0);
-  let roll = Math.random() * total;
-  for (const item of items) {
-    roll -= Math.max(0, item.weight);
-    if (roll <= 0) return item.id;
-  }
-  return items[items.length - 1].id;
 }

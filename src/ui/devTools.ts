@@ -42,6 +42,7 @@ export class DevTools {
         refillHay(this.state);
         refillWater(this.state);
       }),
+      this.createButton("Seed Smoke Bean", () => this.seedSmokeBean()),
       this.createButton("Spawn Normal", () => this.spawnPoop("normal")),
       this.createButton("Spawn Golden", () => this.spawnPoop("golden")),
       this.createButton("Spawn Compost", () => this.spawnPoop("compost")),
@@ -80,6 +81,12 @@ export class DevTools {
   private addResource(id: "compost" | "squeaks" | "cavyWisdom", amount: number): void {
     this.state[id] += amount;
     addLog(this.state, `Dev tools added ${amount} ${id}.`);
+  }
+
+  private seedSmokeBean(): void {
+    clearPoops(this.state);
+    spawnEventPoop(this.state, "normal", this.state.cage.width / 2, this.state.cage.height / 2);
+    addLog(this.state, "Dev tools seeded a smoke-test bean.");
   }
 
   private seedEcologyStress(): void {

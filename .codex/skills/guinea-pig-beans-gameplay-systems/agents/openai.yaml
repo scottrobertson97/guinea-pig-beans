@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPB Gameplay Systems"
+  short_description: "Simulation and progression workflow"
+  default_prompt: "Use $guinea-pig-beans-gameplay-systems to add a visible gameplay system to Guinea Pig Beans."

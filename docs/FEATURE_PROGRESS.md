@@ -5,9 +5,9 @@
 - Pig identity basics: names, breeds, traits, favorite foods, quirks, and roster display.
 - Special poop types: Normal, Golden, Compost, Stinky, Blessed, Mega, Mystery, Hay, Royal, and Cursed beans with distinct values, visuals, and log messages.
 - Cleanliness loop: poop lowers cage cleanliness, and low needs/cleanliness affect pig mood and production.
-- Automation: Poop Roomba can be purchased and sweeps nearby beans.
+- Automation: Poop Roomba can be purchased from Shop, then fueled and directed from Furniture.
 - Combo cleaning: quick consecutive cleanups build a timed Clean Streak and award bonus Beans.
-- Goals and achievements: early quests and joke achievements track the first progression beats.
+- Contracts and records: Contracts drive active short-term goals, while quest and achievement milestones live as Records in the Log.
 - Funny cage log: milestone, cleanup, pig, resource, and automation messages surface game personality.
 - Expanded breeds and traits: Skinny Pig, Silkie, Crested, Royal Pig, Shy Beaner, Hay Goblin, Drama Pig, and Compost Mystic are now in the pig generator.
 - Cage zones: fixed Hay Area, Tunnel Zone, Litter Tray corner, Hidey Zone, and Play/Compost areas now influence targeting, movement, cleanliness, and aging.
@@ -20,13 +20,16 @@
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode are available with cooldowns.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
 - Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds a branching Wisdom tree.
-- Late-game mythos: Hay Dimension, Bean Exchange, Cavy Council, Squeak Choir, and Bean Singularity have first-pass unlocks.
+- Wisdom specializations: after tier-3 Wisdom, the player chooses one permanent Caretaker Philosophy: Gentle Care, Automation Steward, or Rare Bean Alchemy.
+- Late-game systems: Hay Dimension is now a Better Hay capstone, Squeak Choir is folded into Chorus Training Wisdom, Cavy Council seats automatically from herd size, Golden Scoop turns cleanup into a run-limited magnet tool, and Bean Singularity now lives as the repeatable Singularity Experiment recipe; Bean Exchange remains the rare-resource trade track.
 - Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent perks.
 - Cage ecology: Fixed zones now track mess, comfort, traffic, appeal, pig occupants, and next actions; pigs have favorite zones and stress, and habitat pressure affects happiness, movement, production, bean odds, events, and requests.
-- Automation directives: Roomba and Litter Tray can be switched between Balanced Sweep, Protect Cleanliness, Litter Focus, and Rare Guard modes.
+- Automation directives: Roomba and Litter Tray can be switched between Balanced Sweep, Protect Cleanliness, Litter Focus, and Rare Guard modes from the Furniture modal, where Fuel Automation also lives.
 - Furniture care: Owned furniture now tracks condition, can become well-loved or overworked, and can be tended from the Furniture modal for zone and automation benefits.
+- Progressive mechanics reveal: Fresh runs show only Care, Shop, Herd, Goals, and Log; Furniture, Abilities, Recipes, Wisdom, Habitat Care, automation operations, and Caretaker Philosophy reveal when progress makes them actionable.
+- Contract-led progression campaign: Intro Contracts now pace major mechanic reveals for Furniture, Abilities, Recipes, Automation, and Wisdom before ordinary rotating offers take over.
 
-## Current Early Goals
+## Current Progression Records
 
 - Clean 10 beans.
 - Reach 100 Beans.
@@ -40,7 +43,7 @@
 - Adopt a legendary pig.
 - Enter the Great Composting.
 
-## Current Achievements
+## Current Achievement Records
 
 - First Bean.
 - Gold Rush.
@@ -60,8 +63,8 @@
 - Cage zones now have derived ecology, but they are still fixed regions rather than player-placeable tiles.
 - Furniture is auto-placed at fixed locations as one-time unlocks, not freely placed with footprints.
 - Random events are ecology-weighted and interactive, but not yet driven by quest chains or event decks.
-- Wisdom perks now use a first-pass branching tree with prerequisites; the next step is deeper presentation and tuning.
-- Late-game systems unlock passive effects, but they need deeper dedicated interfaces and decisions.
+- Wisdom perks now use a first-pass branching tree with prerequisites and a mutually exclusive Caretaker Philosophy layer.
+- Late-game systems now live inside their owning sections, but they can still gain deeper section-level interactions later.
 - Minigames are still intentionally deferred until the main loop has more tuning data.
 
 ## Design Decisions Needed Later
@@ -69,7 +72,7 @@
 - Whether cage zones should remain fixed regions or eventually support tile painting.
 - Whether special poop aging should reward waiting more aggressively or mostly punish mess.
 - Whether current Squeak ability costs should scale with repeated use or stay flat.
-- Whether Cavy Wisdom should add mutually exclusive choices after the current non-exclusive tree is tuned.
+- Whether Caretaker Philosophies should become per-run choices or remain permanent save-wide identity.
 
 ## Core Loop Improvement Queue
 
@@ -78,7 +81,7 @@
 - [x] Make pig personalities visibly drive behavior and preferred targets.
 - [x] Add mess piles that form from clustered poops and require multiple cleans.
 - [x] Add a visible happiness meter connected to cleanliness, needs, enrichment, socialization, and space.
-- [x] Add rotating short-term objectives beyond static quests.
+- [x] Replace rotating short-term objectives with an optional Contracts Board beyond static quests.
 - [x] Make random events interactive instead of purely timed modifiers.
 - [x] Tune early pacing around first poop, first special poop, first upgrade, second pig, first mess moment, and first automation.
 - [x] Make upgrades and resources depend on each other through static furniture buffs, Squeak ability costs, Compost automation fuel, bean recipes, weighted events, and Wisdom perks.
@@ -98,7 +101,8 @@
 - Litter trays can auto-clean nearby beans.
 - Clusters of four or more beans can merge into a mess pile with multiple clean hits and higher value.
 - Happiness is now visible and affects production speed plus rare poop chance.
-- Rotating objectives provide timed short-term tasks with Bean rewards.
+- Contracts provide timed multi-step care jobs with visible requirements, rewards, and system-specific progress.
+- Intro Contracts prioritize the next unrevealed system, then ordinary Contract offers fill the remaining slots without duplicating templates.
 - Active events expose three Care-modal response choices with light resource tradeoffs.
 - Early costs and initial poop timing were lowered to hit the first upgrades and second pig sooner.
 - Fixed cage zones now create ecology pressure: dirty, crowded, or uncomfortable zones can stress pigs and surface habitat actions in the Furniture modal.
@@ -162,14 +166,14 @@ Acceptance criteria:
 
 ### SYS-005: Bean Orders Or Contracts
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Add optional orders that ask for specific cleanup, rare bean, combo, or care outcomes.
 
 Acceptance criteria:
 
-- Orders have clear requirements and rewards.
-- Orders connect rare beans, abilities, recipes, or ecology.
+- Contracts have clear requirements and rewards.
+- Contracts connect cleanup, refills, ecology, furniture care, automation, rare beans, abilities, or recipes.
 - Completion feedback appears in HUD and Log.
 
 ### SYS-006: Automation Directives
@@ -199,7 +203,7 @@ Acceptance criteria:
 
 ### SYS-008: Wisdom Specializations
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Add late-Wisdom caretaker philosophies that flavor future runs after the current tree is learned.
 
@@ -208,6 +212,14 @@ Acceptance criteria:
 - Specializations unlock after tier-3 Wisdom.
 - Choices provide distinct permanent bonuses.
 - Prestige or Wisdom UI explains the tradeoff.
+
+### No-Orphan-System Checklist
+
+Status: Active design rule.
+
+Every retained or new system should connect to at least two of Contracts, pig requests, events, habitat, automation, rare bean recipes, Wisdom, Log, or cage visuals, and it should produce visible HUD, modal, Log, or scene feedback.
+
+Advanced systems also need a reveal trigger. Do not put a dormant late-game surface on the fresh-run dock unless it gives the player an immediate decision.
 
 ## Polish Backlog Tickets
 
@@ -263,15 +275,15 @@ Priority: P1
 
 Status: First pass implemented.
 
-Description: Add small badges to the bottom section dock so players know where attention is needed. The dock should surface available purchases, usable abilities, new goals, event readiness, and new log entries without reopening every modal.
+Description: Add small badges to the bottom section dock so players know where attention is needed. The dock should surface available purchases, usable abilities, Contract updates, event readiness, and new log entries without reopening every modal.
 
 Acceptance criteria:
 
 - Care shows a badge or pulse when hay/water is low or an event response is ready.
-- Shop/Furniture/Wisdom/Mythos show availability when at least one visible action can be purchased or unlocked.
+- Shop/Furniture/Recipes/Wisdom show availability when at least one visible action can be purchased or unlocked.
 - Abilities shows availability when at least one ability can be used.
-- Goals shows a marker when objective or milestone progress changes meaningfully.
-- Log shows a marker for new entries since the last time the log modal was opened.
+- Goals shows a marker when Contract progress changes meaningfully.
+- Log shows a marker for new entries or milestone Records since the last time the log modal was opened.
 - Badges clear or update when the relevant modal is opened or state changes.
 
 Implementation notes:
@@ -293,7 +305,7 @@ Acceptance criteria:
 - Shop buttons explain missing Beans, capacity, Golden Beans, Compost, or prerequisite state.
 - Furniture buttons explain missing Beans or unlocked state.
 - Ability buttons explain cooldowns or missing Squeaks.
-- Recipe, Mythos, Wisdom, and Prestige buttons explain missing resources or already-active state.
+- Recipe, late-game, Wisdom, and Prestige buttons explain missing resources or already-active state.
 - Reason text fits inside modal buttons on desktop and mobile.
 - Enabled buttons still emphasize their cost or action status.
 
@@ -555,12 +567,12 @@ Priority: P3
 
 Status: First pass implemented.
 
-Description: Add friendly empty or low-content states to read-only sections. These modals should feel intentional even when there are few pigs, no new achievements, or a short log.
+Description: Add friendly empty or low-content states to read-only sections. These modals should feel intentional even when there are few pigs, no Records, or a short log.
 
 Acceptance criteria:
 
 - Herd has a friendly description when only the starting bonded pair is present.
-- Goals/Achievements explain what to do next when lists are short or complete.
+- Goals/Contracts and Log Records explain what to do next when lists are short or complete.
 - Cage Log has an empty state before meaningful entries exist.
 - Empty states do not replace real list content once available.
 
@@ -675,25 +687,25 @@ Implementation notes:
 - Consider helper functions such as `clampFeedbackPoint()` and `canShowFloatingLabel()`.
 - Keep particle counts small and scale them by bean rarity rather than cleaned count alone.
 
-### PB-023: Objective Progress Pulse
+### PB-023: Contract Progress Pulse
 
 Priority: P1
 
 Status: First pass implemented.
 
-Description: Make objective progress visibly respond when player actions advance it. The quick objective card should pulse or brighten when progress changes, especially during the first "Clean beans quickly" objective.
+Description: Make contract progress visibly respond when player actions advance it. The quick contract card should pulse or brighten when requirements advance or a contract completes.
 
 Acceptance criteria:
 
-- `#quick-objective-title` or `#quick-objective-progress` animates when objective progress changes.
-- The top objective row in the Goals modal also remains accurate after the pulse.
-- Objective completion uses a stronger but still short feedback state.
+- The quick contract title or progress text animates when contract progress changes.
+- The top contract row in the Goals modal remains accurate after the pulse.
+- Contract completion uses a stronger but still short feedback state.
 - The animation does not resize or shift the care strip.
 - Reduced-motion settings avoid bounce/scale-heavy effects.
 
 Implementation notes:
 
-- Track a previous objective signature in `src/ui/hud.ts`, similar to `updateGoalAndLogMarkers()`.
+- Track a previous contract signature in `src/ui/hud.ts`, similar to `updateGoalAndLogMarkers()`.
 - Reuse the existing `pulseElement()` helper pattern.
 - Add CSS for a reusable pulse class in `src/styles.css`.
 
@@ -847,7 +859,7 @@ Acceptance criteria:
 
 Implementation notes:
 
-- Keep the checklist in `POLISHING_PLAN.md` as the human-readable source.
+- Keep the checklist in [POLISHING_PLAN.md](POLISHING_PLAN.md) as the human-readable source.
 - If automated, add a small Playwright script under `scripts/`.
 - Use strict Vite port `5176` for this checkout unless it is intentionally changed.
 

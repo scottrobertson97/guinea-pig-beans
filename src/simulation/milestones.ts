@@ -9,6 +9,12 @@ export interface MilestoneView {
   complete: boolean;
 }
 
+export interface MilestoneRecordView {
+  id: string;
+  kind: "Quest" | "Achievement";
+  title: string;
+}
+
 interface MilestoneDefinition {
   id: string;
   title: string;
@@ -241,6 +247,13 @@ export function getAchievementViews(state: GameState): MilestoneView[] {
   );
 }
 
+export function getMilestoneRecordViews(state: GameState): MilestoneRecordView[] {
+  return [
+    ...toRecordViews("Quest", questDefinitions, state.milestones.quests),
+    ...toRecordViews("Achievement", achievementDefinitions, state.milestones.achievements),
+  ];
+}
+
 function completeMilestones(
   state: GameState,
   definitions: MilestoneDefinition[],
@@ -265,4 +278,28 @@ function toView(
     progress: definition.progress(state),
     complete: completedIds.includes(definition.id),
   };
+}
+
+function toRecordViews(
+  kind: MilestoneRecordView["kind"],
+  definitions: MilestoneDefinition[],
+  completedIds: string[],
+): MilestoneRecordView[] {
+  const definitionsById = new Map(definitions.map((definition) => [definition.id, definition]));
+  return completedIds.map((id) => {
+    const definition = definitionsById.get(id);
+    return {
+      id: `${kind}:${id}`,
+      kind,
+      title: definition?.title ?? toFallbackTitle(id),
+    };
+  });
+}
+
+function toFallbackTitle(id: string): string {
+  return id
+    .split("-")
+    .filter(Boolean)
+    .map((part) => `${part.charAt(0).toUpperCase()}${part.slice(1)}`)
+    .join(" ");
 }

@@ -4,8 +4,10 @@ import {
   buyFurniture,
   buyWisdomPerk,
   careForFurniture,
+  chooseWisdomSpecialization,
   canSetAutomationDirective,
   canTendHabitatZone,
+  canRunSingularityExperiment,
   canUnlockBeanRecipe,
   buyPig,
   buyRarePig,
@@ -25,10 +27,12 @@ import {
   getAutomationDirectives,
   getFurnitureCareViews,
   getHabitatTendStatus,
+  getSingularityExperimentStatus,
   prestige,
   refillHay,
   refillWater,
   respondToEventChoice,
+  runSingularityExperiment,
   setAutomationDirective,
   tendHabitatZone,
   unlockBeanRecipe,
@@ -38,13 +42,20 @@ import {
   type EventChoiceView,
 } from "../simulation/actions";
 import { assetPath } from "../assetPaths";
+import { getContractBoardView, getContractQuickView, selectContract } from "../simulation/contracts";
 import {
+  CAVY_COUNCIL_HERD_SIZE,
+  HAY_DIMENSION_FEED_LEVEL,
+  SINGULARITY_RECIPE_COMPOST_COST,
+  SINGULARITY_RECIPE_CURSED_CLEANED,
+  SINGULARITY_RECIPE_RARE_CLEANED,
   getAbilityCost,
   getAutomationFuelCost,
+  getAutomationFuelDuration,
   canBuyWisdomPerk,
   getCageDimensions,
   getCosts,
-  getFurnitureSynergies,
+  getGoldenScoopCost,
   getPigCapacity,
   getPrestigeCost,
   getPrestigeProgress,
@@ -53,10 +64,20 @@ import {
   getWisdomCost,
   getWisdomPerk,
   getWisdomPerks,
-  hasFurnitureSynergy,
+  getWisdomSpecialization,
+  getWisdomSpecializations,
+  hasCavyCouncilEffect,
+  hasGoldenScoopEffect,
+  hasSingularityExperimentEffect,
+  canChooseWisdomSpecialization,
 } from "../simulation/balance";
 import { getCageZoneName, getEcologyConcernCount, getEcologyStatusLine } from "../simulation/ecology";
-import { getAchievementViews, getQuestViews, type MilestoneView } from "../simulation/milestones";
+import {
+  getAchievementViews,
+  getMilestoneRecordViews,
+  getQuestViews,
+  type MilestoneView,
+} from "../simulation/milestones";
 import { SAVE_STATUS_EVENT, type SaveStatusDetail } from "../simulation/persistence";
 import { getActivePigRequestView } from "../simulation/pigRequests";
 import type {
@@ -71,8 +92,31 @@ import type {
   Pig,
   CageZoneId,
   WisdomPerkId,
+  WisdomSpecializationId,
 } from "../simulation/types";
 import { emitPlayerAction, emitUiSound, type PlayerActionId, type SceneFeedbackDetail, type UiSoundId } from "./events";
+import {
+  getDockSectionForReveal,
+  getRevealHint,
+  getRevealedSections,
+  isAutomationOperationsRevealed,
+  isDockSectionRevealed,
+  isFurnitureCareRevealed,
+  isHabitatCareRevealed,
+  isWisdomSpecializationRevealed,
+  type SectionRevealId,
+  type SectionRevealState,
+} from "./progression";
+import { getButton, getDataElement, getDialog, getElement, getImage } from "./dom";
+import {
+  createEmptyStateItem,
+  renderContractList,
+  renderEcologyZoneList,
+  renderFurnitureCareList,
+  renderFurnitureSynergyList,
+  renderLogList,
+  renderRecordList,
+} from "./hudRenderers";
 
 type ButtonId =
   | "adopt-pig"
@@ -108,18 +152,17 @@ type ButtonId =
   | "recipe-bean-blessing"
   | "recipe-compost-catalyst"
   | "recipe-royal-accord"
-  | "hay-dimension"
+  | "recipe-singularity-experiment"
+  | "run-singularity-experiment"
   | "bean-exchange"
+  | "golden-scoop"
   | "exchange-beans-to-compost"
   | "exchange-compost-to-squeaks"
   | "exchange-gold-to-beans"
   | "exchange-squeaks-to-gold"
-  | "cavy-council"
   | "council-care-mandate"
   | "council-cleanup-ordinance"
   | "council-herd-charter"
-  | "squeak-choir"
-  | "bean-singularity"
   | "wisdom-roomy-start"
   | "wisdom-steady-supplies"
   | "wisdom-fresh-start"
@@ -132,6 +175,9 @@ type ButtonId =
   | "wisdom-rare-instinct"
   | "wisdom-golden-nose"
   | "wisdom-royal-memory"
+  | "wisdom-gentle-care"
+  | "wisdom-automation-steward"
+  | "wisdom-rare-bean-alchemy"
   | "prestige";
 
 type QuickCareButtonId = "quick-refill-hay" | "quick-refill-water" | "quick-event-response";
@@ -143,7 +189,6 @@ type SectionId =
   | "furniture"
   | "abilities"
   | "recipes"
-  | "mythos"
   | "wisdom"
   | "herd"
   | "goals"
@@ -160,11 +205,12 @@ type HudPlayerAction = PlayerActionId | PlayerActionId[];
 type StatId = "beans" | "pigs" | "clean" | "streak" | "compost" | "squeaks" | "gold" | "wisdom" | "furniture";
 type DockBadgeKind = "available" | "urgent" | "notice";
 type ActionVisualState = "available" | "locked" | "completed" | "attention";
-type ObjectivePulseState = {
-  id: GameState["objective"]["id"];
+type ContractPulseState = {
+  id: string;
   progress: number;
   target: number;
   completed: number;
+  expired: number;
 };
 
 const HUD_ACTION_EFFECT_EVENT = "guinea-pig-action-effect";
@@ -175,7 +221,6 @@ const SECTION_META: Record<SectionId, SectionMeta> = {
   furniture: { title: "Furniture", icon: assetPath("assets/sprites/decor/toy_pile.png") },
   abilities: { title: "Abilities", icon: assetPath("assets/sprites/beans/bean_golden.png") },
   recipes: { title: "Bean Recipes", icon: assetPath("assets/sprites/beans/bean_rainbow.png") },
-  mythos: { title: "Mythos", icon: assetPath("assets/sprites/upgrades/compost_bin.png") },
   wisdom: { title: "Wisdom", icon: assetPath("assets/sprites/upgrades/cavybot_3000.png") },
   herd: { title: "Herd", icon: assetPath("assets/sprites/pigs/pig_cream_brown_idle.png") },
   goals: { title: "Goals", icon: assetPath("assets/sprites/decor/litter_tray_clean.png") },
@@ -188,11 +233,10 @@ const SECTION_SHORTCUTS: Record<string, SectionId> = {
   "3": "furniture",
   "4": "abilities",
   "5": "recipes",
-  "6": "mythos",
-  "7": "wisdom",
-  "8": "herd",
-  "9": "goals",
-  "0": "log",
+  "6": "wisdom",
+  "7": "herd",
+  "8": "goals",
+  "9": "log",
 };
 
 const WISDOM_BUTTONS: Record<WisdomPerkId, ButtonId> = {
@@ -208,6 +252,12 @@ const WISDOM_BUTTONS: Record<WisdomPerkId, ButtonId> = {
   rareInstinct: "wisdom-rare-instinct",
   goldenNose: "wisdom-golden-nose",
   royalMemory: "wisdom-royal-memory",
+};
+
+const WISDOM_SPECIALIZATION_BUTTONS: Record<WisdomSpecializationId, ButtonId> = {
+  gentleCare: "wisdom-gentle-care",
+  automationSteward: "wisdom-automation-steward",
+  rareBeanAlchemy: "wisdom-rare-bean-alchemy",
 };
 
 const BEAN_EXCHANGE_BUTTONS: Record<BeanExchangeTradeId, ButtonId> = {
@@ -248,15 +298,22 @@ export class Hud {
   private saveStatus: HTMLElement;
   private beanExchangePanel: HTMLElement;
   private cavyCouncilPanel: HTMLElement;
+  private automationPanel: HTMLElement;
+  private furnitureCarePanel: HTMLElement;
+  private habitatCarePanel: HTMLElement;
+  private wisdomSpecializationPanel: HTMLElement;
   private panels: Record<SectionId, HTMLElement>;
   private activeSection: SectionId | null = null;
   private activeLauncher: HTMLButtonElement | null = null;
   private previousComboCount = 0;
-  private previousObjectivePulseState: ObjectivePulseState | null = null;
+  private previousContractPulseState: ContractPulseState | null = null;
   private previousGoalSignature: string | null = null;
   private previousLogSignature: string | null = null;
+  private previousContractListSignature: string | null = null;
   private previousFurnitureCareSignature: string | null = null;
   private previousEcologySignature: string | null = null;
+  private previousSectionReveals: SectionRevealState | null = null;
+  private revealHint: { text: string; expiresAt: number } | null = null;
   private previousCompletedQuestIds: Set<string> | null = null;
   private previousCompletedAchievementIds: Set<string> | null = null;
   private hasGoalUpdate = false;
@@ -267,6 +324,7 @@ export class Hud {
 
     const section = SECTION_SHORTCUTS[event.key];
     if (!section) return;
+    if (!this.canOpenSection(section)) return;
 
     event.preventDefault();
     this.openSection(section, this.launchers[section]);
@@ -315,18 +373,17 @@ export class Hud {
       "recipe-bean-blessing": getButton("recipe-bean-blessing"),
       "recipe-compost-catalyst": getButton("recipe-compost-catalyst"),
       "recipe-royal-accord": getButton("recipe-royal-accord"),
-      "hay-dimension": getButton("hay-dimension"),
+      "recipe-singularity-experiment": getButton("recipe-singularity-experiment"),
+      "run-singularity-experiment": getButton("run-singularity-experiment"),
       "bean-exchange": getButton("bean-exchange"),
+      "golden-scoop": getButton("golden-scoop"),
       "exchange-beans-to-compost": getButton("exchange-beans-to-compost"),
       "exchange-compost-to-squeaks": getButton("exchange-compost-to-squeaks"),
       "exchange-gold-to-beans": getButton("exchange-gold-to-beans"),
       "exchange-squeaks-to-gold": getButton("exchange-squeaks-to-gold"),
-      "cavy-council": getButton("cavy-council"),
       "council-care-mandate": getButton("council-care-mandate"),
       "council-cleanup-ordinance": getButton("council-cleanup-ordinance"),
       "council-herd-charter": getButton("council-herd-charter"),
-      "squeak-choir": getButton("squeak-choir"),
-      "bean-singularity": getButton("bean-singularity"),
       "wisdom-roomy-start": getButton("wisdom-roomy-start"),
       "wisdom-steady-supplies": getButton("wisdom-steady-supplies"),
       "wisdom-fresh-start": getButton("wisdom-fresh-start"),
@@ -339,6 +396,9 @@ export class Hud {
       "wisdom-rare-instinct": getButton("wisdom-rare-instinct"),
       "wisdom-golden-nose": getButton("wisdom-golden-nose"),
       "wisdom-royal-memory": getButton("wisdom-royal-memory"),
+      "wisdom-gentle-care": getButton("wisdom-gentle-care"),
+      "wisdom-automation-steward": getButton("wisdom-automation-steward"),
+      "wisdom-rare-bean-alchemy": getButton("wisdom-rare-bean-alchemy"),
       prestige: getButton("prestige"),
     };
 
@@ -362,7 +422,6 @@ export class Hud {
       furniture: getButton("open-furniture"),
       abilities: getButton("open-abilities"),
       recipes: getButton("open-recipes"),
-      mythos: getButton("open-mythos"),
       wisdom: getButton("open-wisdom"),
       herd: getButton("open-herd"),
       goals: getButton("open-goals"),
@@ -374,7 +433,6 @@ export class Hud {
       furniture: getBadge("furniture"),
       abilities: getBadge("abilities"),
       recipes: getBadge("recipes"),
-      mythos: getBadge("mythos"),
       wisdom: getBadge("wisdom"),
       herd: getBadge("herd"),
       goals: getBadge("goals"),
@@ -399,13 +457,16 @@ export class Hud {
     this.saveStatus = getElement("save-status");
     this.beanExchangePanel = getElement("bean-exchange-panel");
     this.cavyCouncilPanel = getElement("cavy-council-panel");
+    this.automationPanel = getElement("automation-directives-panel");
+    this.furnitureCarePanel = getElement("furniture-care-panel");
+    this.habitatCarePanel = getElement("habitat-care-panel");
+    this.wisdomSpecializationPanel = getElement("wisdom-specialization-panel");
     this.panels = {
       care: getPanel("care"),
       shop: getPanel("shop"),
       furniture: getPanel("furniture"),
       abilities: getPanel("abilities"),
       recipes: getPanel("recipes"),
-      mythos: getPanel("mythos"),
       wisdom: getPanel("wisdom"),
       herd: getPanel("herd"),
       goals: getPanel("goals"),
@@ -529,13 +590,14 @@ export class Hud {
     this.bindRecipeButton("recipe-bean-blessing", "beanBlessing");
     this.bindRecipeButton("recipe-compost-catalyst", "compostCatalyst");
     this.bindRecipeButton("recipe-royal-accord", "royalAccord");
-    this.buttons["hay-dimension"].addEventListener("click", () =>
+    this.bindRecipeButton("recipe-singularity-experiment", "singularityExperiment");
+    this.buttons["run-singularity-experiment"].addEventListener("click", () =>
       this.runAction(
-        () => unlockLateGameSystem(this.state, "hayDimension"),
-        this.buttons["hay-dimension"],
-        { category: "unlock", target: "cage", label: "Hay Dimension", resourceText: "Hay Slowed", color: 0xd7c74b },
+        () => runSingularityExperiment(this.state),
+        this.buttons["run-singularity-experiment"],
+        { category: "experiment", target: "center", label: "Singularity", resourceText: "Gravity Shift", color: 0x75608f },
         "purchase",
-        "purchase",
+        "ability",
       ),
     );
     this.buttons["bean-exchange"].addEventListener("click", () =>
@@ -543,6 +605,15 @@ export class Hud {
         () => unlockLateGameSystem(this.state, "beanExchange"),
         this.buttons["bean-exchange"],
         { category: "unlock", target: "center", label: "Bean Exchange", resourceText: "Trades Open", color: 0xe4b83b },
+        "purchase",
+        "purchase",
+      ),
+    );
+    this.buttons["golden-scoop"].addEventListener("click", () =>
+      this.runAction(
+        () => unlockLateGameSystem(this.state, "goldenScoop"),
+        this.buttons["golden-scoop"],
+        { category: "unlock", target: "scoop", label: "Golden Scoop", resourceText: "Magnetized", color: 0xf0d56b },
         "purchase",
         "purchase",
       ),
@@ -566,15 +637,6 @@ export class Hud {
         ),
       );
     }
-    this.buttons["cavy-council"].addEventListener("click", () =>
-      this.runAction(
-        () => unlockLateGameSystem(this.state, "cavyCouncil"),
-        this.buttons["cavy-council"],
-        { category: "unlock", target: "herd", label: "Cavy Council", resourceText: "Council Active", color: 0xb965d2 },
-        "purchase",
-        "purchase",
-      ),
-    );
     for (const decree of getCouncilDecrees()) {
       const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
       this.buttons[buttonId].addEventListener("click", () =>
@@ -594,26 +656,11 @@ export class Hud {
         ),
       );
     }
-    this.buttons["squeak-choir"].addEventListener("click", () =>
-      this.runAction(
-        () => unlockLateGameSystem(this.state, "squeakChoir"),
-        this.buttons["squeak-choir"],
-        { category: "unlock", target: "herd", label: "Squeak Choir", resourceText: "+Squeaks over time", color: 0xf0d56b },
-        "purchase",
-        "purchase",
-      ),
-    );
-    this.buttons["bean-singularity"].addEventListener("click", () =>
-      this.runAction(
-        () => unlockLateGameSystem(this.state, "beanSingularity"),
-        this.buttons["bean-singularity"],
-        { category: "unlock", target: "cage", label: "Bean Singularity", resourceText: "Gravity Shift", color: 0x75608f },
-        "purchase",
-        "purchase",
-      ),
-    );
     for (const [wisdomId, buttonId] of Object.entries(WISDOM_BUTTONS) as [WisdomPerkId, ButtonId][]) {
       this.bindWisdomButton(buttonId, wisdomId);
+    }
+    for (const [specializationId, buttonId] of Object.entries(WISDOM_SPECIALIZATION_BUTTONS) as [WisdomSpecializationId, ButtonId][]) {
+      this.bindWisdomSpecializationButton(buttonId, specializationId);
     }
     this.buttons.prestige.addEventListener("click", () =>
       this.runAction(
@@ -640,9 +687,11 @@ export class Hud {
 
   render(): void {
     const costs = getCosts(this.state);
+    const sectionReveals = getRevealedSections(this.state);
     const pigCapacity = getPigCapacity(this.state);
     const isAtPigCapacity = this.state.pigs.length >= pigCapacity;
     const furnitureUnlocked = getUnlockedFurnitureCount(this.state);
+    this.updateProgressiveRevealState(sectionReveals);
     setText("beans", Math.floor(this.state.beans).toString());
     setText("pig-count", `${this.state.pigs.length}/${pigCapacity}`);
     setText("cleanliness", `${this.state.cage.cleanliness}%`);
@@ -657,22 +706,17 @@ export class Hud {
     setText("quick-water-value", `${Math.ceil(this.state.needs.water)}%`);
     setText("happiness-value", `${Math.ceil(this.state.cage.happiness)}%`);
     setText("quick-happiness-value", `${Math.ceil(this.state.cage.happiness)}%`);
-    setText("objective-title", this.state.objective.title);
-    setText("quick-objective-title", this.state.objective.title);
-    setText(
-      "objective-progress",
-      `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
-    );
-    setText(
-      "quick-objective-progress",
-      `${Math.floor(this.state.objective.progress)}/${this.state.objective.target} - ${Math.ceil(this.state.objective.timer)}s`,
-    );
+    const contractQuickView = getContractQuickView(this.state);
+    setText("objective-title", contractQuickView.title);
+    setText("quick-objective-title", contractQuickView.title);
+    setText("objective-progress", contractQuickView.progress);
+    setText("quick-objective-progress", contractQuickView.progress);
     setText("combo-value", getComboText(this.state));
     this.updateStatEmphasis(furnitureUnlocked);
-    this.updateObjectivePulse();
+    this.updateContractPulse();
     this.updateComboPulse();
     setText("adopt-cost", getAdoptPigStatusText(this.state, costs.pig, pigCapacity));
-    setText("feed-cost", getBeanCostStatusText(this.state, costs.feed, `${costs.feed} Beans`));
+    setText("feed-cost", getBetterHayStatusText(this.state, costs.feed));
     setText("scoop-cost", getBeanCostStatusText(this.state, costs.scoop, `${costs.scoop} Beans`));
     setText("robot-cost", getRobotStatusText(this.state, costs.robot));
     setText("fuel-automation-status", getAutomationFuelText(this.state));
@@ -691,7 +735,14 @@ export class Hud {
     this.renderPigRequest();
     this.updateEventButtonLabels();
     setText("prestige-cost", getPrestigeStatusText(this.state));
-    setText("status-line", getStatusLine(this.state));
+    setText(
+      "status-line",
+      this.getActiveRevealHint() ??
+        getStatusLine(this.state, {
+          showFurnitureCare: isFurnitureCareRevealed(this.state),
+          showHabitatCare: isHabitatCareRevealed(this.state),
+        }),
+    );
 
     setMeter("hay-meter", this.state.needs.hay);
     setMeter("quick-hay-meter", this.state.needs.hay);
@@ -722,17 +773,10 @@ export class Hud {
     this.updateActionVisualStates();
 
     const log = document.querySelector<HTMLOListElement>("#event-log");
-    if (log) {
-      log.replaceChildren(
-        ...(this.state.log.length > 0
-          ? this.state.log.map((message) => {
-              const item = document.createElement("li");
-              item.textContent = message;
-              return item;
-            })
-          : [createEmptyStateItem("The cage log is quiet. The bedding is enjoying the suspense.")]),
-      );
-    }
+    if (log) renderLogList(log, this.state.log);
+
+    const records = document.querySelector<HTMLUListElement>("#record-list");
+    if (records) renderRecordList(records, getMilestoneRecordViews(this.state));
 
     const roster = document.querySelector<HTMLUListElement>("#pig-roster");
     if (roster) {
@@ -753,21 +797,22 @@ export class Hud {
 
     const questViews = getQuestViews(this.state);
     const achievementViews = getAchievementViews(this.state);
-    renderMilestoneList(
-      "quest-list",
-      questViews,
-      4,
-      "No open quests right now. Keep the cage cozy and clean.",
-      "Visible quests are handled. New cage ambitions unlock as the herd grows.",
-    );
-    renderMilestoneList(
-      "achievement-list",
-      achievementViews,
-      3,
-      "No achievements yet. The first bean usually starts it.",
-      "Visible achievements are handled. The cage is quietly impressed.",
-    );
+    this.renderContracts();
     this.updateMilestoneFeedback(questViews, achievementViews);
+  }
+
+  private renderContracts(): void {
+    const list = document.querySelector<HTMLUListElement>("#contract-list");
+    if (!list) return;
+
+    const board = getContractBoardView(this.state);
+    const signature = getContractBoardRenderSignature(board);
+    if (this.previousContractListSignature === signature && list.childElementCount > 0) return;
+    this.previousContractListSignature = signature;
+
+    renderContractList(list, board, (contractId, button) =>
+      this.runAction(() => selectContract(this.state, contractId), button, undefined, undefined, "button"),
+    );
   }
 
   private runAction(
@@ -914,7 +959,74 @@ export class Hud {
     window.dispatchEvent(new CustomEvent(HUD_ACTION_EFFECT_EVENT, { detail }));
   }
 
+  private updateProgressiveRevealState(reveals: SectionRevealState): void {
+    for (const [section, launcher] of Object.entries(this.launchers) as [SectionId, HTMLButtonElement][]) {
+      const visible = isDockSectionRevealed(this.state, section);
+      launcher.hidden = !visible;
+      launcher.disabled = !visible;
+      launcher.tabIndex = visible ? 0 : -1;
+      launcher.setAttribute("aria-hidden", String(!visible));
+      if (!visible) launcher.setAttribute("aria-pressed", "false");
+    }
+
+    const automationVisible = isAutomationOperationsRevealed(this.state);
+    const furnitureCareVisible = isFurnitureCareRevealed(this.state);
+    const habitatCareVisible = isHabitatCareRevealed(this.state);
+    const specializationVisible = isWisdomSpecializationRevealed(this.state);
+    this.automationPanel.hidden = !automationVisible;
+    this.furnitureCarePanel.hidden = !furnitureCareVisible;
+    this.habitatCarePanel.hidden = !habitatCareVisible;
+    this.wisdomSpecializationPanel.hidden = !specializationVisible;
+
+    this.buttons["fuel-automation"].hidden = !automationVisible;
+    for (const buttonId of Object.values(AUTOMATION_DIRECTIVE_BUTTONS)) {
+      this.buttons[buttonId].hidden = !automationVisible;
+    }
+    for (const buttonId of Object.values(WISDOM_SPECIALIZATION_BUTTONS)) {
+      this.buttons[buttonId].hidden = !specializationVisible;
+    }
+
+    if (this.activeSection && !this.canOpenSection(this.activeSection)) {
+      this.closeModal();
+    }
+
+    if (this.previousSectionReveals) {
+      for (const [revealId, revealed] of Object.entries(reveals) as [SectionRevealId, boolean][]) {
+        if (revealed && !this.previousSectionReveals[revealId]) {
+          this.revealHint = {
+            text: getRevealHint(revealId),
+            expiresAt: performance.now() + 4200,
+          };
+          this.pulseDockReveal(revealId);
+        }
+      }
+    }
+    this.previousSectionReveals = { ...reveals };
+  }
+
+  private canOpenSection(section: SectionId): boolean {
+    return isDockSectionRevealed(this.state, section);
+  }
+
+  private getActiveRevealHint(): string | null {
+    if (!this.revealHint) return null;
+    if (performance.now() <= this.revealHint.expiresAt) return this.revealHint.text;
+    this.revealHint = null;
+    return null;
+  }
+
+  private pulseDockReveal(id: SectionRevealId): void {
+    const section = getDockSectionForReveal(id) as SectionId;
+    const launcher = this.launchers[section];
+    if (!launcher || launcher.hidden) return;
+    launcher.classList.remove("dock-reveal-pulse");
+    void launcher.offsetWidth;
+    launcher.classList.add("dock-reveal-pulse");
+    window.setTimeout(() => launcher.classList.remove("dock-reveal-pulse"), 1800);
+  }
+
   private openSection(section: SectionId, launcher: HTMLButtonElement): void {
+    if (!this.canOpenSection(section)) return;
     const wasOpen = this.modal.open;
     this.activeSection = section;
     this.activeLauncher = launcher;
@@ -975,21 +1087,21 @@ export class Hud {
     this.previousComboCount = comboCount;
   }
 
-  private updateObjectivePulse(): void {
-    const current = getObjectivePulseState(this.state);
-    const previous = this.previousObjectivePulseState;
-    this.previousObjectivePulseState = current;
+  private updateContractPulse(): void {
+    const current = getContractPulseState(this.state);
+    const previous = this.previousContractPulseState;
+    this.previousContractPulseState = current;
     if (!previous) return;
 
-    const objectiveChanged = current.id !== previous.id || current.target !== previous.target;
-    const objectiveCompleted = current.completed > previous.completed;
+    const contractChanged = current.id !== previous.id || current.target !== previous.target;
+    const contractCompleted = current.completed > previous.completed;
     const progressIncreased = current.id === previous.id && current.progress > previous.progress;
 
-    if (objectiveChanged || objectiveCompleted) {
-      pulseElement("quick-objective-title", "objective-pulse");
-      pulseElement("quick-objective-progress", "objective-pulse");
+    if (contractChanged || contractCompleted) {
+      pulseElement("quick-objective-title", "contract-pulse");
+      pulseElement("quick-objective-progress", "contract-pulse");
     } else if (progressIncreased) {
-      pulseElement("quick-objective-progress", "objective-pulse");
+      pulseElement("quick-objective-progress", "contract-pulse");
     }
   }
 
@@ -1012,11 +1124,6 @@ export class Hud {
       "better-hay",
       "better-scoop",
       "poop-roomba",
-      "fuel-automation",
-      "automation-balanced",
-      "automation-cleanliness",
-      "automation-litter-focus",
-      "automation-rare-guard",
       "bigger-cage",
       "rare-pig",
     ]), "available");
@@ -1029,6 +1136,11 @@ export class Hud {
       "snuggle-sack",
       "cardboard-castle",
       "royal-throne",
+      "fuel-automation",
+      "automation-balanced",
+      "automation-cleanliness",
+      "automation-litter-focus",
+      "automation-rare-guard",
     ]), ecologyConcerns > 0 ? "urgent" : "available");
     this.setDockIndicator("abilities", countEnabled(this.buttons, [
       "wheek-call",
@@ -1042,21 +1154,19 @@ export class Hud {
       "recipe-bean-blessing",
       "recipe-compost-catalyst",
       "recipe-royal-accord",
-    ]), "available");
-    this.setDockIndicator("mythos", countEnabled(this.buttons, [
-      "hay-dimension",
+      "recipe-singularity-experiment",
+      "run-singularity-experiment",
       "bean-exchange",
+      "golden-scoop",
       "exchange-beans-to-compost",
       "exchange-compost-to-squeaks",
       "exchange-gold-to-beans",
       "exchange-squeaks-to-gold",
-      "cavy-council",
+    ]), "available");
+    this.setDockIndicator("herd", countEnabled(this.buttons, [
       "council-care-mandate",
       "council-cleanup-ordinance",
       "council-herd-charter",
-      "squeak-choir",
-      "bean-singularity",
-      "prestige",
     ]), "available");
     this.setDockIndicator("wisdom", countEnabled(this.buttons, [
       "wisdom-roomy-start",
@@ -1071,9 +1181,17 @@ export class Hud {
       "wisdom-rare-instinct",
       "wisdom-golden-nose",
       "wisdom-royal-memory",
+      "wisdom-gentle-care",
+      "wisdom-automation-steward",
+      "wisdom-rare-bean-alchemy",
+      "prestige",
     ]), "available");
-    this.setDockIndicator("herd", "", "notice");
-    this.setDockIndicator("goals", this.hasGoalUpdate ? "!" : "", "notice");
+    const contractBoard = getContractBoardView(this.state);
+    this.setDockIndicator(
+      "goals",
+      this.hasGoalUpdate ? "!" : !contractBoard.active && contractBoard.offers.length > 0 ? contractBoard.offers.length.toString() : "",
+      this.hasGoalUpdate ? "urgent" : "notice",
+    );
     this.setDockIndicator("log", this.hasUnreadLog ? "!" : "", "notice");
   }
 
@@ -1100,7 +1218,8 @@ export class Hud {
   private setDockIndicator(section: SectionId, value: number | string, kind: DockBadgeKind): void {
     const badge = this.badges[section];
     const launcher = this.launchers[section];
-    const text = typeof value === "number" ? (value > 0 ? value.toString() : "") : value;
+    const indicatorText = typeof value === "number" ? (value > 0 ? value.toString() : "") : value;
+    const text = launcher.hidden ? "" : indicatorText;
     badge.textContent = text;
     badge.hidden = text.length === 0;
     badge.dataset.badgeKind = kind;
@@ -1159,6 +1278,9 @@ export class Hud {
     for (const button of document.querySelectorAll<HTMLButtonElement>(".furniture-care-button")) {
       this.setActionVisualState(button, getActionVisualState(button));
     }
+    for (const button of document.querySelectorAll<HTMLButtonElement>(".contract-select-button")) {
+      this.setActionVisualState(button, getActionVisualState(button));
+    }
     this.updateModalScanStates();
   }
 
@@ -1171,7 +1293,9 @@ export class Hud {
 
   private updateModalScanStates(): void {
     for (const panel of Object.values(this.panels)) {
-      const buttons = [...panel.querySelectorAll<HTMLButtonElement>("button")].filter((button) => !button.hidden);
+      const buttons = [...panel.querySelectorAll<HTMLButtonElement>("button")].filter((button) =>
+        isModalButtonVisible(button, panel),
+      );
       const available = buttons.filter((button) => getActionVisualState(button) === "available").length;
       const completed = buttons.filter((button) => getActionVisualState(button) === "completed").length;
       const locked = buttons.filter((button) => getActionVisualState(button) === "locked").length;
@@ -1244,6 +1368,24 @@ export class Hud {
     );
   }
 
+  private bindWisdomSpecializationButton(buttonId: ButtonId, specializationId: WisdomSpecializationId): void {
+    this.buttons[buttonId].addEventListener("click", () =>
+      this.runAction(
+        () => chooseWisdomSpecialization(this.state, specializationId),
+        this.buttons[buttonId],
+        {
+          category: "unlock",
+          target: "center",
+          label: getWisdomSpecialization(specializationId).label,
+          resourceText: "Philosophy Chosen",
+          color: 0xf0d56b,
+        },
+        "purchase",
+        "purchase",
+      ),
+    );
+  }
+
   private renderFurnitureCosts(costs: Record<FurnitureId, number>): void {
     setText("hidey-house-cost", getFurnitureStatusText(this.state, costs, "hideyHouse"));
     setText("tunnel-cost", getFurnitureStatusText(this.state, costs, "tunnel"));
@@ -1265,24 +1407,7 @@ export class Hud {
   private renderFurnitureSynergies(): void {
     const list = document.querySelector<HTMLUListElement>("#furniture-synergy-list");
     if (!list) return;
-
-    const items = getFurnitureSynergies().map((synergy) => {
-      const active = hasFurnitureSynergy(this.state, synergy.id);
-      const missing = synergy.furniture.filter((furnitureId) => !this.state.furniture[furnitureId]);
-      const item = document.createElement("li");
-      if (active) item.classList.add("complete");
-
-      const title = document.createElement("span");
-      const status = document.createElement("strong");
-      const description = document.createElement("em");
-      title.textContent = synergy.name;
-      status.textContent = active ? "Active" : `Needs ${missing.map(getFurnitureName).join(" + ")}`;
-      description.textContent = synergy.description;
-      item.append(title, status, description);
-      return item;
-    });
-
-    list.replaceChildren(...items);
+    renderFurnitureSynergyList(list, this.state);
   }
 
   private renderFurnitureCare(): void {
@@ -1294,42 +1419,9 @@ export class Hud {
     this.previousFurnitureCareSignature = signature;
 
     const views = getFurnitureCareViews(this.state);
-    if (views.length === 0) {
-      list.replaceChildren(createEmptyStateItem("Unlock furniture to start caring for well-loved cage pieces."));
-      return;
-    }
-
-    const items = views.map((view) => {
-      const item = document.createElement("li");
-      const conditionClass = view.condition >= 88 ? "complete" : view.condition < 58 ? "attention" : "";
-      if (conditionClass) item.classList.add(conditionClass);
-      if (view.status.startsWith("Cooldown")) item.classList.add("cooldown");
-
-      const title = document.createElement("span");
-      const status = document.createElement("strong");
-      const metrics = document.createElement("small");
-      const effect = document.createElement("em");
-      const controls = document.createElement("div");
-      const careButton = document.createElement("button");
-      const careStatus = document.createElement("small");
-
-      title.textContent = view.label;
-      status.textContent = view.conditionLabel;
-      metrics.textContent = `Condition ${view.condition} - ${getCageZoneName(view.zoneId)}`;
-      effect.textContent = view.effect;
-      controls.className = "furniture-care-actions";
-      careButton.type = "button";
-      careButton.className = "furniture-care-button";
-      careButton.textContent = "Care";
-      careButton.disabled = !view.canCare;
-      careStatus.textContent = view.status;
-      careButton.addEventListener("click", () => this.runFurnitureCare(view.id, view.label, view.zoneId, careButton));
-      controls.append(careButton, careStatus);
-      item.append(title, status, metrics, effect, controls);
-      return item;
-    });
-
-    list.replaceChildren(...items);
+    renderFurnitureCareList(list, views, (furnitureId, label, zoneId, button) =>
+      this.runFurnitureCare(furnitureId, label, zoneId, button),
+    );
   }
 
   private renderEcologyZones(): void {
@@ -1339,39 +1431,14 @@ export class Hud {
     if (signature === this.previousEcologySignature) return;
     this.previousEcologySignature = signature;
 
-    const items = this.state.ecology.zones.map((zone) => {
-      const item = document.createElement("li");
-      item.dataset.zoneId = zone.id;
-      if (zone.mess >= 55 || zone.traffic >= 72 || zone.comfort <= 32) item.classList.add("attention");
-      if (zone.appeal >= 78 && zone.pigIds.length > 0) item.classList.add("complete");
-
-      const title = document.createElement("span");
-      const status = document.createElement("strong");
-      const metrics = document.createElement("small");
-      const action = document.createElement("em");
-      const controls = document.createElement("div");
-      const tendButton = document.createElement("button");
-      const tendStatus = document.createElement("small");
-      title.textContent = zone.label;
-      status.textContent = zone.status;
-      const stewardshipCare = this.state.ecology.stewardship[zone.id]?.care ?? 0;
-      const stewardshipCooldown = this.state.ecology.stewardship[zone.id]?.cooldown ?? 0;
-      if (stewardshipCooldown > 0) item.classList.add("cooldown");
-      metrics.textContent = `Comfort ${zone.comfort} - Mess ${zone.mess} - Traffic ${zone.traffic} - Care ${Math.round(stewardshipCare)}`;
-      action.textContent = `${zone.action}${zone.pigIds.length > 0 ? ` - ${zone.pigIds.length} pig${zone.pigIds.length === 1 ? "" : "s"}` : ""}`;
-      controls.className = "ecology-actions";
-      tendButton.type = "button";
-      tendButton.className = "zone-tend-button";
-      tendButton.textContent = "Tend";
-      tendButton.disabled = !canTendHabitatZone(this.state, zone.id);
-      tendStatus.textContent = getHabitatTendStatus(this.state, zone.id);
-      tendButton.addEventListener("click", () => this.runHabitatTend(zone.id, tendButton));
-      controls.append(tendButton, tendStatus);
-      item.append(title, status, metrics, action, controls);
-      return item;
-    });
-
-    list.replaceChildren(...items);
+    renderEcologyZoneList(
+      list,
+      this.state.ecology.zones,
+      this.state.ecology.stewardship,
+      (zoneId) => canTendHabitatZone(this.state, zoneId),
+      (zoneId) => getHabitatTendStatus(this.state, zoneId),
+      (zoneId, button) => this.runHabitatTend(zoneId, button),
+    );
   }
 
   private runHabitatTend(zoneId: CageZoneId, button: HTMLButtonElement): void {
@@ -1423,16 +1490,16 @@ export class Hud {
     setText("recipe-bean-blessing-status", getRecipeStatusText(this.state, "beanBlessing"));
     setText("recipe-compost-catalyst-status", getRecipeStatusText(this.state, "compostCatalyst"));
     setText("recipe-royal-accord-status", getRecipeStatusText(this.state, "royalAccord"));
+    setText("recipe-singularity-experiment-status", getRecipeStatusText(this.state, "singularityExperiment"));
+    setText("run-singularity-experiment-status", getSingularityExperimentStatus(this.state));
   }
 
   private renderLateGameStatuses(): void {
-    setText("hay-dimension-status", getLateGameStatusText(this.state, "hayDimension"));
     setText("bean-exchange-status", getLateGameStatusText(this.state, "beanExchange"));
+    setText("golden-scoop-status", getLateGameStatusText(this.state, "goldenScoop"));
     this.renderBeanExchangeStatuses();
-    setText("cavy-council-status", getLateGameStatusText(this.state, "cavyCouncil"));
+    setText("cavy-council-status", getCavyCouncilStatusText(this.state));
     this.renderCouncilDecreeStatuses();
-    setText("squeak-choir-status", getLateGameStatusText(this.state, "squeakChoir"));
-    setText("bean-singularity-status", getLateGameStatusText(this.state, "beanSingularity"));
   }
 
   private renderBeanExchangeStatuses(): void {
@@ -1444,7 +1511,8 @@ export class Hud {
   }
 
   private renderCouncilDecreeStatuses(): void {
-    this.cavyCouncilPanel.hidden = !this.state.lateGame.cavyCouncil;
+    const councilSeated = hasCavyCouncilEffect(this.state);
+    this.cavyCouncilPanel.hidden = !councilSeated;
     for (const decree of getCouncilDecrees()) {
       const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
       setText(`${buttonId}-status`, getCouncilDecreeStatus(this.state, decree.id));
@@ -1454,6 +1522,9 @@ export class Hud {
   private renderWisdomStatuses(): void {
     for (const perk of getWisdomPerks()) {
       setText(`${WISDOM_BUTTONS[perk.id]}-status`, getWisdomStatusText(this.state, perk.id));
+    }
+    for (const specialization of getWisdomSpecializations()) {
+      setText(`${WISDOM_SPECIALIZATION_BUTTONS[specialization.id]}-status`, getWisdomSpecializationStatusText(this.state, specialization.id));
     }
   }
 
@@ -1560,30 +1631,33 @@ export class Hud {
     this.buttons["recipe-bean-blessing"].disabled = !canUnlockBeanRecipe(this.state, "beanBlessing");
     this.buttons["recipe-compost-catalyst"].disabled = !canUnlockBeanRecipe(this.state, "compostCatalyst");
     this.buttons["recipe-royal-accord"].disabled = !canUnlockBeanRecipe(this.state, "royalAccord");
+    this.buttons["recipe-singularity-experiment"].disabled = !canUnlockBeanRecipe(this.state, "singularityExperiment");
+    this.buttons["run-singularity-experiment"].hidden = !hasSingularityExperimentEffect(this.state);
+    this.buttons["run-singularity-experiment"].disabled = !canRunSingularityExperiment(this.state);
   }
 
   private updateLateGameDisabled(): void {
-    this.buttons["hay-dimension"].disabled = this.state.lateGame.hayDimension || this.state.beans < 750 || this.state.compost < 25;
     this.buttons["bean-exchange"].disabled = this.state.lateGame.beanExchange || this.state.beans < 1200 || this.state.goldenBeans < 2;
+    this.buttons["golden-scoop"].disabled = !canUnlockGoldenScoop(this.state);
     for (const trade of getBeanExchangeTrades()) {
       const buttonId = BEAN_EXCHANGE_BUTTONS[trade.id];
       this.buttons[buttonId].disabled = getBeanExchangeTradeStatus(this.state, trade.id) !== "Trade";
       this.buttons[buttonId].hidden = !this.state.lateGame.beanExchange;
     }
-    this.buttons["cavy-council"].disabled = this.state.lateGame.cavyCouncil || this.state.pigs.length < 8 || this.state.squeaks < 10;
+    const councilSeated = hasCavyCouncilEffect(this.state);
     for (const decree of getCouncilDecrees()) {
       const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
       this.buttons[buttonId].disabled = getCouncilDecreeStatus(this.state, decree.id) !== "Pass";
-      this.buttons[buttonId].hidden = !this.state.lateGame.cavyCouncil;
+      this.buttons[buttonId].hidden = !councilSeated;
     }
-    this.buttons["squeak-choir"].disabled = this.state.lateGame.squeakChoir || this.state.squeaks < 25;
-    this.buttons["bean-singularity"].disabled =
-      this.state.lateGame.beanSingularity || this.state.compost < 100 || this.state.stats.rarePoopsCleaned < 25;
   }
 
   private updateWisdomDisabled(): void {
     for (const perk of getWisdomPerks()) {
       this.buttons[WISDOM_BUTTONS[perk.id]].disabled = !canBuyWisdomPerk(this.state, perk.id);
+    }
+    for (const specialization of getWisdomSpecializations()) {
+      this.buttons[WISDOM_SPECIALIZATION_BUTTONS[specialization.id]].disabled = !canChooseWisdomSpecialization(this.state, specialization.id);
     }
   }
 
@@ -1596,64 +1670,26 @@ export class Hud {
   }
 }
 
-function getButton(id: string): HTMLButtonElement {
-  const element = document.getElementById(id);
-  if (!(element instanceof HTMLButtonElement)) {
-    throw new Error(`Missing button #${id}`);
-  }
-  return element;
-}
-
-function getElement(id: string): HTMLElement {
-  const element = document.getElementById(id);
-  if (!element) {
-    throw new Error(`Missing element #${id}`);
-  }
-  return element;
-}
-
-function getDialog(id: string): HTMLDialogElement {
-  const element = document.getElementById(id);
-  if (!(element instanceof HTMLDialogElement)) {
-    throw new Error(`Missing dialog #${id}`);
-  }
-  return element;
-}
-
-function getImage(id: string): HTMLImageElement {
-  const element = document.getElementById(id);
-  if (!(element instanceof HTMLImageElement)) {
-    throw new Error(`Missing image #${id}`);
-  }
-  return element;
-}
-
 function getPanel(section: SectionId): HTMLElement {
-  const element = document.querySelector<HTMLElement>(`[data-section-panel="${section}"]`);
-  if (!element) {
-    throw new Error(`Missing modal panel for ${section}`);
-  }
-  return element;
+  return getDataElement("data-section-panel", section);
 }
 
 function getBadge(section: SectionId): HTMLElement {
-  const element = document.querySelector<HTMLElement>(`[data-dock-badge="${section}"]`);
-  if (!element) {
-    throw new Error(`Missing dock badge for ${section}`);
-  }
-  return element;
+  return getDataElement("data-dock-badge", section);
 }
 
 function getStatCard(id: StatId): HTMLElement {
-  const element = document.querySelector<HTMLElement>(`[data-stat="${id}"]`);
-  if (!element) {
-    throw new Error(`Missing stat card for ${id}`);
-  }
-  return element;
+  return getDataElement("data-stat", id);
 }
 
 function countEnabled(buttons: Record<ButtonId, HTMLButtonElement>, ids: ButtonId[]): number {
-  return ids.reduce((total, id) => total + Number(!buttons[id].disabled), 0);
+  return ids.reduce((total, id) => total + Number(!buttons[id].disabled && !buttons[id].hidden), 0);
+}
+
+function isModalButtonVisible(button: HTMLButtonElement, panel: HTMLElement): boolean {
+  if (button.hidden) return false;
+  const hiddenParent = button.closest<HTMLElement>("[hidden]");
+  return !hiddenParent || hiddenParent === panel;
 }
 
 function pulseElement(id: string, className: string): void {
@@ -1677,22 +1713,44 @@ function isEditableTarget(target: EventTarget | null): boolean {
 }
 
 function getGoalSignature(state: GameState): string {
+  const active = state.contracts.active;
   return [
-    state.objective.id,
-    Math.floor(state.objective.progress),
-    state.objective.target,
-    state.stats.objectivesCompleted,
-    state.milestones.quests.join(","),
-    state.milestones.achievements.join(","),
+    active?.id ?? "offers",
+    active?.requirements.map((requirement) => `${requirement.id}:${Math.floor(requirement.progress)}`).join(",") ?? "",
+    state.contracts.offers.map((offer) => offer.id).join(","),
+    state.contracts.completed,
+    state.contracts.expired,
   ].join("|");
 }
 
-function getObjectivePulseState(state: GameState): ObjectivePulseState {
+function getContractBoardRenderSignature(board: ReturnType<typeof getContractBoardView>): string {
+  return [
+    board.active ? getContractCardRenderSignature(board.active) : "none",
+    board.offers.map(getContractCardRenderSignature).join(";"),
+    board.lastResult
+      ? `${board.lastResult.token}:${board.lastResult.completed}:${board.lastResult.title}:${board.lastResult.rewardText}`
+      : "none",
+  ].join("|");
+}
+
+function getContractCardRenderSignature(card: ReturnType<typeof getContractBoardView>["offers"][number]): string {
+  return [
+    card.id,
+    card.title,
+    card.timer,
+    card.rewardText,
+    card.requirements.map((requirement) => `${requirement.label}:${requirement.progressText}:${requirement.complete}`).join(","),
+  ].join(":");
+}
+
+function getContractPulseState(state: GameState): ContractPulseState {
+  const active = state.contracts.active;
   return {
-    id: state.objective.id,
-    progress: Math.floor(state.objective.progress),
-    target: state.objective.target,
-    completed: state.stats.objectivesCompleted,
+    id: active?.id ?? "offers",
+    progress: active ? active.requirements.reduce((total, requirement) => total + Math.floor(requirement.progress), 0) : 0,
+    target: active ? active.requirements.reduce((total, requirement) => total + requirement.target, 0) : state.contracts.offers.length,
+    completed: state.contracts.completed,
+    expired: state.contracts.expired,
   };
 }
 
@@ -1787,11 +1845,16 @@ function isCompletedButton(button: HTMLButtonElement): boolean {
 function getBeanRecipeName(id: BeanRecipeId): string {
   if (id === "beanBlessing") return "Bean Blessing";
   if (id === "compostCatalyst") return "Compost Catalyst";
+  if (id === "singularityExperiment") return "Singularity Experiment";
   return "Royal Accord";
 }
 
 function getLogSignature(state: GameState): string {
-  return state.log.join("|");
+  return [
+    state.log.join("|"),
+    state.milestones.quests.join(","),
+    state.milestones.achievements.join(","),
+  ].join("|records:");
 }
 
 function getFurnitureCareRenderSignature(state: GameState): string {
@@ -1841,11 +1904,20 @@ function setMeter(id: string, value: number): void {
   if (element) element.style.width = `${Math.max(0, Math.min(100, value))}%`;
 }
 
-function getStatusLine(state: GameState): string {
-  const ecologyLine = getEcologyStatusLine(state);
-  if (ecologyLine) return ecologyLine;
-  const careNeed = getFurnitureCareViews(state).find((view) => view.condition < 58);
-  if (careNeed) return `${careNeed.label} is ${careNeed.conditionLabel.toLowerCase()}. Open Furniture Care to tend it.`;
+function getStatusLine(
+  state: GameState,
+  options: { showFurnitureCare: boolean; showHabitatCare: boolean },
+): string {
+  if (options.showHabitatCare) {
+    const ecologyLine = getEcologyStatusLine(state);
+    if (ecologyLine) return ecologyLine;
+  }
+  if (options.showFurnitureCare) {
+    const careNeed = getFurnitureCareViews(state).find((view) => view.condition < 58);
+    if (careNeed) return `${careNeed.label} is ${careNeed.conditionLabel.toLowerCase()}. Open Furniture Care to tend it.`;
+  }
+  const contractQuick = getContractQuickView(state);
+  if (!contractQuick.active) return "Choose a Contract in Goals to focus the next few minutes of care.";
   if (state.automation.overdrive > 0) return `Automation overdrive is sweeping faster for ${Math.ceil(state.automation.overdrive)}s.`;
   if (state.robot || state.furniture.litterTray) return `Automation directive: ${getAutomationDirectiveName(state.automation.directive)}.`;
   if (state.event.active && state.event.responseReady)
@@ -1896,7 +1968,17 @@ function getAutomationFuelText(state: GameState): string {
   if (state.automation.overdrive > 0) return `${Math.ceil(state.automation.overdrive)}s active`;
   const cost = getAutomationFuelCost(state);
   if (state.compost < cost) return formatNeed(state.compost, cost, "Compost", "Compost");
-  return `Fuel ${cost} Compost`;
+  return `Fuel ${cost} Compost, +${getAutomationFuelDuration(state)}s`;
+}
+
+function getBetterHayStatusText(state: GameState, cost: number): string {
+  const nextLevel = state.upgrades.feedLevel + 1;
+  const capstone = state.lateGame.hayDimension
+    ? "Dimension active"
+    : nextLevel >= HAY_DIMENSION_FEED_LEVEL
+      ? "opens Hay Dimension"
+      : `Lv ${state.upgrades.feedLevel}/${HAY_DIMENSION_FEED_LEVEL}`;
+  return getBeanCostStatusText(state, cost, `${cost} Beans - ${capstone}`);
 }
 
 function getAbilityStatusText(state: GameState, id: AbilityId): string {
@@ -1918,7 +2000,7 @@ function getBiggerCageStatusText(state: GameState, cost: number, capacity: numbe
   const widthIncrease = nextSize.width - currentSize.width;
   const heightIncrease = nextSize.height - currentSize.height;
   const expansionText = widthIncrease > 0 || heightIncrease > 0 ? `+${widthIncrease}x${heightIncrease}` : "Max size";
-  return getBeanCostStatusText(state, cost, `${cost} Beans - ${expansionText} - Cap ${capacity + 2}`);
+  return getBeanCostStatusText(state, cost, `${cost} Beans - ${expansionText} - Cap ${capacity + 2} - cleaner longer`);
 }
 
 function getRarePigStatusText(state: GameState, cost: number, capacity: number): string {
@@ -1945,7 +2027,7 @@ function getFurnitureStatusText(state: GameState, costs: Record<FurnitureId, num
 }
 
 function getRecipeStatusText(state: GameState, id: BeanRecipeId): string {
-  if (state.recipes[id]) return "Active";
+  if (state.recipes[id] || (id === "singularityExperiment" && hasSingularityExperimentEffect(state))) return "Active";
   if (id === "beanBlessing") {
     if (state.goldenBeans < 2) return formatNeed(state.goldenBeans, 2, "Golden Bean");
     if (state.squeaks < 8) return formatNeed(state.squeaks, 8, "Squeak");
@@ -1958,36 +2040,52 @@ function getRecipeStatusText(state: GameState, id: BeanRecipeId): string {
     if (state.stats.stinkyCleaned < 2) return `Clean ${2 - state.stats.stinkyCleaned} Stinky`;
     return "Unlock";
   }
+  if (id === "singularityExperiment") {
+    if (state.compost < SINGULARITY_RECIPE_COMPOST_COST) {
+      return formatNeed(state.compost, SINGULARITY_RECIPE_COMPOST_COST, "Compost", "Compost");
+    }
+    if (state.stats.rarePoopsCleaned < SINGULARITY_RECIPE_RARE_CLEANED) {
+      return `Clean ${SINGULARITY_RECIPE_RARE_CLEANED - state.stats.rarePoopsCleaned} rare`;
+    }
+    if (state.stats.cursedCleaned < SINGULARITY_RECIPE_CURSED_CLEANED) return "Clean Cursed";
+    return "Unlock";
+  }
   if (state.goldenBeans < 1) return formatNeed(state.goldenBeans, 1, "Golden Bean");
   if (state.squeaks < 16) return formatNeed(state.squeaks, 16, "Squeak");
   if (state.stats.royalCleaned < 1 && state.stats.legendaryPigsAdopted < 1) return "Clean Royal";
   return "Unlock";
 }
 
-function getLateGameStatusText(state: GameState, id: keyof GameState["lateGame"]): string {
+function getLateGameStatusText(
+  state: GameState,
+  id: Exclude<keyof GameState["lateGame"], "hayDimension" | "squeakChoir" | "cavyCouncil" | "beanSingularity">,
+): string {
   if (state.lateGame[id]) return "Active";
-  if (id === "hayDimension") {
-    if (state.beans < 750) return formatNeed(state.beans, 750, "Bean");
-    if (state.compost < 25) return formatNeed(state.compost, 25, "Compost", "Compost");
-    return "Unlock";
-  }
   if (id === "beanExchange") {
     if (state.beans < 1200) return formatNeed(state.beans, 1200, "Bean");
     if (state.goldenBeans < 2) return formatNeed(state.goldenBeans, 2, "Golden Bean");
     return "Unlock";
   }
-  if (id === "cavyCouncil") {
-    if (state.pigs.length < 8) return formatNeed(state.pigs.length, 8, "Pig");
-    if (state.squeaks < 10) return formatNeed(state.squeaks, 10, "Squeak");
-    return "Unlock";
-  }
-  if (id === "squeakChoir") {
-    if (state.squeaks < 25) return formatNeed(state.squeaks, 25, "Squeak");
+  if (id === "goldenScoop") {
+    const cost = getGoldenScoopCost();
+    if (state.beans < cost.beans) return formatNeed(state.beans, cost.beans, "Bean");
+    if (state.goldenBeans < cost.goldenBeans) return formatNeed(state.goldenBeans, cost.goldenBeans, "Golden Bean");
     return "Unlock";
   }
   if (state.compost < 100) return formatNeed(state.compost, 100, "Compost", "Compost");
   if (state.stats.rarePoopsCleaned < 25) return `Clean ${25 - state.stats.rarePoopsCleaned} rare`;
   return "Unlock";
+}
+
+function canUnlockGoldenScoop(state: GameState): boolean {
+  if (hasGoldenScoopEffect(state)) return false;
+  const cost = getGoldenScoopCost();
+  return state.beans >= cost.beans && state.goldenBeans >= cost.goldenBeans;
+}
+
+function getCavyCouncilStatusText(state: GameState): string {
+  if (hasCavyCouncilEffect(state)) return "Council seated";
+  return formatNeed(state.pigs.length, CAVY_COUNCIL_HERD_SIZE, "Pig");
 }
 
 function getPrestigeStatusText(state: GameState): string {
@@ -2007,70 +2105,22 @@ function getWisdomStatusText(state: GameState, id: WisdomPerkId): string {
   return `Learn ${cost} Wisdom`;
 }
 
+function getWisdomSpecializationStatusText(state: GameState, id: WisdomSpecializationId): string {
+  if (state.wisdomSpecialization === id) return "Active";
+  if (state.wisdomSpecialization) return "Philosophy chosen";
+  const tierThreeLearned = getWisdomPerks().some((perk) => perk.tier >= 3 && state.wisdom[perk.id]);
+  if (!tierThreeLearned) return "Requires tier-3 Wisdom";
+  return "Choose";
+}
+
 function formatNeed(current: number, required: number, singular: string, plural = `${singular}s`): string {
   const missing = Math.max(1, Math.ceil(required - current));
   return `Need ${missing} ${missing === 1 ? singular : plural}`;
 }
 
-function getFurnitureName(id: FurnitureId): string {
-  const names: Record<FurnitureId, string> = {
-    hideyHouse: "Hidey House",
-    tunnel: "Tunnel",
-    litterTray: "Litter Tray",
-    chewToy: "Chew Toy",
-    snuggleSack: "Snuggle Sack",
-    cardboardCastle: "Cardboard Castle",
-    royalThrone: "Royal Throne",
-  };
-  return names[id];
-}
-
 function getComboText(state: GameState): string {
   if (state.combo.count <= 1 || state.combo.timer <= 0) return "Ready";
   return `x${state.combo.count}`;
-}
-
-function createEmptyStateItem(text: string): HTMLLIElement {
-  const item = document.createElement("li");
-  item.className = "empty-state";
-  item.textContent = text;
-  return item;
-}
-
-function renderMilestoneList(
-  id: string,
-  milestones: MilestoneView[],
-  limit: number,
-  emptyText: string,
-  completeText: string,
-): void {
-  const list = document.querySelector<HTMLUListElement>(`#${id}`);
-  if (!list) return;
-
-  const visible = [
-    ...milestones.filter((milestone) => !milestone.complete),
-    ...milestones.filter((milestone) => milestone.complete),
-  ].slice(0, limit);
-
-  const items = visible.map((milestone) => {
-    const item = document.createElement("li");
-    if (milestone.complete) item.classList.add("complete");
-
-    const title = document.createElement("span");
-    const progress = document.createElement("strong");
-    title.textContent = milestone.title;
-    progress.textContent = milestone.complete ? "Done" : milestone.progress;
-    item.append(title, progress);
-    return item;
-  });
-
-  if (visible.length === 0) {
-    items.push(createEmptyStateItem(emptyText));
-  } else if (visible.every((milestone) => milestone.complete)) {
-    items.push(createEmptyStateItem(completeText));
-  }
-
-  list.replaceChildren(...items);
 }
 
 function getCooldownText(seconds: number): string {

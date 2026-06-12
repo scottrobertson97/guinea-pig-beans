@@ -43,21 +43,23 @@ The persistent screen shows:
 - The cage playfield with pigs, beans, hay, water, furniture, dirt, and automation.
 - Top stats: Beans, Pigs, Cleanliness, Streak, Compost, Squeaks, Gold, Wisdom, and Furniture.
 - Quick care meters for Hay, Water, and Happiness.
-- A current Objective.
+- A current Contract prompt.
 - Persistent utility controls for sound, save status, and reset.
 
-The section dock opens modal sections:
+The fresh-run section dock opens the core loop first:
 
 - Care
 - Shop
-- Furniture
-- Abilities
-- Recipes
-- Mythos
-- Wisdom
 - Herd
 - Goals
 - Log
+
+Advanced sections reveal when the player has a reason to use them:
+
+- Furniture
+- Abilities
+- Recipes
+- Wisdom
 
 High-frequency care information stays visible. Deeper decisions live behind dock sections.
 
@@ -79,7 +81,7 @@ A fresh run begins with:
 - No robot.
 - No recipes.
 - No mythic systems.
-- A starting objective: "Clean 3 beans quickly."
+- Fresh Contract offers in the Goals modal.
 
 The two starting pigs enter as a bonded pair. This matters because bonding contributes to the socialization layer, and because the game treats two pigs as the healthy baseline herd.
 
@@ -103,11 +105,25 @@ The loop creates a soft tension between:
 - Spending resources on growth versus support.
 - Expanding the herd versus keeping the cage livable.
 
+### No-Orphan-System Rule
+
+Every new or surviving system should connect to at least two other systems and one visible feedback channel.
+
+Examples:
+
+- Contracts connect care, ecology, automation, recipes, herd management, and Log feedback.
+- Wisdom philosophies change multiple systems and show their tradeoff in the Wisdom modal.
+- Furniture and Habitat Stewardship affect pig stress, ecology, automation, requests, Contracts, and cage feedback.
+
+A system is not considered complete if it only changes hidden state.
+
+Mechanics should also reveal themselves at the moment they create a useful decision. Advanced dock sections should stay hidden on a fresh run, then appear when existing progress, resources, accepted Contracts, or cage pressure make them relevant.
+
 ## Resources
 
 ### Beans
 
-Beans are the main currency. The player earns them primarily by cleaning beans in the cage. Beans buy pigs, upgrades, furniture, automation, mythic unlocks, and some event or trade choices.
+Beans are the main currency. The player earns them primarily by cleaning beans in the cage. Beans buy pigs, upgrades, furniture, automation, late-game unlocks, and some event or trade choices.
 
 Lifetime Beans also drive prestige progress.
 
@@ -117,13 +133,12 @@ Compost is a secondary resource earned mainly from compost beans and some reques
 
 - Fueling automation overdrive.
 - Unlocking Compost Catalyst.
-- Unlocking Hay Dimension.
-- Unlocking Bean Singularity.
+- Unlocking and running the Singularity Experiment recipe.
 - Bean Exchange trades.
 
 ### Squeaks
 
-Squeaks are an active-ability resource. They come from blessed beans, requests, events, Wheek Call, and late-game Squeak Choir.
+Squeaks are an active-ability resource. They come from blessed beans, requests, events, Wheek Call, and the Chorus Training choir effect.
 
 Squeaks are used for:
 
@@ -360,7 +375,7 @@ Modifiers:
 - Hay Frenzy increases hay drain.
 - Hay Goblins increase hay drain.
 - Chew Toy slows hay drain.
-- Hay Dimension slows hay drain.
+- The Better Hay capstone opens Hay Dimension and slows hay drain.
 - Steady Supplies slows both hay and water drain.
 - Total Wisdom very slightly slows water drain.
 - Bottle Jam prevents normal water drain, but pigs cannot drink while the bottle is jammed.
@@ -434,7 +449,7 @@ The base interval is 5 seconds, then modifiers are applied.
 Production can get faster from:
 
 - Better Hay levels.
-- Hay Dimension.
+- Better Hay's Hay Dimension capstone.
 - High enrichment.
 - High socialization.
 - High happiness.
@@ -485,7 +500,7 @@ Current bean types:
 | Hay | 3 | More likely when hay is high. |
 | Golden | 8 | Awards a Golden Bean when cleaned. |
 | Royal | 10 | Supports royal/legendary progression. |
-| Cursed | 12 | High value, higher cleanliness pressure, tied to Bean Singularity or very dirty cages. |
+| Cursed | 12 | High value, higher cleanliness pressure, tied to the Singularity Experiment or very dirty cages. |
 | Mess Pile | Varies | Forms from clustered beans and requires multiple cleanup hits. |
 
 Chonker pigs add +1 to starting bean value.
@@ -564,8 +579,8 @@ Cleaning can award:
 - Squeaks.
 - Golden Beans.
 - Mystery rewards.
-- Objective progress.
-- Quest and achievement progress.
+- Contract progress.
+- Record milestone progress.
 - Pig request progress.
 
 ## Cleanliness And Mess
@@ -591,6 +606,10 @@ Cleanliness can receive small bonuses:
 Dirty cages are visible in the playfield through floor tint, dirt wash, and dirt patches. Stinky beans and Mess Piles also create local dirty areas.
 
 ## Shop Progression
+
+Shop is the growth/build surface. It groups herd growth separately from cage growth so early purchases stay easy to scan.
+
+Ongoing operating choices, such as fueling automation or choosing automation directives, live in Furniture with the systems they control.
 
 ### Adopt Pig
 
@@ -634,29 +653,6 @@ Current pricing:
 - Reduced by Better Scoop.
 - Reduced by Gentle Automation.
 - Minimum cost is 45 Beans.
-
-### Fuel Automation
-
-Spends Compost to activate Roomba overdrive.
-
-Overdrive makes automation faster and improves detection/sweep performance.
-
-Current fuel cost:
-
-- Starts at 12 Compost.
-- Reduced by Better Scoop.
-- Reduced by Gentle Automation.
-- Reduced by Compost Engine.
-- Reduced by Compost Catalyst.
-- Minimum cost is 3 Compost.
-
-Current overdrive duration:
-
-- 18 seconds base.
-- More with Compost Catalyst.
-- More with Gentle Automation.
-- More with Compost Engine.
-- Capped at 60 seconds stored.
 
 ### Bigger Cage
 
@@ -771,9 +767,32 @@ Roomba performance improves with:
 - Cleanup Circuit.
 - Compost fuel systems.
 
+### Fuel Automation
+
+Fuel Automation is managed from Furniture alongside automation directives.
+
+It spends Compost to activate Roomba overdrive. Overdrive makes automation faster and improves detection/sweep performance.
+
+Current fuel cost:
+
+- Starts at 12 Compost.
+- Reduced by Better Scoop.
+- Reduced by Gentle Automation.
+- Reduced by Compost Engine.
+- Reduced by Compost Catalyst.
+- Minimum cost is 3 Compost.
+
+Current overdrive duration:
+
+- 18 seconds base.
+- More with Compost Catalyst.
+- More with Gentle Automation.
+- More with Compost Engine.
+- Capped at 60 seconds stored.
+
 ### Automation Directives
 
-Once the player has a Roomba or Litter Tray, automation can be given a directive. Directives are free mode choices, not upgrades.
+Once the player has a Roomba or Litter Tray, automation can be given a directive. Directives are free mode choices, not upgrades, and are managed from Furniture alongside Fuel Automation, Litter Tray, Furniture Care, and Cage Ecology.
 
 Current directives:
 
@@ -801,38 +820,40 @@ Abilities are direct player interventions. Most cost Squeaks and then enter cool
 
 Ability costs can be reduced by:
 
-- Chorus Training Wisdom.
-- Squeak Choir.
+- Chorus Training Wisdom, which also helps the herd generate Squeaks over time.
 
-## Objectives, Quests, And Achievements
+## Contracts And Records
 
-### Rotating Objectives
+### Contracts Board
 
-The player always has a timed objective.
+Contracts are optional timed care jobs that ask the player to connect several systems before the timer expires. They replace the older one-step rotating objective loop as the main short-term goal layer.
 
-Starting objective:
+Contracts also pace mechanic discovery. Early intro Contracts point the player toward one new system at a time, and accepting those Contracts can reveal the matching dock section before the raw resource threshold would.
 
-- Clean 3 beans quickly.
+The player can have one active Contract at a time. When no Contract is active, the Goals modal shows up to three available offers. The quick care strip shows whether a Contract is active or waiting to be chosen.
 
-Current objective cycle includes:
+Current first-pass Contract offers:
 
-- Clean 5 beans quickly.
-- Keep clean above 80%.
-- Clean more rare beans.
-- Use an active ability.
-- Unlock furniture.
-- Hold 75 Beans.
-- Keep a larger herd happy.
-- Fuel automation with Compost.
-- Unlock a bean recipe.
+- Fresh Cage Delivery: clean beans, refill hay or water, then hold high cleanliness.
+- Room to Nest: introduce Furniture by unlocking or caring for one cage piece.
+- First Wheek: introduce Abilities by using Wheek Call or another active care move.
+- Habitat Reset: tend different habitat zones, care for or unlock furniture, then keep average stress low.
+- Cleanup Route: choose a cleanup automation directive, let automation clean beans, and handle the Litter Corner.
+- Compost Starter: introduce Bean Recipes by turning Compost or rare cleanup into recipe momentum.
+- Rare Sample Order: clean a rare bean, reach a Clean Streak, and hold Gold or Squeaks.
+- Recipe Commission: clean recipe-minded beans, use an ability, and unlock a recipe or hold Compost.
+- Council Session: keep an 8-pig herd happy and pass a Cavy Council decree.
+- Great Composting Rumor: introduce Wisdom by pointing a strong run toward permanent Great Composting progress.
 
-Completing an objective awards Beans. The reward starts at 8 Beans and increases by 3 for each completed objective.
+Contracts can reward Beans, Squeaks, Compost, or a short rare-bean odds boost. They are meant to nudge the player across care, ecology, automation, abilities, recipes, herd management, and rare resources without forcing a single play style.
 
-Expired objectives are replaced by the next objective.
+Expired Contracts disappear without penalty and are replaced by new offers. Pig requests remain a separate personal favor layer, but their progress hooks can feed future Contract requirements.
 
-### Quests
+### Records
 
-Quests are longer progression milestones. Current quest beats:
+Records are completed milestone beats shown in the Log rather than a second active checklist. They preserve the flavor of older quests and achievements while keeping Contracts as the only active goal layer.
+
+Current progression records:
 
 - Clean 10 beans.
 - Reach 100 Beans.
@@ -850,9 +871,7 @@ Quests are longer progression milestones. Current quest beats:
 - Learn Cavy Wisdom.
 - Enter the Great Composting.
 
-### Achievements
-
-Achievements are broader accomplishments and jokes. Current achievements:
+Current achievement records:
 
 - First Bean.
 - Gold Rush.
@@ -973,7 +992,7 @@ Choices:
 
 - Answer the Chorus: gain Squeaks.
 - Conduct the Herd: spend Beans for happiness and Squeaks.
-- Echo Into Mythos: spend Squeaks for a Golden Bean.
+- Echo Into Gold: spend Squeaks for a Golden Bean.
 
 ## Bean Recipes
 
@@ -1024,16 +1043,38 @@ Effects:
 - Discounts legendary pigs.
 - Improves royal bean access.
 
-## Mythos And Late Game
+### Singularity Experiment
 
-Mythos systems make the game stranger and add late-game resource conversion.
+Requirements:
 
-### Hay Dimension
+- 100 Compost.
+- 25 rare beans cleaned.
+- At least 1 Cursed bean cleaned.
 
-Unlock cost:
+Effects:
 
-- 750 Beans.
-- 25 Compost.
+- Adds cursed bean potential.
+- Slowly pulls loose beans toward the cage center.
+- Unlocks Run Singularity, a repeatable experiment that spends Compost and Squeaks for a stronger center pull and a short strange-bean boost.
+
+## Late-Game Systems
+
+Late-game systems make the game stranger and add deeper resource conversion, but they now live inside the section they most directly support instead of a separate module.
+
+Current homes:
+
+- Hay Dimension is no longer a standalone purchase. It opens automatically as the Better Hay capstone.
+- Bean Exchange appears in Bean Recipes because it shapes rare-resource conversion.
+- Bean Singularity is no longer a standalone purchase. Its effects live in the Singularity Experiment recipe.
+- Cavy Council seats itself in Herd when the player manages a large herd, then offers repeatable decrees.
+- Squeak Choir is folded into Chorus Training Wisdom because both shape the Squeak ability economy.
+- Great Composting appears in Wisdom because it turns a run into permanent Cavy Wisdom.
+
+### Better Hay Capstone: Hay Dimension
+
+Unlock path:
+
+- Reach Better Hay level 7.
 
 Effects:
 
@@ -1055,18 +1096,19 @@ Unlocks trades:
 - 1 Golden Bean -> 300 Beans.
 - 20 Squeaks + 150 Beans -> 1 Golden Bean.
 
-### Cavy Council
+### Herd Council: Cavy Council
 
-Unlock requirements:
+Convenes when:
 
-- 8 pigs.
-- 10 Squeaks.
+- The herd reaches 8 pigs.
+- Old saves that already unlocked Cavy Council keep it seated.
 
 Effects:
 
 - Adds social stability for large herds.
 - Helps large-herd happiness.
 - Unlocks repeatable Council Decrees.
+- Can appear as a Council Session Contract that asks the player to keep morale high and pass a decree.
 
 Council Decrees:
 
@@ -1074,31 +1116,19 @@ Council Decrees:
 - Cleanup Ordinance: spend 8 Squeaks to clean a wide center area.
 - Herd Charter: spend 10 Squeaks to gain +75 Beans and +1 Golden Bean, requiring a large happy herd.
 
-### Squeak Choir
+### Chorus Training Choir
 
-Unlock cost:
+Unlock path:
 
-- 25 Squeaks.
+- Learn Bonded Beginnings.
+- Learn Social Memory.
+- Spend 3 Wisdom on Chorus Training.
 
 Effects:
 
 - Generates Squeaks over time.
 - Reduces active ability costs by 1.
-- Works especially well with Chorus Training.
-
-### Bean Singularity
-
-Unlock requirements:
-
-- 100 Compost.
-- 25 rare beans cleaned.
-
-Effects:
-
-- Adds cursed bean potential.
-- Slowly pulls loose beans toward the cage center.
-
-This is a risk/reward late-game system: it improves clustering and strange bean access while making the cage feel less normal.
+- Makes Wheek Call grant more Squeaks.
 
 ## Prestige: The Great Composting
 
@@ -1122,10 +1152,10 @@ On prestige:
 - Reset feed, scoop, and cage upgrades.
 - Reset furniture.
 - Reset recipes.
-- Reset Mythos unlocks.
+- Reset late-game unlocks.
 - Restore hay, water, and cleanliness.
 - Return the herd to two pigs.
-- Reset events and objectives.
+- Reset events and Contracts.
 - Keep Wisdom and learned Wisdom perks.
 - Increase prestige count.
 
@@ -1158,7 +1188,7 @@ Each branch currently has three tiers. Later tiers require the previous tier in 
 | --- | ---: | --- |
 | Bonded Beginnings | 1 Wisdom | Bonded pigs add more socialization. |
 | Social Memory | 2 Wisdom | Every bonded pig adds extra socialization. |
-| Chorus Training | 3 Wisdom | Ability costs drop and Wheek Call gives more Squeaks. |
+| Chorus Training | 3 Wisdom | Ability costs drop, Wheek Call gives more Squeaks, and the herd generates Squeaks over time. |
 
 ### Automation Branch
 
@@ -1177,6 +1207,18 @@ Each branch currently has three tiers. Later tiers require the previous tier in 
 | Royal Memory | 3 Wisdom | Legendary pigs cost less and royal bean odds improve. |
 
 Total Wisdom also slightly improves production speed.
+
+### Caretaker Philosophies
+
+After learning any tier-3 Wisdom perk, the player can choose one permanent Caretaker Philosophy. The choices are mutually exclusive and persist through Great Composting.
+
+| Philosophy | Direction | Connected systems |
+| --- | --- | --- |
+| Gentle Care | Lower-pressure habitat care. | Furniture Care, Habitat Stewardship, hay/water drain, pig stress, Contracts. |
+| Automation Steward | Operational cleanup mastery. | Automation fuel, directives, Roomba overdrive, cleanup Contracts, Furniture. |
+| Rare Bean Alchemy | Strange-bean economy. | Rare bean odds, Singularity Experiment, rare Contracts, recipes. |
+
+The Wisdom modal explains the tradeoff before selection. The chosen philosophy is meant to make later runs feel more like a caretaker style than another checklist perk.
 
 ## Progression Arc
 
@@ -1215,7 +1257,7 @@ Primary beats:
 - Buy furniture.
 - Trigger furniture synergies.
 - Use the Litter Tray and Poop Roomba.
-- Handle pig requests and rotating objectives.
+- Handle pig requests and Contracts.
 - Start earning rare resources.
 
 Design goal:
@@ -1236,15 +1278,15 @@ Design goal:
 
 - Make multiple systems depend on each other: care, cleanup, traits, rare drops, and upgrades.
 
-### Phase 5: Mythos
+### Phase 5: Late-Game Systems
 
 Primary beats:
 
-- Unlock Hay Dimension.
+- Push Better Hay into its Hay Dimension capstone.
 - Unlock Bean Exchange.
-- Build a large herd for Cavy Council.
-- Generate Squeaks through Squeak Choir.
-- Unlock Bean Singularity.
+- Build a large herd to seat Cavy Council.
+- Turn Chorus Training into passive Squeak support.
+- Unlock and run the Singularity Experiment.
 
 Design goal:
 
@@ -1272,10 +1314,10 @@ These are current design areas that are intentionally first-pass or still need d
 - Random events are timer-driven. Future versions may use event decks, quest chains, or stronger state-based arcs.
 - Wisdom perks are non-exclusive. Future versions may add mutually exclusive choices.
 - Special bean aging currently mixes reward and cleanliness pressure. Future tuning should decide how much the game should reward waiting.
-- Late-game Mythos systems have first-pass effects but need deeper dedicated decisions and interfaces.
+- Late-game systems have first-pass effects but need deeper decisions and clearer section-level interactions.
 - Pig relationships could expand beyond bonded pairs into buddies, rivals, nap partners, or shy followers.
 - Furniture care could later gain piece-specific events, pig preferences, or recipe-family hooks.
-- Orders or contracts could ask for specific bean, care, combo, ecology, or rare-resource outcomes.
+- Contracts could gain deeper offer weighting, pig-request tie-ins, event-chain handoffs, and recipe-family commissions.
 - Automation directives could later gain deeper mode-specific upgrades or event interactions.
 - Recipe families and Wisdom specializations could make long-term runs feel more distinct.
 - Minigames are deferred until the main management loop is more tuned.
@@ -1287,6 +1329,7 @@ These are current design areas that are intentionally first-pass or still need d
 - Prefer cozy management tension over harsh punishment.
 - Make pig identity matter through behavior, requests, moods, and production quirks.
 - Let upgrades interact with existing systems instead of becoming isolated bonuses.
+- Reveal deeper mechanics when they become actionable instead of showing dormant late-game surfaces from the first minute.
 - Preserve recovery paths after neglect or pig death.
 - Explain late-game purchases directly when the effect is not obvious.
 - Treat absurdity as a reward for mastering the simple care loop.

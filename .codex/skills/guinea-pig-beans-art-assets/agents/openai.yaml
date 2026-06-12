@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPB Art Assets"
+  short_description: "Asset naming and Phaser integration"
+  default_prompt: "Use $guinea-pig-beans-art-assets to add or integrate Guinea Pig Beans art assets."

@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPB UI HUD Polish"
+  short_description: "HUD, modal, and feedback workflow"
+  default_prompt: "Use $guinea-pig-beans-ui-hud-polish to polish a Guinea Pig Beans HUD or modal interaction."

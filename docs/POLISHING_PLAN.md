@@ -2,7 +2,7 @@
 
 ## Goal
 
-Move the current playable prototype from "functional and charming" to "intentionally polished" without changing the core cozy management loop. The first polishing target is the first 60 seconds of play: the player should immediately understand that cleaning beans matters, feel rewarded for doing it, and see the cage, HUD, dock, and objective system react as one coherent game surface.
+Move the current playable prototype from "functional and charming" to "intentionally polished" without changing the core cozy management loop. The first polishing target is the first 60 seconds of play: the player should immediately understand that cleaning beans matters, feel rewarded for doing it, and see the cage, HUD, dock, and contract system react as one coherent game surface.
 
 Current screenshot anchor: `tmp/polish-screenshot-2026-06-03.png`
 
@@ -21,7 +21,7 @@ What still feels prototype-like:
 
 - The top stat bar gives every resource equal weight, so early priorities compete with late-game counters.
 - The cage is the strongest visual element, but the surrounding canvas/background area still feels like a broad neutral container rather than a staged playfield.
-- The first tutorial hint reads as a generic UI toast instead of an authored in-game objective prompt.
+- The first tutorial hint reads as a generic UI toast instead of an authored in-game care prompt.
 - The dock icons are useful, but the action states need clearer hierarchy between "available now", "needs attention", "locked/quiet", and "selected".
 - Cleanup feedback exists, but the first bean cleanup should be more ceremonious because it teaches the whole game.
 
@@ -57,7 +57,7 @@ Done when:
 
 ## Pass 1: First 60 Seconds
 
-Purpose: make the first cleanup, first objective, and first care decisions feel authored.
+Purpose: make the first cleanup, first contract, and first care decisions feel authored.
 
 ### 1A. Make First Cleanup Feel Like A Moment
 
@@ -91,21 +91,21 @@ Done when:
 - Normal repeated cleaning remains quick and not overwhelming.
 - Rare beans still read stronger than normal beans.
 
-### 1B. Pulse Objective Progress
+### 1B. Pulse Contract Progress
 
 Implementation direction:
 
-- Track the previous objective signature in `Hud`, similar to `updateGoalAndLogMarkers()`.
-- When `objective.id`, `progress`, or completion changes, add a short CSS class to:
+- Track the previous contract signature in `Hud`, similar to `updateGoalAndLogMarkers()`.
+- When contract id, progress, offer state, or completion changes, add a short CSS class to:
   - `#quick-objective-title`
   - `#quick-objective-progress`
   - optionally the top `#combo-value` when streak changes
 - Use the existing `pulseElement()` helper pattern instead of adding a new animation system.
-- Keep the objective pulse visual in CSS under `.quick-objective.is-progressing` or a small reusable `.ui-pulse` class.
+- Keep the contract pulse visual in CSS under a small reusable pulse class.
 
 Done when:
 
-- Cleaning toward "Clean 3 beans quickly" visibly updates the objective card.
+- Cleaning or care actions visibly update the contract card when they advance a requirement.
 - The pulse does not resize the care strip or shift nearby meters.
 
 ### 1C. Restyle Tutorial Hint Into A Game Prompt
@@ -155,7 +155,7 @@ Potential helper functions in `Hud`:
 
 Done when:
 
-- A fresh run visually emphasizes cleaning, pigs, beans, and objective progress.
+- A fresh run visually emphasizes cleaning, pigs, beans, and contract progress.
 - Late-game counters no longer dominate the first read.
 - No stat text overflows at desktop or mobile widths.
 
@@ -272,7 +272,7 @@ Run this after every polish implementation slice:
 Start with Pass 1A and 1B together:
 
 - First-clean ceremony in `GameScene.ts`
-- Objective progress pulse in `Hud` and `src/styles.css`
+- Contract progress pulse in `Hud` and `src/styles.css`
 - One screenshot after first cleanup
 
 This is the smallest slice likely to make the game feel meaningfully more polished while keeping simulation risk low. It also gives us a concrete before/after to judge the tone of future polish.

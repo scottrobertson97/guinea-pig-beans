@@ -1,0 +1,4 @@
+interface:
+  display_name: "GPB Browser Verification"
+  short_description: "Build and browser smoke workflow"
+  default_prompt: "Use $guinea-pig-beans-browser-verification to verify a Guinea Pig Beans gameplay or UI change."

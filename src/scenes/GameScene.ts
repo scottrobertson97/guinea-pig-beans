@@ -1,12 +1,20 @@
 import Phaser from "phaser";
 import { assetPath } from "../assetPaths";
-import { getZoneMetrics, isPigComfortableInFavoriteZone } from "../simulation/ecology";
+import { getZoneMetrics } from "../simulation/ecology";
 import { getScoopRadius } from "../simulation/balance";
-import { cleanAtWithResult, type CleanedPoop, type CleanResult } from "../simulation/actions";
+import { cleanAtWithResult, magnetizePoopsTowardScoop, type CleanedPoop, type CleanResult } from "../simulation/actions";
 import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
 import { updateSimulation } from "../simulation/systems";
 import type { AbilityId, FurnitureId, GameState, Pig, Poop, PoopType, Robot } from "../simulation/types";
 import { emitPlayerAction, emitUiSound, type SceneFeedbackDetail } from "../ui/events";
+import {
+  getAbilityReaction,
+  getCleanRewardText,
+  getClickReactionText,
+  getCouncilReactionText,
+  getEventReactionText,
+  getPigThoughtText,
+} from "./sceneFeedbackText";
 
 interface SceneData {
   state: GameState;
@@ -76,6 +84,13 @@ const FIRST_CLEAN_POP_SCALE = 1.52;
 const FIRST_CLEAN_BURST_COUNT = 14;
 const FLOATING_TEXT_MARGIN = 34;
 const MAX_FLOATING_TEXT_LABELS = 5;
+const SCOOPER_CURSOR_ORIGIN_X = 0;
+const SCOOPER_CURSOR_ORIGIN_Y = 1;
+const SCOOPER_CURSOR_MIN_WIDTH = 46;
+const SCOOPER_CURSOR_MAX_WIDTH = 76;
+const SCOOP_RADIUS_PREVIEW_DEPTH = 49;
+const GOLDEN_SCOOP_MAGNET_INTERVAL_MS = 90;
+const GOLDEN_SCOOP_MIN_POINTER_DISTANCE = 6;
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
@@ -99,11 +114,15 @@ export class GameScene extends Phaser.Scene {
   private hayShadow!: Phaser.GameObjects.Ellipse;
   private waterBottle!: Phaser.GameObjects.Image;
   private waterShadow!: Phaser.GameObjects.Ellipse;
-  private scoopPreview!: Phaser.GameObjects.Ellipse;
+  private scoopRadiusPreview!: Phaser.GameObjects.Ellipse;
+  private scoopCursor!: Phaser.GameObjects.Image;
   private lastCageWidth = 0;
   private lastCageHeight = 0;
   private activeFloatingTextCount = 0;
   private lastCleanedPoops = 0;
+  private lastGoldenScoopMagnetAt = 0;
+  private lastMagnetPointerX = Number.NaN;
+  private lastMagnetPointerY = Number.NaN;
   private prefersReducedMotion = false;
   private readonly handleHudActionEffect = (event: Event): void => {
     const detail = (event as CustomEvent<SceneFeedbackDetail>).detail;
@@ -142,6 +161,8 @@ export class GameScene extends Phaser.Scene {
     this.load.image("roaming-dustpan", assetPath("assets/sprites/upgrades/roaming_dustpan.png"));
     this.load.image("compost-bin", assetPath("assets/sprites/upgrades/compost_bin.png"));
     this.load.image("cavybot-3000", assetPath("assets/sprites/upgrades/cavybot_3000.png"));
+    this.load.image("scooper-cursor", assetPath("assets/ui/scooper_cursor.png"));
+    this.load.image("golden-scooper-cursor", assetPath("assets/ui/golden_scooper_cursor.png"));
   }
 
   create(): void {
@@ -150,20 +171,35 @@ export class GameScene extends Phaser.Scene {
     this.drawCage();
     this.hayPile = this.createHayPile(88, 88);
     this.waterBottle = this.createWaterBottle(this.state.cage.width - 90, 82);
-    this.scoopPreview = this.add
+    this.input.setDefaultCursor("none");
+    this.scoopRadiusPreview = this.add
       .ellipse(0, 0, getScoopRadius(this.state) * 2, getScoopRadius(this.state) * 2)
-      .setStrokeStyle(2, 0xffffff, 0.7)
-      .setFillStyle(0xffffff, 0.08)
-      .setDepth(50)
+      .setDepth(SCOOP_RADIUS_PREVIEW_DEPTH)
       .setVisible(false);
+    this.scoopCursor = this.add
+      .image(0, 0, this.getScoopCursorTextureKey())
+      .setOrigin(SCOOPER_CURSOR_ORIGIN_X, SCOOPER_CURSOR_ORIGIN_Y)
+      .setDepth(50)
+      .setAlpha(0.94)
+      .setVisible(false);
+    this.syncScoopCursorSize();
 
     this.input.on("pointermove", (pointer: Phaser.Input.Pointer) => {
-      this.scoopPreview.setPosition(pointer.worldX, pointer.worldY);
-      this.scoopPreview.setVisible(true);
+      this.scoopRadiusPreview.setPosition(pointer.worldX, pointer.worldY);
+      this.scoopRadiusPreview.setVisible(true);
+      this.scoopCursor.setPosition(pointer.worldX, pointer.worldY);
+      this.scoopCursor.setVisible(true);
+      this.handleGoldenScoopPointerMove(pointer.worldX, pointer.worldY);
+    });
+
+    this.input.on("pointerout", () => {
+      this.scoopRadiusPreview.setVisible(false);
+      this.scoopCursor.setVisible(false);
     });
 
     this.input.on("pointerdown", (pointer: Phaser.Input.Pointer) => {
       const isFirstCleanAttempt = this.state.stats.cleanedPoops === 0;
+      magnetizePoopsTowardScoop(this.state, pointer.worldX, pointer.worldY);
       const cleanResult = cleanAtWithResult(this.state, pointer.worldX, pointer.worldY);
       const isFirstClean = isFirstCleanAttempt && cleanResult.cleaned > 0;
       this.playCleanFeedback(cleanResult, pointer.worldX, pointer.worldY, isFirstClean);
@@ -398,8 +434,36 @@ export class GameScene extends Phaser.Scene {
       this.robotView = null;
     }
 
-    this.scoopPreview.setSize(getScoopRadius(this.state) * 2, getScoopRadius(this.state) * 2);
+    this.syncScoopCursorSize();
     this.syncCareObjectStates();
+  }
+
+  private syncScoopCursorSize(): void {
+    this.scoopCursor.setTexture(this.getScoopCursorTextureKey());
+    this.scoopRadiusPreview.setSize(getScoopRadius(this.state) * 2, getScoopRadius(this.state) * 2);
+    this.scoopRadiusPreview
+      .setStrokeStyle(2, this.state.lateGame.goldenScoop ? 0xf0d56b : 0xffffff, this.state.lateGame.goldenScoop ? 0.86 : 0.72)
+      .setFillStyle(this.state.lateGame.goldenScoop ? 0xf0d56b : 0xffffff, this.state.lateGame.goldenScoop ? 0.1 : 0.07);
+    const displayWidth = Phaser.Math.Clamp(getScoopRadius(this.state) * 1.9, SCOOPER_CURSOR_MIN_WIDTH, SCOOPER_CURSOR_MAX_WIDTH);
+    this.scoopCursor.setDisplaySize(displayWidth, displayWidth * (this.scoopCursor.height / this.scoopCursor.width));
+  }
+
+  private getScoopCursorTextureKey(): string {
+    return this.state.lateGame.goldenScoop ? "golden-scooper-cursor" : "scooper-cursor";
+  }
+
+  private handleGoldenScoopPointerMove(x: number, y: number): void {
+    if (!this.state.lateGame.goldenScoop) return;
+    if (this.time.now - this.lastGoldenScoopMagnetAt < GOLDEN_SCOOP_MAGNET_INTERVAL_MS) return;
+    if (Number.isFinite(this.lastMagnetPointerX)) {
+      const distance = Math.hypot(x - this.lastMagnetPointerX, y - this.lastMagnetPointerY);
+      if (distance < GOLDEN_SCOOP_MIN_POINTER_DISTANCE) return;
+    }
+
+    this.lastGoldenScoopMagnetAt = this.time.now;
+    this.lastMagnetPointerX = x;
+    this.lastMagnetPointerY = y;
+    if (magnetizePoopsTowardScoop(this.state, x, y) > 0) this.syncViews();
   }
 
   private syncCageSize(): void {
@@ -599,6 +663,11 @@ export class GameScene extends Phaser.Scene {
 
     if (detail.category === "trade") {
       this.playCenterFeedback(detail.label ?? "Trade", detail.resourceText, detail.color ?? 0xe4b83b, "Trade!");
+      return;
+    }
+
+    if (detail.category === "experiment") {
+      this.playCenterFeedback(detail.label ?? "Experiment", detail.resourceText, detail.color ?? 0x75608f, "Wheek?");
       return;
     }
 
@@ -1288,87 +1357,4 @@ function getFurnitureShadowSize(id: FurnitureId): { width: number; height: numbe
   if (id === "royalThrone") return { width: 94, height: 28, y: 42 };
   if (id === "snuggleSack") return { width: 74, height: 22, y: 18 };
   return { width: 74, height: 22, y: 26 };
-}
-
-function getPigThoughtText(pig: Pig, state: GameState): string {
-  if (pig.stress >= 72) return "Too much";
-  if (pig.stress >= 48) return "Uneasy";
-  if (pig.goal === "sleep") return "Zzz";
-  if (pig.goal === "eat") return state.needs.hay > 0 ? "Hay?" : "Hay!";
-  if (pig.goal === "drink") return state.needs.water > 0 && !state.event.bottleJammed ? "Sip" : "H2O";
-  if (isPigComfortableInFavoriteZone(state, pig)) return "Cozy";
-  if (pig.goal === "roam" && Math.min(pig.hunger, pig.thirst, pig.energy) > 55) return "Roam";
-  if (state.needs.hay < 25 || pig.mood === "hungry") return "Hay?";
-  if (state.needs.water < 25 || pig.mood === "thirsty") return "H2O";
-  if (pig.mood === "messy" || state.cage.cleanliness < 45) return "Clean?";
-  if (pig.trait === "Neat Freak") return "Tray";
-  if (pig.trait === "Hay Goblin") return "Hay!";
-  if (pig.trait === "Shy Beaner") return "Hide";
-  if (pig.trait === "Royal Pig") return "Royal";
-  if (pig.trait === "Zoomer") return "Run!";
-  if (pig.trait === "Compost Mystic") return "Hmm";
-  return "Sniff";
-}
-
-function getClickReactionText(pig: Pig): string {
-  if (pig.trait === "Zoomer") return "Zoom?";
-  if (pig.trait === "Neat Freak") return "Clean?";
-  if (pig.trait === "Shy Beaner") return "Hi?";
-  if (pig.trait === "Royal Pig") return "Yes?";
-  return "Sniff";
-}
-
-function getAbilityReaction(abilityId?: AbilityId): { label: string; thought: string; color: number; pigCount: number; burstCount: number } {
-  if (abilityId === "wheekCall") {
-    return { label: "Wheek Call", thought: "Wheek!", color: 0xf0d56b, pigCount: 4, burstCount: 7 };
-  }
-  if (abilityId === "treatBag") {
-    return { label: "Treat Bag", thought: "Treats?", color: 0xe4b83b, pigCount: 4, burstCount: 7 };
-  }
-  if (abilityId === "deepClean") {
-    return { label: "Deep Clean", thought: "Clean!", color: 0x86d9f0, pigCount: 3, burstCount: 6 };
-  }
-  if (abilityId === "freshBedding") {
-    return { label: "Fresh Bedding", thought: "Fresh!", color: 0x7db46a, pigCount: 3, burstCount: 6 };
-  }
-  if (abilityId === "snackTime") {
-    return { label: "Snack Time", thought: "Snack!", color: 0xe4b83b, pigCount: 4, burstCount: 7 };
-  }
-  if (abilityId === "zoomieMode") {
-    return { label: "Zoomie Mode", thought: "Run!", color: 0xb965d2, pigCount: 4, burstCount: 8 };
-  }
-  return { label: "Ability", thought: "!", color: 0xf0d56b, pigCount: 3, burstCount: 5 };
-}
-
-function getCouncilReactionText(decreeId?: SceneFeedbackDetail["decreeId"]): string {
-  if (decreeId === "careMandate") return "Order!";
-  if (decreeId === "cleanupOrdinance") return "Clean!";
-  if (decreeId === "herdCharter") return "Charter!";
-  return "Council!";
-}
-
-function getEventReactionText(choiceId?: SceneFeedbackDetail["eventChoiceId"]): string {
-  if (!choiceId) return "Event!";
-  if (choiceId.includes("litter")) return "Clean!";
-  if (choiceId.includes("hidey")) return "Cozy";
-  if (choiceId.includes("traffic")) return "Run!";
-  if (choiceId.includes("zoomies") || choiceId.includes("Zoomies")) return "Zoom!";
-  if (choiceId.includes("hay") || choiceId.includes("Hay")) return "Hay!";
-  if (choiceId.includes("bottle") || choiceId.includes("Bottle")) return "Sip!";
-  if (choiceId.includes("nap") || choiceId.includes("Nap")) return "Nap!";
-  if (choiceId.includes("compost") || choiceId.includes("Compost")) return "Compost!";
-  if (choiceId.includes("wheek") || choiceId.includes("Wheek")) return "Wheek!";
-  return "Done!";
-}
-
-function getCleanRewardText(cleaned: CleanedPoop): string {
-  if (cleaned.type === "golden") return "+Gold";
-  if (cleaned.type === "compost") return "+Compost";
-  if (cleaned.type === "blessed") return "+Squeak";
-  if (cleaned.type === "royal") return "+Royal";
-  if (cleaned.type === "cursed") return "+Cursed";
-  if (cleaned.type === "mystery") return "+Mystery";
-  if (cleaned.type === "stinky") return "+Stinky";
-  if (cleaned.type === "messPile") return "+Pile";
-  return `+${cleaned.value}`;
 }

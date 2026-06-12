@@ -1,10 +1,22 @@
-import type { AbilityId, Costs, FurnitureId, GameState, Pig, WisdomPerkId } from "./types";
+import type { AbilityId, Costs, FurnitureId, GameState, Pig, WisdomPerkId, WisdomSpecializationId } from "./types";
 
 export const CAGE_PADDING = 34;
 export const MAX_CAGE_LEVEL_FOR_SIZE = 7;
 export const BASE_POOP_INTERVAL = 5;
 export const MAX_LOG_ITEMS = 8;
 export const ROBOT_COST = 75;
+export const HAY_DIMENSION_FEED_LEVEL = 7;
+export const CAVY_COUNCIL_HERD_SIZE = 8;
+export const GOLDEN_SCOOP_BEAN_COST = 900;
+export const GOLDEN_SCOOP_GOLDEN_BEAN_COST = 3;
+export const GOLDEN_SCOOP_MAGNET_RADIUS_BONUS = 90;
+export const GOLDEN_SCOOP_MAGNET_STRENGTH = 0.18;
+export const GOLDEN_SCOOP_MAGNET_MAX_STEP = 8;
+export const SINGULARITY_RECIPE_COMPOST_COST = 100;
+export const SINGULARITY_RECIPE_RARE_CLEANED = 25;
+export const SINGULARITY_RECIPE_CURSED_CLEANED = 1;
+export const SINGULARITY_EXPERIMENT_COMPOST_COST = 35;
+export const SINGULARITY_EXPERIMENT_SQUEAK_COST = 4;
 const FURNITURE_SPACE_COSTS: Record<FurnitureId, number> = {
   hideyHouse: 2,
   tunnel: 2,
@@ -33,6 +45,18 @@ export interface WisdomPerkDefinition {
   description: string;
   cost: number;
   prerequisite?: WisdomPerkId;
+}
+
+export interface WisdomSpecializationDefinition {
+  id: WisdomSpecializationId;
+  label: string;
+  description: string;
+  effect: string;
+}
+
+export interface GoldenScoopCost {
+  beans: number;
+  goldenBeans: number;
 }
 
 export interface FurnitureSynergyDefinition {
@@ -79,7 +103,7 @@ export const WISDOM_PERKS: WisdomPerkDefinition[] = [
     branch: "Care",
     tier: 1,
     label: "Roomy Start",
-    description: "+2 pig capacity and more cage space.",
+    description: "+2 pig capacity, more cage space, and more mess tolerance.",
     cost: 1,
   },
   {
@@ -122,7 +146,7 @@ export const WISDOM_PERKS: WisdomPerkDefinition[] = [
     branch: "Herd",
     tier: 3,
     label: "Chorus Training",
-    description: "Ability Squeak costs drop and Wheek Call gives more Squeaks.",
+    description: "Ability Squeak costs drop, Wheek Call gives more Squeaks, and the herd generates Squeaks over time.",
     cost: 3,
     prerequisite: "socialMemory",
   },
@@ -184,6 +208,31 @@ const WISDOM_PERK_MAP = Object.fromEntries(WISDOM_PERKS.map((perk) => [perk.id, 
   WisdomPerkId,
   WisdomPerkDefinition
 >;
+
+export const WISDOM_SPECIALIZATIONS: WisdomSpecializationDefinition[] = [
+  {
+    id: "gentleCare",
+    label: "Gentle Care",
+    description: "A calmer caretaker style focused on habitat, furniture, and low-stress herds.",
+    effect: "Furniture Care and Habitat Stewardship cost less, cool down faster, and calm pigs harder.",
+  },
+  {
+    id: "automationSteward",
+    label: "Automation Steward",
+    description: "A tidy operations style built around Roomba fuel, directives, and hands-off cleanup.",
+    effect: "Automation fuel is cheaper, lasts longer, and cleanup contracts pay extra Compost.",
+  },
+  {
+    id: "rareBeanAlchemy",
+    label: "Rare Bean Alchemy",
+    description: "A strange-bean style that turns recipes, rare cleanup, and contracts into more momentum.",
+    effect: "Rare odds improve slightly, Singularity runs cost less, and rare contracts boost longer.",
+  },
+];
+
+const WISDOM_SPECIALIZATION_MAP = Object.fromEntries(
+  WISDOM_SPECIALIZATIONS.map((specialization) => [specialization.id, specialization]),
+) as Record<WisdomSpecializationId, WisdomSpecializationDefinition>;
 
 export function getCosts(state: GameState): Costs {
   const furniture = Object.fromEntries(
@@ -268,9 +317,32 @@ export function getUnlockedFurnitureCount(state: GameState): number {
   );
 }
 
+export function hasSqueakChoirEffect(state: GameState): boolean {
+  return state.wisdom.chorusTraining || state.lateGame.squeakChoir;
+}
+
+export function hasCavyCouncilEffect(state: GameState): boolean {
+  return state.lateGame.cavyCouncil || state.pigs.length >= CAVY_COUNCIL_HERD_SIZE;
+}
+
+export function hasSingularityExperimentEffect(state: GameState): boolean {
+  return state.recipes.singularityExperiment || state.lateGame.beanSingularity;
+}
+
+export function hasGoldenScoopEffect(state: GameState): boolean {
+  return state.lateGame.goldenScoop;
+}
+
+export function getGoldenScoopCost(): GoldenScoopCost {
+  return {
+    beans: GOLDEN_SCOOP_BEAN_COST,
+    goldenBeans: GOLDEN_SCOOP_GOLDEN_BEAN_COST,
+  };
+}
+
 export function getAbilityCost(state: GameState, id: AbilityId): number {
-  const discount = state.wisdom.chorusTraining ? 1 : 0;
-  return Math.max(0, ABILITY_SQUEAK_COSTS[id] - discount - (state.lateGame.squeakChoir ? 1 : 0));
+  const discount = hasSqueakChoirEffect(state) ? 1 : 0;
+  return Math.max(0, ABILITY_SQUEAK_COSTS[id] - discount);
 }
 
 export function getAutomationFuelCost(state: GameState): number {
@@ -280,8 +352,26 @@ export function getAutomationFuelCost(state: GameState): number {
       state.upgrades.scoopLevel -
       (state.wisdom.gentleAutomation ? 3 : 0) -
       (state.wisdom.compostEngine ? 2 : 0) -
-      (state.recipes.compostCatalyst ? 2 : 0),
+      (state.recipes.compostCatalyst ? 2 : 0) -
+      (hasWisdomSpecialization(state, "automationSteward") ? 2 : 0),
   );
+}
+
+export function getAutomationFuelDuration(state: GameState): number {
+  return (
+    18 +
+    (state.recipes.compostCatalyst ? 8 : 0) +
+    (state.wisdom.gentleAutomation ? 5 : 0) +
+    (state.wisdom.compostEngine ? 6 : 0) +
+    (hasWisdomSpecialization(state, "automationSteward") ? 10 : 0)
+  );
+}
+
+export function getSingularityExperimentCost(state: GameState): { compost: number; squeaks: number } {
+  return {
+    compost: Math.max(20, SINGULARITY_EXPERIMENT_COMPOST_COST - (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 8 : 0)),
+    squeaks: Math.max(2, SINGULARITY_EXPERIMENT_SQUEAK_COST - (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 1 : 0)),
+  };
 }
 
 export function getWisdomCost(id: WisdomPerkId): number {
@@ -294,6 +384,26 @@ export function getWisdomPerk(id: WisdomPerkId): WisdomPerkDefinition {
 
 export function getWisdomPerks(): WisdomPerkDefinition[] {
   return WISDOM_PERKS;
+}
+
+export function getWisdomSpecializations(): WisdomSpecializationDefinition[] {
+  return WISDOM_SPECIALIZATIONS;
+}
+
+export function getWisdomSpecialization(id: WisdomSpecializationId): WisdomSpecializationDefinition {
+  return WISDOM_SPECIALIZATION_MAP[id];
+}
+
+export function hasWisdomSpecialization(state: GameState, id: WisdomSpecializationId): boolean {
+  return state.wisdomSpecialization === id;
+}
+
+export function canChooseWisdomSpecialization(state: GameState, id: WisdomSpecializationId): boolean {
+  return (
+    !state.wisdomSpecialization &&
+    Boolean(WISDOM_SPECIALIZATION_MAP[id]) &&
+    WISDOM_PERKS.some((perk) => perk.tier >= 3 && state.wisdom[perk.id])
+  );
 }
 
 export function getFurnitureSynergies(): FurnitureSynergyDefinition[] {
@@ -358,6 +468,7 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
   const traitMultiplier = getTraitPoopMultiplier(pig);
   const breedMultiplier = getBreedPoopMultiplier(pig);
   const wisdomMultiplier = 0.98 ** getTotalWisdom(state);
+  const gentleCareMultiplier = hasWisdomSpecialization(state, "gentleCare") && pig.stress < 25 ? 0.96 : 1;
   const earlyMultiplier = state.stats.cleanedPoops < 5 ? 0.64 : state.stats.cleanedPoops < 15 ? 0.82 : 1;
   return (
     BASE_POOP_INTERVAL *
@@ -375,6 +486,7 @@ export function getPigPoopInterval(state: GameState, pig: Pig): number {
     eventMultiplier *
     abilityMultiplier *
     wisdomMultiplier *
+    gentleCareMultiplier *
     earlyMultiplier
   );
 }

@@ -73,8 +73,8 @@
                 <button id="quick-event-response" type="button">Event</button>
                 <div class="meter"><span id="quick-happiness-meter"></span></div>
               </div>
-              <div class="quick-objective">
-                <span>Objective</span>
+              <div class="quick-contract">
+                <span>Contract</span>
                 <strong id="quick-objective-title"></strong>
                 <em id="quick-objective-progress"></em>
               </div>
@@ -105,11 +105,6 @@
                 <img src="assets/sprites/beans/bean_rainbow.png" alt="" />
                 <span>Recipes</span>
                 <span class="dock-badge" data-dock-badge="recipes" hidden></span>
-              </button>
-              <button id="open-mythos" class="dock-button" type="button" data-section="mythos" aria-controls="section-modal">
-                <img src="assets/sprites/upgrades/compost_bin.png" alt="" />
-                <span>Mythos</span>
-                <span class="dock-badge" data-dock-badge="mythos" hidden></span>
               </button>
               <button id="open-wisdom" class="dock-button" type="button" data-section="wisdom" aria-controls="section-modal">
                 <img src="assets/sprites/upgrades/cavybot_3000.png" alt="" />
@@ -171,8 +166,8 @@
                 <button id="event-response" type="button">Event</button>
                 <div class="meter"><span id="happiness-meter"></span></div>
               </div>
-              <div class="objective-row">
-                <span>Objective</span>
+              <div class="contract-row">
+                <span>Contract</span>
                 <strong id="objective-title"></strong>
                 <em id="objective-progress"></em>
               </div>
@@ -199,58 +194,36 @@
 
               <section class="shop section-panel" data-section-panel="shop" hidden>
               <h2>Shop</h2>
-              <button id="adopt-pig" type="button">
-                <span>Adopt Pig</span>
-                <strong id="adopt-cost">15 Beans</strong>
-              </button>
-              <button id="better-hay" type="button">
-                <span>Better Hay</span>
-                <strong id="feed-cost">25 Beans</strong>
-              </button>
-              <button id="better-scoop" type="button">
-                <span>Better Scoop</span>
-                <strong id="scoop-cost">20 Beans</strong>
-              </button>
-              <button id="poop-roomba" type="button">
-                <span>Poop Roomba</span>
-                <strong id="robot-cost">75 Beans</strong>
-              </button>
-              <button id="fuel-automation" type="button">
-                <span>Fuel Automation</span>
-                <strong id="fuel-automation-status">12 Compost</strong>
-              </button>
-              <div class="automation-directives">
-                <h2>Automation Directives</h2>
-                <p>Current: <strong id="automation-directive-current">Balanced Sweep</strong></p>
-                <button id="automation-balanced" type="button">
-                  <span>Balanced Sweep</span>
-                  <strong id="automation-balanced-status"></strong>
-                  <em>Normal nearest-bean behavior for Roomba and Litter Tray.</em>
+              <div class="shop-group">
+                <h3 class="shop-group-title">Herd Growth</h3>
+                <button id="adopt-pig" type="button">
+                  <span>Adopt Pig</span>
+                  <strong id="adopt-cost">15 Beans</strong>
                 </button>
-                <button id="automation-cleanliness" type="button">
-                  <span>Protect Cleanliness</span>
-                  <strong id="automation-cleanliness-status"></strong>
-                  <em>Hunts the messiest beans first when the cage starts slipping.</em>
-                </button>
-                <button id="automation-litter-focus" type="button">
-                  <span>Litter Focus</span>
-                  <strong id="automation-litter-focus-status"></strong>
-                  <em>Patrols the litter corner and gives the tray extra reach.</em>
-                </button>
-                <button id="automation-rare-guard" type="button">
-                  <span>Rare Guard</span>
-                  <strong id="automation-rare-guard-status"></strong>
-                  <em>Avoids special beans so you can claim them manually.</em>
+                <button id="rare-pig" type="button">
+                  <span>Legendary Pig</span>
+                  <strong id="rare-pig-cost">220 + Gold</strong>
                 </button>
               </div>
-              <button id="bigger-cage" type="button">
-                <span>Bigger Cage</span>
-                <strong id="cage-cost">80 Beans</strong>
-              </button>
-              <button id="rare-pig" type="button">
-                <span>Legendary Pig</span>
-                <strong id="rare-pig-cost">220 + Gold</strong>
-              </button>
+              <div class="shop-group">
+                <h3 class="shop-group-title">Cage Growth</h3>
+                <button id="better-hay" type="button">
+                  <span>Better Hay</span>
+                  <strong id="feed-cost">25 Beans</strong>
+                </button>
+                <button id="better-scoop" type="button">
+                  <span>Better Scoop</span>
+                  <strong id="scoop-cost">20 Beans</strong>
+                </button>
+                <button id="bigger-cage" type="button">
+                  <span>Bigger Cage</span>
+                  <strong id="cage-cost">80 Beans</strong>
+                </button>
+                <button id="poop-roomba" type="button">
+                  <span>Poop Roomba</span>
+                  <strong id="robot-cost">75 Beans</strong>
+                </button>
+              </div>
             </section>
 
               <section class="shop compact-shop section-panel" data-section-panel="furniture" hidden>
@@ -283,16 +256,44 @@
                 <span>Royal Throne</span><strong id="royal-throne-cost"></strong>
                 <em>Attracts royal pigs and improves royal bean odds.</em>
               </button>
+              <div id="automation-directives-panel" class="automation-directives" hidden>
+                <h2>Automation Directives</h2>
+                <p>Current: <strong id="automation-directive-current">Balanced Sweep</strong></p>
+                <button id="fuel-automation" type="button">
+                  <span>Fuel Automation</span>
+                  <strong id="fuel-automation-status">12 Compost</strong>
+                </button>
+                <button id="automation-balanced" type="button">
+                  <span>Balanced Sweep</span>
+                  <strong id="automation-balanced-status"></strong>
+                  <em>Normal nearest-bean behavior for Roomba and Litter Tray.</em>
+                </button>
+                <button id="automation-cleanliness" type="button">
+                  <span>Protect Cleanliness</span>
+                  <strong id="automation-cleanliness-status"></strong>
+                  <em>Hunts the messiest beans first when the cage starts slipping.</em>
+                </button>
+                <button id="automation-litter-focus" type="button">
+                  <span>Litter Focus</span>
+                  <strong id="automation-litter-focus-status"></strong>
+                  <em>Patrols the litter corner and gives the tray extra reach.</em>
+                </button>
+                <button id="automation-rare-guard" type="button">
+                  <span>Rare Guard</span>
+                  <strong id="automation-rare-guard-status"></strong>
+                  <em>Avoids special beans so you can claim them manually.</em>
+                </button>
+              </div>
               <div class="synergy-list">
                 <h2>Synergies</h2>
                 <ul id="furniture-synergy-list"></ul>
               </div>
-              <div class="furniture-care-list">
+              <div id="furniture-care-panel" class="furniture-care-list" hidden>
                 <h2>Furniture Care</h2>
                 <ul id="furniture-care-list"></ul>
               </div>
-              <div class="ecology-list">
-                <h2>Cage Ecology</h2>
+              <div id="habitat-care-panel" class="ecology-list" hidden>
+                <h2>Habitat Care</h2>
                 <ul id="ecology-zone-list"></ul>
               </div>
             </section>
@@ -330,17 +331,22 @@
               <button id="recipe-bean-blessing" type="button"><span>Bean Blessing</span><strong id="recipe-bean-blessing-status"></strong></button>
               <button id="recipe-compost-catalyst" type="button"><span>Compost Catalyst</span><strong id="recipe-compost-catalyst-status"></strong></button>
               <button id="recipe-royal-accord" type="button"><span>Royal Accord</span><strong id="recipe-royal-accord-status"></strong></button>
-            </section>
-
-              <section class="shop compact-shop section-panel" data-section-panel="mythos" hidden>
-              <h2>Mythos</h2>
-              <button id="hay-dimension" type="button">
-                <span>Hay Dimension</span><strong id="hay-dimension-status"></strong>
-                <em>Slows hay drain, helps pigs produce faster, and adds a little furniture room.</em>
+              <button id="recipe-singularity-experiment" type="button">
+                <span>Singularity Experiment</span><strong id="recipe-singularity-experiment-status"></strong>
+                <em>Turns cursed cleanup and Compost into a repeatable gravity experiment.</em>
               </button>
+              <button id="run-singularity-experiment" type="button">
+                <span>Run Singularity</span><strong id="run-singularity-experiment-status"></strong>
+                <em>Spend Compost and Squeaks to pull loose beans inward and raise strange bean pressure.</em>
+              </button>
+              <h2>Bean Economy</h2>
               <button id="bean-exchange" type="button">
                 <span>Bean Exchange</span><strong id="bean-exchange-status"></strong>
                 <em>Spends Beans and Gold to open the late-game economy track.</em>
+              </button>
+              <button id="golden-scoop" type="button">
+                <span>Golden Scoop</span><strong id="golden-scoop-status"></strong>
+                <em>Spends Beans and Gold to pull nearby beans toward your cleanup path.</em>
               </button>
               <div id="bean-exchange-panel" class="exchange-panel" hidden>
                 <h2>Exchange</h2>
@@ -361,10 +367,47 @@
                   <em>Convert 20 Squeaks and 150 Beans into 1 Golden Bean.</em>
                 </button>
               </div>
-              <button id="cavy-council" type="button">
-                <span>Cavy Council</span><strong id="cavy-council-status"></strong>
-                <em>Large herds gain social stability and unlock repeatable Council Decrees.</em>
+            </section>
+
+              <section class="shop compact-shop ability-shop section-panel" data-section-panel="wisdom" hidden>
+              <h2>Wisdom</h2>
+              <h2>Care</h2>
+              <button id="wisdom-roomy-start" type="button"><span>Roomy Start</span><strong id="wisdom-roomy-start-status"></strong><em>+2 pig capacity and more cage space.</em></button>
+              <button id="wisdom-steady-supplies" type="button"><span>Steady Supplies</span><strong id="wisdom-steady-supplies-status"></strong><em>Hay and water drain 10% slower.</em></button>
+              <button id="wisdom-fresh-start" type="button"><span>Fresh Start</span><strong id="wisdom-fresh-start-status"></strong><em>Cleanliness gets a permanent +3 cushion.</em></button>
+              <h2>Herd</h2>
+              <button id="wisdom-bonded-beginnings" type="button"><span>Bonded Beginnings</span><strong id="wisdom-bonded-beginnings-status"></strong><em>Bonded pigs add more socialization.</em></button>
+              <button id="wisdom-social-memory" type="button"><span>Social Memory</span><strong id="wisdom-social-memory-status"></strong><em>Every bonded pig adds extra socialization.</em></button>
+              <button id="wisdom-chorus-training" type="button"><span>Chorus Training</span><strong id="wisdom-chorus-training-status"></strong><em>Ability Squeak costs drop, Wheek Call gives more Squeaks, and the herd generates Squeaks over time.</em></button>
+              <h2>Automation</h2>
+              <button id="wisdom-gentle-automation" type="button"><span>Gentle Automation</span><strong id="wisdom-gentle-automation-status"></strong><em>Roomba and Compost fuel are cheaper.</em></button>
+              <button id="wisdom-compost-engine" type="button"><span>Compost Engine</span><strong id="wisdom-compost-engine-status"></strong><em>Compost fuel is cheaper and compost beans age better.</em></button>
+              <button id="wisdom-tray-affinity" type="button"><span>Tray Affinity</span><strong id="wisdom-tray-affinity-status"></strong><em>Litter Tray cleans farther and more often.</em></button>
+              <h2>Rare Beans</h2>
+              <button id="wisdom-rare-instinct" type="button"><span>Rare Instinct</span><strong id="wisdom-rare-instinct-status"></strong><em>Rare bean odds and enrichment improve.</em></button>
+              <button id="wisdom-golden-nose" type="button"><span>Golden Nose</span><strong id="wisdom-golden-nose-status"></strong><em>Golden beans are more likely and worth more.</em></button>
+              <button id="wisdom-royal-memory" type="button"><span>Royal Memory</span><strong id="wisdom-royal-memory-status"></strong><em>Legendary pigs cost less and royal bean odds improve.</em></button>
+              <div id="wisdom-specialization-panel" class="wisdom-specialization-panel" hidden>
+                <h2>Caretaker Philosophy</h2>
+                <button id="wisdom-gentle-care" type="button"><span>Gentle Care</span><strong id="wisdom-gentle-care-status"></strong><em>Care costs less, cools down faster, and calms habitat stress.</em></button>
+                <button id="wisdom-automation-steward" type="button"><span>Automation Steward</span><strong id="wisdom-automation-steward-status"></strong><em>Automation fuel is cheaper, lasts longer, and cleanup contracts pay more Compost.</em></button>
+                <button id="wisdom-rare-bean-alchemy" type="button"><span>Rare Bean Alchemy</span><strong id="wisdom-rare-bean-alchemy-status"></strong><em>Rare odds improve, Singularity runs cost less, and rare contracts boost harder.</em></button>
+              </div>
+              <h2>Great Composting</h2>
+              <button id="prestige" type="button">
+                <span>Great Composting</span><strong id="prestige-cost"></strong>
+                <em>Resets the run for Cavy Wisdom after enough lifetime Beans.</em>
               </button>
+            </section>
+
+              <section class="shop compact-shop pig-roster section-panel" data-section-panel="herd" hidden>
+              <h2>Herd</h2>
+              <ul id="pig-roster"></ul>
+              <h2>Herd Council</h2>
+              <div id="cavy-council-summary" class="system-summary">
+                <span>Cavy Council</span><strong id="cavy-council-status"></strong>
+                <em>Large herds seat the council automatically, gaining social stability and repeatable decrees.</em>
+              </div>
               <div id="cavy-council-panel" class="exchange-panel" hidden>
                 <h2>Council Decrees</h2>
                 <button id="council-care-mandate" type="button">
@@ -380,53 +423,16 @@
                   <em>Spend 10 Squeaks to grant +75 Beans and +1 Golden Bean to a large, happy herd.</em>
                 </button>
               </div>
-              <button id="squeak-choir" type="button">
-                <span>Squeak Choir</span><strong id="squeak-choir-status"></strong>
-                <em>Generates Squeaks over time and reduces every active ability cost by 1.</em>
-              </button>
-              <button id="bean-singularity" type="button">
-                <span>Bean Singularity</span><strong id="bean-singularity-status"></strong>
-                <em>Adds cursed bean potential and slowly pulls loose beans toward the cage center.</em>
-              </button>
-              <button id="prestige" type="button">
-                <span>Great Composting</span><strong id="prestige-cost"></strong>
-                <em>Resets the run for Cavy Wisdom after enough lifetime Beans.</em>
-              </button>
-            </section>
-
-              <section class="shop compact-shop ability-shop section-panel" data-section-panel="wisdom" hidden>
-              <h2>Wisdom</h2>
-              <h2>Care</h2>
-              <button id="wisdom-roomy-start" type="button"><span>Roomy Start</span><strong id="wisdom-roomy-start-status"></strong><em>+2 pig capacity and more cage space.</em></button>
-              <button id="wisdom-steady-supplies" type="button"><span>Steady Supplies</span><strong id="wisdom-steady-supplies-status"></strong><em>Hay and water drain 10% slower.</em></button>
-              <button id="wisdom-fresh-start" type="button"><span>Fresh Start</span><strong id="wisdom-fresh-start-status"></strong><em>Cleanliness gets a permanent +3 cushion.</em></button>
-              <h2>Herd</h2>
-              <button id="wisdom-bonded-beginnings" type="button"><span>Bonded Beginnings</span><strong id="wisdom-bonded-beginnings-status"></strong><em>Bonded pigs add more socialization.</em></button>
-              <button id="wisdom-social-memory" type="button"><span>Social Memory</span><strong id="wisdom-social-memory-status"></strong><em>Every bonded pig adds extra socialization.</em></button>
-              <button id="wisdom-chorus-training" type="button"><span>Chorus Training</span><strong id="wisdom-chorus-training-status"></strong><em>Ability Squeak costs drop and Wheek Call gives more Squeaks.</em></button>
-              <h2>Automation</h2>
-              <button id="wisdom-gentle-automation" type="button"><span>Gentle Automation</span><strong id="wisdom-gentle-automation-status"></strong><em>Roomba and Compost fuel are cheaper.</em></button>
-              <button id="wisdom-compost-engine" type="button"><span>Compost Engine</span><strong id="wisdom-compost-engine-status"></strong><em>Compost fuel is cheaper and compost beans age better.</em></button>
-              <button id="wisdom-tray-affinity" type="button"><span>Tray Affinity</span><strong id="wisdom-tray-affinity-status"></strong><em>Litter Tray cleans farther and more often.</em></button>
-              <h2>Rare Beans</h2>
-              <button id="wisdom-rare-instinct" type="button"><span>Rare Instinct</span><strong id="wisdom-rare-instinct-status"></strong><em>Rare bean odds and enrichment improve.</em></button>
-              <button id="wisdom-golden-nose" type="button"><span>Golden Nose</span><strong id="wisdom-golden-nose-status"></strong><em>Golden beans are more likely and worth more.</em></button>
-              <button id="wisdom-royal-memory" type="button"><span>Royal Memory</span><strong id="wisdom-royal-memory-status"></strong><em>Legendary pigs cost less and royal bean odds improve.</em></button>
-            </section>
-
-              <section class="pig-roster section-panel" data-section-panel="herd" hidden>
-              <h2>Herd</h2>
-              <ul id="pig-roster"></ul>
             </section>
 
               <section class="goals section-panel" data-section-panel="goals" hidden>
-              <h2>Goals</h2>
-              <ul id="quest-list"></ul>
-              <h2>Achievements</h2>
-              <ul id="achievement-list"></ul>
+              <h2>Contracts</h2>
+              <ul id="contract-list"></ul>
             </section>
 
               <section class="log section-panel" data-section-panel="log" hidden>
+              <h2>Records</h2>
+              <ul id="record-list"></ul>
               <h2>Cage Log</h2>
               <ol id="event-log"></ol>
             </section>

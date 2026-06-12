@@ -51,7 +51,7 @@ export type FurnitureId =
   | "cardboardCastle"
   | "royalThrone";
 export type AbilityId = "wheekCall" | "treatBag" | "deepClean" | "freshBedding" | "snackTime" | "zoomieMode";
-export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord";
+export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord" | "singularityExperiment";
 export type BeanExchangeTradeId = "beansToCompost" | "compostToSqueaks" | "goldToBeans" | "squeaksToGold";
 export type CouncilDecreeId = "careMandate" | "cleanupOrdinance" | "herdCharter";
 export type WisdomPerkId =
@@ -67,6 +67,7 @@ export type WisdomPerkId =
   | "rareInstinct"
   | "goldenNose"
   | "royalMemory";
+export type WisdomSpecializationId = "gentleCare" | "automationSteward" | "rareBeanAlchemy";
 export type EventId =
   | "zoomies"
   | "hayFrenzy"
@@ -140,6 +141,38 @@ export type PigRequestProgressKind =
   | "compost"
   | "ecologyClean"
   | "bondedZone";
+export type ContractTemplateId =
+  | "freshCageDelivery"
+  | "roomToNest"
+  | "firstWheek"
+  | "habitatReset"
+  | "cleanupRoute"
+  | "compostStarter"
+  | "rareSampleOrder"
+  | "recipeCommission"
+  | "herdCouncilSession"
+  | "greatCompostingRumor"
+  | "caretakerPhilosophy";
+export type ContractProgressKind =
+  | "clean"
+  | "refill"
+  | "cleanlinessHold"
+  | "zoneTend"
+  | "furnitureCareOrUnlock"
+  | "stressHold"
+  | "automationDirective"
+  | "automationClean"
+  | "litterAction"
+  | "rareClean"
+  | "combo"
+  | "rareResourceHold"
+  | "recipeBeanClean"
+  | "ability"
+  | "recipeUnlockOrCompostHold"
+  | "largeHerdHold"
+  | "happinessHold"
+  | "councilDecree"
+  | "pigRequest";
 
 export interface CageZoneMetrics {
   id: CageZoneId;
@@ -261,6 +294,47 @@ export interface PigRequestResult {
   token: number;
 }
 
+export interface ContractRequirementState {
+  id: string;
+  kind: ContractProgressKind;
+  label: string;
+  progress: number;
+  target: number;
+  sources?: string[];
+}
+
+export interface ContractOfferState {
+  id: string;
+  templateId: ContractTemplateId;
+  title: string;
+  description: string;
+  rewardText: string;
+  duration: number;
+  requirements: ContractRequirementState[];
+}
+
+export interface ActiveContractState extends ContractOfferState {
+  timer: number;
+}
+
+export interface ContractResult {
+  title: string;
+  rewardText: string;
+  completed: boolean;
+  token: number;
+}
+
+export interface ContractsState {
+  active: ActiveContractState | null;
+  offers: ContractOfferState[];
+  completed: number;
+  expired: number;
+  lastResult: ContractResult | null;
+  nextOfferSeed: number;
+  rareEventBoost: number;
+  completedTemplates: Partial<Record<ContractTemplateId, number>>;
+}
+
 export interface GameState {
   beans: number;
   compost: number;
@@ -298,6 +372,7 @@ export interface GameState {
   };
   recipes: Record<BeanRecipeId, boolean>;
   wisdom: Record<WisdomPerkId, boolean>;
+  wisdomSpecialization: WisdomSpecializationId | null;
   event: {
     active: ActiveEvent | null;
     nextTimer: number;
@@ -305,6 +380,7 @@ export interface GameState {
     responseReady: boolean;
   };
   objective: ActiveObjective;
+  contracts: ContractsState;
   pigRequest: {
     active: ActivePigRequest | null;
     nextTimer: number;
@@ -323,6 +399,7 @@ export interface GameState {
   lateGame: {
     hayDimension: boolean;
     beanExchange: boolean;
+    goldenScoop: boolean;
     cavyCouncil: boolean;
     squeakChoir: boolean;
     beanSingularity: boolean;
