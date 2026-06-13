@@ -286,20 +286,23 @@ function getPigDeathLogMessage(pig: Pig, cause: DeathCause): string {
 
 function updateNeeds(state: GameState, deltaSeconds: number): void {
   const pigCount = state.pigs.length;
+  const careRoutineMultiplier = Math.max(0.85, 1 - (state.tech?.levels?.careRoutines ?? 0) * 0.03);
   const hayDrainMultiplier =
     (state.event.active?.id === "hayFrenzy" ? 1.7 : 1) *
     (state.pigs.some((pig) => pig.trait === "Hay Goblin") ? 1.16 : 1) *
     (state.furniture.chewToy ? 0.9 : 1) *
     (state.lateGame.hayDimension ? 0.82 : 1) *
     (state.wisdom.steadySupplies ? 0.9 : 1) *
-    (hasWisdomSpecialization(state, "gentleCare") ? 0.94 : 1);
+    (hasWisdomSpecialization(state, "gentleCare") ? 0.94 : 1) *
+    careRoutineMultiplier;
   const totalWisdom = getTotalWisdom(state);
   const waterDrainMultiplier =
     state.event.bottleJammed
       ? 0
       : (totalWisdom > 0 ? 0.98 ** totalWisdom : 1) *
         (state.wisdom.steadySupplies ? 0.9 : 1) *
-        (hasWisdomSpecialization(state, "gentleCare") ? 0.94 : 1);
+        (hasWisdomSpecialization(state, "gentleCare") ? 0.94 : 1) *
+        careRoutineMultiplier;
   state.needs.hay = Math.max(0, state.needs.hay - 0.035 * pigCount * hayDrainMultiplier * deltaSeconds);
   state.needs.water = Math.max(0, state.needs.water - 0.02 * pigCount * waterDrainMultiplier * deltaSeconds);
   if (hasSqueakChoirEffect(state)) state.squeaks += (state.wisdom.chorusTraining ? 0.035 : 0.02) * deltaSeconds;
@@ -678,14 +681,16 @@ function updateLitterTrays(state: GameState, deltaSeconds: number): void {
   const directive = state.automation.directive;
   const overdriveBonus = state.automation.overdrive > 0 ? 0.14 : 0;
   const wisdomBonus = state.wisdom.trayAffinity ? 0.12 : 0;
+  const litterMethodLevel = state.tech?.levels?.litterMethod ?? 0;
   const synergyBonus = hasFurnitureSynergy(state, "cleanupCircuit") ? 0.08 : 0;
   const careMultiplier = getFurnitureAutomationMultiplier(state, "litterTray");
   const directiveBonus =
     directive === "litterFocus" ? 0.11 : directive === "cleanliness" && state.cage.cleanliness < 72 ? 0.06 : 0;
-  if (Math.random() > (0.18 + overdriveBonus + wisdomBonus + synergyBonus + directiveBonus) * careMultiplier * deltaSeconds) return;
+  if (Math.random() > (0.18 + overdriveBonus + wisdomBonus + synergyBonus + directiveBonus + litterMethodLevel * 0.05) * careMultiplier * deltaSeconds) return;
   const trayRadius =
     ((state.wisdom.trayAffinity ? 56 : 42) +
       (hasFurnitureSynergy(state, "cleanupCircuit") ? 8 : 0) +
+      litterMethodLevel * 5 +
       (directive === "litterFocus" ? 12 : 0)) *
     careMultiplier;
   const poop = chooseAutomationPoop(state, state.poops.filter((candidate) => Math.hypot(candidate.x - tray.x, candidate.y - tray.y) <= trayRadius), directive, tray);
@@ -738,6 +743,7 @@ function getNearestPoopInRange(state: GameState, robot: Robot): Poop | null {
   const directive = state.automation.directive;
   const nearestDistance =
     robot.sensorRadius *
+    (1 + (state.tech?.levels?.roombaSensors ?? 0) * 0.12) *
     (state.automation.overdrive > 0 ? 1.45 : 1) *
     (hasFurnitureSynergy(state, "cleanupCircuit") ? 1.18 : 1) *
     (directive === "cleanliness" ? 1.08 : directive === "litterFocus" ? 1.05 : 1);
@@ -795,7 +801,8 @@ function getRobotSpeedMultiplier(state: GameState): number {
   const overdrive = state.automation.overdrive > 0 ? 1.55 : 1;
   const directive = state.automation.directive;
   const directiveSpeed = directive === "litterFocus" ? 1.06 : directive === "rareGuard" ? 0.92 : 1;
-  return overdrive * directiveSpeed;
+  const sensorTech = 1 + (state.tech?.levels?.roombaSensors ?? 0) * 0.05;
+  return overdrive * directiveSpeed * sensorTech;
 }
 
 function moveRobot(robot: Robot, deltaSeconds: number, speedMultiplier: number): void {

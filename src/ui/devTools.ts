@@ -7,8 +7,9 @@ import {
   unlockRobot,
 } from "../simulation/actions";
 import { getZoneMetrics, refreshEcology } from "../simulation/ecology";
-import { addLog, spawnDebugPoop, spawnEventPoop } from "../simulation/state";
+import { addLog, addPig, chooseTarget, setPigGoal, spawnDebugPoop, spawnEventPoop } from "../simulation/state";
 import type { GameState, PoopType } from "../simulation/types";
+import { emitDevLifecycleStatusSeeded } from "./events";
 
 export class DevTools {
   private readonly root: HTMLDivElement;
@@ -49,6 +50,7 @@ export class DevTools {
       this.createButton("Spawn Blessed", () => this.spawnPoop("blessed")),
       this.createButton("Spawn Royal", () => this.spawnPoop("royal")),
       this.createButton("Spawn Stinky", () => this.spawnPoop("stinky")),
+      this.createButton("Seed Lifecycle Status", () => this.seedLifecycleStatus()),
       this.createButton("Seed Ecology Stress", () => this.seedEcologyStress()),
       this.createButton("Buy/Unlock Roomba", () => unlockRobot(this.state)),
       this.createButton("Clear Poops", () => clearPoops(this.state)),
@@ -87,6 +89,36 @@ export class DevTools {
     clearPoops(this.state);
     spawnEventPoop(this.state, "normal", this.state.cage.width / 2, this.state.cage.height / 2);
     addLog(this.state, "Dev tools seeded a smoke-test bean.");
+  }
+
+  private seedLifecycleStatus(): void {
+    while (this.state.pigs.length < 3) {
+      addPig(this.state);
+    }
+
+    this.state.needs.hay = Math.max(this.state.needs.hay, 55);
+    this.state.needs.water = Math.max(this.state.needs.water, 55);
+
+    const seeds = [
+      { hunger: 12, thirst: 82, energy: 74, goal: "seekFood" as const },
+      { hunger: 82, thirst: 12, energy: 74, goal: "seekWater" as const },
+      { hunger: 82, thirst: 82, energy: 12, goal: "seekSleep" as const },
+    ];
+
+    for (const [index, seed] of seeds.entries()) {
+      const pig = this.state.pigs[index];
+      if (!pig) continue;
+      pig.hunger = seed.hunger;
+      pig.thirst = seed.thirst;
+      pig.energy = seed.energy;
+      pig.stress = 0;
+      setPigGoal(this.state, pig, seed.goal);
+      pig.goalTimer = 0;
+      chooseTarget(this.state, pig);
+    }
+
+    refreshEcology(this.state);
+    emitDevLifecycleStatusSeeded();
   }
 
   private seedEcologyStress(): void {

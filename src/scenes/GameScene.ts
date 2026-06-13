@@ -6,14 +6,14 @@ import { cleanAtWithResult, magnetizePoopsTowardScoop, type CleanedPoop, type Cl
 import { getStaticFurniturePlacement, getUnlockedFurniturePlacements } from "../simulation/state";
 import { updateSimulation } from "../simulation/systems";
 import type { AbilityId, FurnitureId, GameState, Pig, Poop, PoopType, Robot } from "../simulation/types";
-import { emitPlayerAction, emitUiSound, type SceneFeedbackDetail } from "../ui/events";
+import { DEV_LIFECYCLE_STATUS_EVENT, emitPlayerAction, emitUiSound, type SceneFeedbackDetail } from "../ui/events";
 import {
   getAbilityReaction,
   getCleanRewardText,
   getClickReactionText,
   getCouncilReactionText,
   getEventReactionText,
-  getPigThoughtText,
+  getPigLifecycleStatusMessage,
 } from "./sceneFeedbackText";
 
 interface SceneData {
@@ -91,6 +91,12 @@ const SCOOPER_CURSOR_MAX_WIDTH = 76;
 const SCOOP_RADIUS_PREVIEW_DEPTH = 49;
 const GOLDEN_SCOOP_MAGNET_INTERVAL_MS = 90;
 const GOLDEN_SCOOP_MIN_POINTER_DISTANCE = 6;
+const PIG_STATUS_THOUGHT_INITIAL_MIN_MS = 900;
+const PIG_STATUS_THOUGHT_INITIAL_MAX_MS = 3200;
+const PIG_STATUS_THOUGHT_ACTIVE_MIN_MS = 5500;
+const PIG_STATUS_THOUGHT_ACTIVE_MAX_MS = 9500;
+const PIG_STATUS_THOUGHT_IDLE_MIN_MS = 1600;
+const PIG_STATUS_THOUGHT_IDLE_MAX_MS = 2800;
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
@@ -127,6 +133,11 @@ export class GameScene extends Phaser.Scene {
   private readonly handleHudActionEffect = (event: Event): void => {
     const detail = (event as CustomEvent<SceneFeedbackDetail>).detail;
     if (detail) this.playActionEffect(detail);
+  };
+  private readonly handleDevLifecycleStatusSeeded = (): void => {
+    for (const pig of this.state.pigs) {
+      this.pigThoughtCooldowns.set(pig.id, this.time.now + Phaser.Math.Between(80, 260));
+    }
   };
 
   constructor() {
@@ -213,8 +224,10 @@ export class GameScene extends Phaser.Scene {
 
     this.scale.on("resize", this.resize, this);
     window.addEventListener(HUD_ACTION_EFFECT_EVENT, this.handleHudActionEffect);
+    if (import.meta.env.DEV) window.addEventListener(DEV_LIFECYCLE_STATUS_EVENT, this.handleDevLifecycleStatusSeeded);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       window.removeEventListener(HUD_ACTION_EFFECT_EVENT, this.handleHudActionEffect);
+      if (import.meta.env.DEV) window.removeEventListener(DEV_LIFECYCLE_STATUS_EVENT, this.handleDevLifecycleStatusSeeded);
     });
     this.resize();
     this.syncViews();
@@ -383,7 +396,7 @@ export class GameScene extends Phaser.Scene {
             : Math.sin(this.time.now / 220 + pig.id) * 0.035,
       );
       view.setScale(dx < 0 ? -1 : 1, 1);
-      this.applyPigMood(view, pig);
+      this.applyPigPresentation(view, pig);
       this.maybeShowPigThought(pig);
     }
 
@@ -563,7 +576,7 @@ export class GameScene extends Phaser.Scene {
     return view;
   }
 
-  private applyPigMood(view: Phaser.GameObjects.Container, pig: Pig): void {
+  private applyPigPresentation(view: Phaser.GameObjects.Container, pig: Pig): void {
     const sprite = view.list[1] as Phaser.GameObjects.Image;
     const nearHay = Math.hypot(pig.x - 88, pig.y - 88) < 90;
     const nearWater = Math.hypot(pig.x - (this.state.cage.width - 90), pig.y - 82) < 90;
@@ -573,21 +586,11 @@ export class GameScene extends Phaser.Scene {
 
     sprite.setTexture(this.getPigTextureKey(pig));
     sprite.clearTint();
-    if (pig.stress >= 70) sprite.setAlpha(0.68);
-    else if (pig.mood === "hungry") sprite.setAlpha(0.78);
-    else if (pig.mood === "thirsty") sprite.setAlpha(0.86);
-    else if (pig.mood === "messy") sprite.setAlpha(0.7);
-    else sprite.setAlpha(1);
-
-    if (pig.stress >= 70) sprite.setTint(0xd8a36f);
-    else if (pig.mood === "hungry") sprite.setTint(0xf0d56b);
-    else if (pig.mood === "thirsty") sprite.setTint(0x9ed9e8);
-    else if (pig.mood === "messy") sprite.setTint(0xd8c2a3);
+    sprite.setAlpha(1);
 
     if (pig.goal === "sleep") {
       displayWidth *= 1.08;
       displayHeight *= 0.9;
-      sprite.setAlpha(Math.min(sprite.alpha, 0.88));
     } else if (pig.goal === "playWithPig" || pig.goal === "playWithFurniture") {
       displayWidth *= 1.06 + Math.abs(idleWiggle) * 1.8;
       displayHeight *= 0.96 + Math.abs(idleWiggle);
@@ -1177,16 +1180,30 @@ export class GameScene extends Phaser.Scene {
 
   private maybeShowPigThought(pig: Pig): void {
     if (!this.pigThoughtCooldowns.has(pig.id)) {
-      this.pigThoughtCooldowns.set(pig.id, this.time.now + Phaser.Math.Between(900, 3200));
+      this.pigThoughtCooldowns.set(
+        pig.id,
+        this.time.now + Phaser.Math.Between(PIG_STATUS_THOUGHT_INITIAL_MIN_MS, PIG_STATUS_THOUGHT_INITIAL_MAX_MS),
+      );
       return;
     }
 
     const nextTime = this.pigThoughtCooldowns.get(pig.id) ?? 0;
     if (this.time.now < nextTime) return;
 
-    const text = getPigThoughtText(pig, this.state);
+    const text = getPigLifecycleStatusMessage(pig, this.state);
+    if (!text) {
+      this.pigThoughtCooldowns.set(
+        pig.id,
+        this.time.now + Phaser.Math.Between(PIG_STATUS_THOUGHT_IDLE_MIN_MS, PIG_STATUS_THOUGHT_IDLE_MAX_MS),
+      );
+      return;
+    }
+
     this.showPigThought(pig, text, 1500);
-    this.pigThoughtCooldowns.set(pig.id, this.time.now + Phaser.Math.Between(5200, 9200));
+    this.pigThoughtCooldowns.set(
+      pig.id,
+      this.time.now + Phaser.Math.Between(PIG_STATUS_THOUGHT_ACTIVE_MIN_MS, PIG_STATUS_THOUGHT_ACTIVE_MAX_MS),
+    );
   }
 
   private showPigThought(pig: Pig, text: string, duration: number): void {

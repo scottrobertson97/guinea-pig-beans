@@ -79,6 +79,19 @@ import {
   type MilestoneView,
 } from "../simulation/milestones";
 import { SAVE_STATUS_EVENT, type SaveStatusDetail } from "../simulation/persistence";
+import {
+  canUnlockTechNode,
+  getAbilityTechNodeId,
+  getAvailableTechUnlockCount,
+  getTechBranches,
+  getTechLevel,
+  getTechNodeDefinition,
+  getTechNodeDefinitions,
+  getTechNodeStatusText,
+  isAbilityTechUnlocked,
+  isTechComplete,
+  unlockTechNode,
+} from "../simulation/techTree";
 import { getActivePigRequestView } from "../simulation/pigRequests";
 import type {
   AbilityId,
@@ -91,6 +104,8 @@ import type {
   GameState,
   Pig,
   CageZoneId,
+  TechNodeDefinition,
+  TechNodeId,
   WisdomPerkId,
   WisdomSpecializationId,
 } from "../simulation/types";
@@ -221,7 +236,7 @@ const SECTION_META: Record<SectionId, SectionMeta> = {
   furniture: { title: "Furniture", icon: assetPath("assets/sprites/decor/toy_pile.png") },
   abilities: { title: "Abilities", icon: assetPath("assets/sprites/beans/bean_golden.png") },
   recipes: { title: "Bean Recipes", icon: assetPath("assets/sprites/beans/bean_rainbow.png") },
-  wisdom: { title: "Wisdom", icon: assetPath("assets/sprites/upgrades/cavybot_3000.png") },
+  wisdom: { title: "Tech Tree", icon: assetPath("assets/sprites/upgrades/cavybot_3000.png") },
   herd: { title: "Herd", icon: assetPath("assets/sprites/pigs/pig_cream_brown_idle.png") },
   goals: { title: "Goals", icon: assetPath("assets/sprites/decor/litter_tray_clean.png") },
   log: { title: "Cage Log", icon: assetPath("assets/sprites/beans/bean_normal.png") },
@@ -302,6 +317,7 @@ export class Hud {
   private furnitureCarePanel: HTMLElement;
   private habitatCarePanel: HTMLElement;
   private wisdomSpecializationPanel: HTMLElement;
+  private techTree: HTMLElement;
   private panels: Record<SectionId, HTMLElement>;
   private activeSection: SectionId | null = null;
   private activeLauncher: HTMLButtonElement | null = null;
@@ -312,6 +328,7 @@ export class Hud {
   private previousContractListSignature: string | null = null;
   private previousFurnitureCareSignature: string | null = null;
   private previousEcologySignature: string | null = null;
+  private previousTechTreeSignature: string | null = null;
   private previousSectionReveals: SectionRevealState | null = null;
   private revealHint: { text: string; expiresAt: number } | null = null;
   private previousCompletedQuestIds: Set<string> | null = null;
@@ -461,6 +478,7 @@ export class Hud {
     this.furnitureCarePanel = getElement("furniture-care-panel");
     this.habitatCarePanel = getElement("habitat-care-panel");
     this.wisdomSpecializationPanel = getElement("wisdom-specialization-panel");
+    this.techTree = getElement("tech-tree");
     this.panels = {
       care: getPanel("care"),
       shop: getPanel("shop"),
@@ -671,6 +689,7 @@ export class Hud {
         "purchase",
       ),
     );
+    this.techTree.addEventListener("click", (event) => this.runTechTreeClick(event));
     this.resetRunButton.addEventListener("click", () => this.resetRun());
 
     for (const [section, launcher] of Object.entries(this.launchers) as [SectionId, HTMLButtonElement][]) {
@@ -731,6 +750,7 @@ export class Hud {
     this.renderRecipeStatuses();
     this.renderLateGameStatuses();
     this.renderWisdomStatuses();
+    this.renderTechTree();
     this.renderEventChoices();
     this.renderPigRequest();
     this.updateEventButtonLabels();
@@ -856,6 +876,21 @@ export class Hud {
       },
       "eventResponse",
       "event",
+    );
+  }
+
+  private runTechTreeClick(event: Event): void {
+    const target = event.target instanceof HTMLElement ? event.target : null;
+    const button = target?.closest<HTMLButtonElement>("[data-tech-node-id]");
+    if (!button || !this.techTree.contains(button)) return;
+    const techNodeId = button.dataset.techNodeId as TechNodeId | undefined;
+    if (!techNodeId) return;
+    this.runAction(
+      () => unlockTechNode(this.state, techNodeId),
+      button,
+      getTechFeedbackDetail(techNodeId),
+      "purchase",
+      "purchase",
     );
   }
 
@@ -1030,6 +1065,7 @@ export class Hud {
     const wasOpen = this.modal.open;
     this.activeSection = section;
     this.activeLauncher = launcher;
+    this.modal.classList.toggle("modal-wide", section === "wisdom");
     const meta = SECTION_META[section];
     this.modalTitle.textContent = meta.title;
     this.modalIcon.src = meta.icon;
@@ -1168,24 +1204,7 @@ export class Hud {
       "council-cleanup-ordinance",
       "council-herd-charter",
     ]), "available");
-    this.setDockIndicator("wisdom", countEnabled(this.buttons, [
-      "wisdom-roomy-start",
-      "wisdom-steady-supplies",
-      "wisdom-fresh-start",
-      "wisdom-bonded-beginnings",
-      "wisdom-social-memory",
-      "wisdom-chorus-training",
-      "wisdom-gentle-automation",
-      "wisdom-compost-engine",
-      "wisdom-tray-affinity",
-      "wisdom-rare-instinct",
-      "wisdom-golden-nose",
-      "wisdom-royal-memory",
-      "wisdom-gentle-care",
-      "wisdom-automation-steward",
-      "wisdom-rare-bean-alchemy",
-      "prestige",
-    ]), "available");
+    this.setDockIndicator("wisdom", getAvailableTechUnlockCount(this.state), "available");
     const contractBoard = getContractBoardView(this.state);
     this.setDockIndicator(
       "goals",
@@ -1528,6 +1547,92 @@ export class Hud {
     }
   }
 
+  private renderTechTree(): void {
+    const definitions = getTechNodeDefinitions();
+    const signature = definitions
+      .map((definition) =>
+        [
+          definition.id,
+          getTechLevel(this.state, definition.id),
+          canUnlockTechNode(this.state, definition.id) ? "available" : "locked",
+          getTechNodeStatusText(this.state, definition.id),
+        ].join(":"),
+      )
+      .join("|");
+    if (signature === this.previousTechTreeSignature && this.techTree.childElementCount > 0) return;
+    this.previousTechTreeSignature = signature;
+
+    const branches = getTechBranches().map((branch) => {
+      const branchElement = document.createElement("section");
+      const title = document.createElement("h3");
+      const list = document.createElement("div");
+      branchElement.className = "tech-branch";
+      branchElement.dataset.techBranch = branch.id;
+      title.textContent = branch.label;
+      list.className = "tech-node-list";
+      for (const definition of definitions.filter((candidate) => candidate.branch === branch.id)) {
+        list.append(this.createTechNode(definition));
+      }
+      branchElement.append(title, list);
+      return branchElement;
+    });
+
+    this.techTree.replaceChildren(...branches);
+  }
+
+  private createTechNode(definition: TechNodeDefinition): HTMLElement {
+    const currentLevel = getTechLevel(this.state, definition.id);
+    const complete = isTechComplete(this.state, definition.id);
+    const available = canUnlockTechNode(this.state, definition.id);
+    const statusText = getTechNodeStatusText(this.state, definition.id);
+
+    const row = document.createElement("div");
+    const button = document.createElement("button");
+    const header = document.createElement("span");
+    const label = document.createElement("span");
+    const status = document.createElement("strong");
+    const description = document.createElement("em");
+    const pips = document.createElement("span");
+
+    row.className = "tech-node-row";
+    row.dataset.techNodeId = definition.id;
+    row.dataset.techBranch = definition.branch;
+    row.classList.toggle("complete", complete);
+    row.classList.toggle("available", available);
+    row.classList.toggle("locked", !complete && !available);
+    row.classList.toggle("derived", definition.kind === "derived");
+    row.classList.toggle("action-node", definition.kind === "action");
+
+    button.type = "button";
+    button.className = "tech-node-button";
+    button.dataset.techNodeId = definition.id;
+    button.disabled = !available;
+    button.setAttribute("aria-label", `${definition.label}. ${statusText}`);
+
+    header.className = "tech-node-header";
+    label.className = "tech-node-label";
+    status.className = "tech-node-status";
+    description.className = "tech-node-description";
+    pips.className = "tech-level-pips";
+
+    label.textContent = definition.label;
+    status.textContent = statusText;
+    description.textContent = definition.description;
+
+    for (let index = 0; index < definition.maxLevel; index += 1) {
+      const pip = document.createElement("span");
+      pip.className = "tech-level-pip";
+      pip.classList.toggle("filled", index < currentLevel);
+      pip.setAttribute("aria-hidden", "true");
+      pips.append(pip);
+    }
+
+    header.append(label, status);
+    button.append(header, description, pips);
+    row.append(button);
+    return row;
+  }
+
   private renderEventChoices(): void {
     const choices = getEventChoices(this.state);
     const event = this.state.event.active;
@@ -1666,7 +1771,7 @@ export class Hud {
   }
 
   private canUseAbility(id: AbilityId): boolean {
-    return this.state.abilities[id] <= 0 && this.state.squeaks >= getAbilityCost(this.state, id);
+    return isAbilityTechUnlocked(this.state, id) && this.state.abilities[id] <= 0 && this.state.squeaks >= getAbilityCost(this.state, id);
   }
 }
 
@@ -1769,6 +1874,32 @@ function toSceneFeedbackDetail(effect: HudActionEffect): SceneFeedbackDetail {
   if (effect === "herd") return { category: "adoption", target: "herd", label: "New Pig", color: 0xf0d56b };
   if (effect === "ability") return { category: "purchase", target: "ability", label: "Ability", color: 0xf0d56b };
   return { category: "unlock", target: "furniture", label: "Unlocked", color: 0x7db46a };
+}
+
+function getTechFeedbackDetail(id: TechNodeId): SceneFeedbackDetail {
+  const definition = getTechNodeDefinition(id);
+  if (id === "greatComposting") {
+    return { category: "prestige", target: "cage", label: definition.label, resourceText: "+Wisdom", color: 0xf0d56b };
+  }
+  if (id === "betterHay" || id === "hayDimension" || id === "careRoutines") {
+    return { category: "unlock", target: "hay", label: definition.label, color: 0xd7c74b };
+  }
+  if (id === "betterScoop" || id === "cleanStreakTraining" || id === "goldenScoop") {
+    return { category: "unlock", target: "scoop", label: definition.label, color: 0xf0d56b };
+  }
+  if (id === "biggerCage") {
+    return { category: "unlock", target: "cage", label: definition.label, color: 0x7db46a };
+  }
+  if (id === "poopRoomba" || id === "roombaSensors" || id === "rareGuardProtocol") {
+    return { category: "unlock", target: "robot", label: definition.label, color: 0x86d9f0 };
+  }
+  if (definition.branch === "habitat") {
+    return { category: "unlock", target: "furniture", label: definition.label, color: 0x7db46a };
+  }
+  if (definition.branch === "abilities") {
+    return { category: "unlock", target: "ability", label: definition.label, color: 0xb965d2 };
+  }
+  return { category: "unlock", target: "center", label: definition.label, color: 0xf0d56b };
 }
 
 function getBeanExchangeFeedbackText(tradeId: BeanExchangeTradeId): string {
@@ -1988,6 +2119,9 @@ function getBetterHayStatusText(state: GameState, cost: number): string {
 }
 
 function getAbilityStatusText(state: GameState, id: AbilityId): string {
+  if (!isAbilityTechUnlocked(state, id)) {
+    return `Unlock ${getTechNodeDefinition(getAbilityTechNodeId(id)).label}`;
+  }
   if (state.abilities[id] > 0) return `Cooldown ${getCooldownText(state.abilities[id])}`;
   const cost = getAbilityCost(state, id);
   if (state.squeaks < cost) return formatNeed(state.squeaks, cost, "Squeak");

@@ -64,6 +64,64 @@ export type AbilityId = "wheekCall" | "treatBag" | "deepClean" | "freshBedding" 
 export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord" | "singularityExperiment";
 export type BeanExchangeTradeId = "beansToCompost" | "compostToSqueaks" | "goldToBeans" | "squeaksToGold";
 export type CouncilDecreeId = "careMandate" | "cleanupOrdinance" | "herdCharter";
+export type TechBranchId = "care" | "habitat" | "automation" | "abilities" | "wisdom";
+export type TechNodeId =
+  | "betterHay"
+  | "betterScoop"
+  | "biggerCage"
+  | "hayDimension"
+  | "cleanStreakTraining"
+  | "careRoutines"
+  | "hideyHouse"
+  | "tunnel"
+  | "litterTray"
+  | "chewToy"
+  | "snuggleSack"
+  | "cardboardCastle"
+  | "royalThrone"
+  | "cozyCorner"
+  | "zoomiePlayground"
+  | "cleanupCircuit"
+  | "royalCompostCourt"
+  | "furnitureCareKit"
+  | "habitatStewardKit"
+  | "poopRoomba"
+  | "compostOverdrive"
+  | "automationDirectives"
+  | "roombaSensors"
+  | "litterMethod"
+  | "rareGuardProtocol"
+  | "abilityWheekCall"
+  | "abilityTreatBag"
+  | "abilityFreshBedding"
+  | "abilitySnackTime"
+  | "abilityZoomieMode"
+  | "abilityDeepClean"
+  | "squeakTraining"
+  | "beanBlessing"
+  | "compostCatalyst"
+  | "royalAccord"
+  | "beanExchange"
+  | "goldenScoop"
+  | "rareCatalog"
+  | "singularityExperiment"
+  | "singularityStabilizers"
+  | "greatComposting"
+  | "roomyStart"
+  | "steadySupplies"
+  | "freshStart"
+  | "bondedBeginnings"
+  | "socialMemory"
+  | "chorusTraining"
+  | "gentleAutomation"
+  | "compostEngine"
+  | "trayAffinity"
+  | "rareInstinct"
+  | "goldenNose"
+  | "royalMemory"
+  | "gentleCare"
+  | "automationSteward"
+  | "rareBeanAlchemy";
 export type WisdomPerkId =
   | "roomyStart"
   | "steadySupplies"
@@ -345,6 +403,29 @@ export interface ContractsState {
   completedTemplates: Partial<Record<ContractTemplateId, number>>;
 }
 
+export interface TechState {
+  levels: Partial<Record<TechNodeId, number>>;
+}
+
+export interface TechCost {
+  beans?: number;
+  compost?: number;
+  squeaks?: number;
+  goldenBeans?: number;
+  wisdom?: number;
+}
+
+export interface TechNodeDefinition {
+  id: TechNodeId;
+  branch: TechBranchId;
+  label: string;
+  description: string;
+  maxLevel: number;
+  prerequisites: TechNodeId[];
+  kind: "unlock" | "derived" | "action";
+  costs?: TechCost[];
+}
+
 export interface GameState {
   beans: number;
   compost: number;
@@ -414,6 +495,7 @@ export interface GameState {
     squeakChoir: boolean;
     beanSingularity: boolean;
   };
+  tech: TechState;
   combo: {
     count: number;
     timer: number;

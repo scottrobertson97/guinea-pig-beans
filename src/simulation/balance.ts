@@ -368,7 +368,8 @@ export function getGoldenScoopCost(): GoldenScoopCost {
 }
 
 export function getAbilityCost(state: GameState, id: AbilityId): number {
-  const discount = hasSqueakChoirEffect(state) ? 1 : 0;
+  const squeakTrainingDiscount = (state.tech?.levels?.squeakTraining ?? 0) >= 2 ? 1 : 0;
+  const discount = (hasSqueakChoirEffect(state) ? 1 : 0) + squeakTrainingDiscount;
   return Math.max(0, ABILITY_SQUEAK_COSTS[id] - discount);
 }
 
@@ -395,9 +396,10 @@ export function getAutomationFuelDuration(state: GameState): number {
 }
 
 export function getSingularityExperimentCost(state: GameState): { compost: number; squeaks: number } {
+  const stabilizerLevel = state.tech?.levels?.singularityStabilizers ?? 0;
   return {
-    compost: Math.max(20, SINGULARITY_EXPERIMENT_COMPOST_COST - (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 8 : 0)),
-    squeaks: Math.max(2, SINGULARITY_EXPERIMENT_SQUEAK_COST - (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 1 : 0)),
+    compost: Math.max(15, SINGULARITY_EXPERIMENT_COMPOST_COST - (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 8 : 0) - stabilizerLevel * 5),
+    squeaks: Math.max(1, SINGULARITY_EXPERIMENT_SQUEAK_COST - (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 1 : 0) - stabilizerLevel),
   };
 }
 

@@ -24,7 +24,7 @@ export type DockSectionId =
 export type SectionRevealId = "furniture" | "abilities" | "recipes" | "wisdom";
 export type SectionRevealState = Record<SectionRevealId, boolean>;
 
-const CORE_SECTIONS = new Set<DockSectionId>(["care", "shop", "herd", "goals", "log"]);
+const CORE_SECTIONS = new Set<DockSectionId>(["care", "shop", "wisdom", "herd", "goals", "log"]);
 
 const SECTION_REVEAL_IDS: Record<SectionRevealId, DockSectionId> = {
   furniture: "furniture",

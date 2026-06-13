@@ -104,7 +104,8 @@ function getFurnitureWearRate(state: GameState, id: FurnitureId): number {
   const messPressure = (zone?.mess ?? 0) * 0.00025;
   const automationPressure =
     id === "litterTray" ? 0.006 + state.poops.length * 0.0012 + (state.automation.overdrive > 0 ? 0.012 : 0) : 0;
-  return 0.004 + trafficPressure + pigPressure + messPressure + automationPressure;
+  const careKitMultiplier = Math.max(0.8, 1 - (state.tech?.levels?.furnitureCareKit ?? 0) * 0.05);
+  return (0.004 + trafficPressure + pigPressure + messPressure + automationPressure) * careKitMultiplier;
 }
 
 function getWellLovedEffectText(id: FurnitureId): string {

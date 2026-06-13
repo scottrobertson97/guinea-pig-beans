@@ -64,6 +64,7 @@ import type {
   CageZoneId,
   Poop,
   PoopType,
+  TechNodeId,
   WisdomPerkId,
   WisdomSpecializationId,
 } from "./types";
@@ -185,6 +186,15 @@ const AUTOMATION_DIRECTIVES: AutomationDirectiveDefinition[] = [
     description: "Automation avoids special beans so the player can clean them manually.",
   },
 ];
+
+const ABILITY_TECH_NODES: Record<AbilityId, TechNodeId> = {
+  wheekCall: "abilityWheekCall",
+  treatBag: "abilityTreatBag",
+  deepClean: "abilityDeepClean",
+  freshBedding: "abilityFreshBedding",
+  snackTime: "abilitySnackTime",
+  zoomieMode: "abilityZoomieMode",
+};
 
 export interface CleanedPoop {
   id: number;
@@ -345,14 +355,16 @@ export function cleanPoopsInRadius(state: GameState, x: number, y: number, radiu
 
   if (result.cleaned > 0) {
     const comboCount = state.combo.timer > 0 ? state.combo.count + 1 : 1;
-    const comboBonus = comboCount > 1 ? Math.ceil(result.baseEarned * Math.min(1, (comboCount - 1) * 0.15)) : 0;
+    const cleanStreakLevel = state.tech?.levels?.cleanStreakTraining ?? 0;
+    const comboStep = 0.15 + cleanStreakLevel * 0.02;
+    const comboBonus = comboCount > 1 ? Math.ceil(result.baseEarned * Math.min(1, (comboCount - 1) * comboStep)) : 0;
     result.comboCount = comboCount;
     result.comboBonus = comboBonus;
     result.earned = result.baseEarned + comboBonus;
 
     state.combo.count = comboCount;
     state.combo.best = Math.max(state.combo.best, comboCount);
-    state.combo.timer = 2.25;
+    state.combo.timer = 2.25 + cleanStreakLevel * 0.2;
     state.beans += result.earned;
     state.stats.lifetimeBeans += result.earned;
     state.stats.cleanedPoops += result.cleaned;
@@ -539,7 +551,8 @@ export function careForFurniture(state: GameState, id: FurnitureId): boolean {
 
   const care = getFurnitureCareEntry(state, id);
   const previousCondition = care.condition;
-  care.condition = Math.min(100, care.condition + 30);
+  const careKitLevel = state.tech?.levels?.furnitureCareKit ?? 0;
+  care.condition = Math.min(100, care.condition + 30 + careKitLevel * 3);
   care.cooldown = hasWisdomSpecialization(state, "gentleCare") ? 7 : 10;
   care.lastCare = `Cared for ${getFurnitureName(id)}`;
   state.furnitureCare[id] = care;
@@ -591,8 +604,9 @@ export function tendHabitatZone(state: GameState, zoneId: CageZoneId): boolean {
   const zone = getZoneMetrics(state, zoneId);
   const stewardship = getZoneStewardship(state, zoneId);
   const bottleWasJammed = zoneId === "waterBottle" && state.event.bottleJammed;
-  stewardship.care = Math.min(100, stewardship.care + (hasWisdomSpecialization(state, "gentleCare") ? 28 : 22));
-  stewardship.cooldown = hasWisdomSpecialization(state, "gentleCare") ? 6 : 8;
+  const stewardKitLevel = state.tech?.levels?.habitatStewardKit ?? 0;
+  stewardship.care = Math.min(100, stewardship.care + (hasWisdomSpecialization(state, "gentleCare") ? 28 : 22) + stewardKitLevel * 2);
+  stewardship.cooldown = Math.max(3, (hasWisdomSpecialization(state, "gentleCare") ? 6 : 8) - stewardKitLevel * 0.5);
   stewardship.lastAction = `Tended ${zone.label}`;
   state.ecology.stewardship[zoneId] = stewardship;
 
@@ -700,6 +714,10 @@ export function clearPoops(state: GameState): void {
 }
 
 export function useAbility(state: GameState, id: AbilityId): boolean {
+  if (!hasAbilityLicense(state, id)) {
+    addLog(state, `${getAbilityName(id)} needs a Tech Tree unlock first.`);
+    return false;
+  }
   if (state.abilities[id] > 0) return false;
   const squeakCost = getAbilityCost(state, id);
   if (state.squeaks < squeakCost) {
@@ -707,29 +725,31 @@ export function useAbility(state: GameState, id: AbilityId): boolean {
     return false;
   }
   state.squeaks -= squeakCost;
+  const squeakTrainingLevel = state.tech?.levels?.squeakTraining ?? 0;
+  const timingBonus = squeakTrainingLevel >= 3 ? 1 : 0;
 
   if (id === "wheekCall") {
-    state.abilities.wheekCall = 10;
-    state.squeaks += state.wisdom.chorusTraining ? 2 : 1;
+    state.abilities.wheekCall = 10 + timingBonus * 3;
+    state.squeaks += (state.wisdom.chorusTraining ? 2 : 1) + (squeakTrainingLevel >= 1 ? 1 : 0);
     addLog(state, "Wheek call issued. Pigs are converging on snacks.");
   } else if (id === "treatBag") {
-    state.abilities.treatBag = 15;
+    state.abilities.treatBag = 15 + timingBonus * 3;
     addLog(state, `Treat bag shaken for ${squeakCost} Squeaks. Production has become emotionally complicated.`);
   } else if (id === "deepClean") {
     const result = cleanPoopsInRadius(state, state.cage.width / 2, state.cage.height / 2, Math.max(state.cage.width, state.cage.height));
-    state.abilities.deepClean = 45;
+    state.abilities.deepClean = Math.max(32, 45 - timingBonus * 6);
     addLog(state, `Deep Clean cleared ${result.cleaned} beans for +${result.earned}.`);
   } else if (id === "freshBedding") {
     state.cage.cleanliness = 100;
-    state.abilities.freshBedding = 35;
+    state.abilities.freshBedding = Math.max(24, 35 - timingBonus * 5);
     adjustHerdStress(state, -8);
     addLog(state, "Fresh bedding restored the cage to suspicious respectability.");
   } else if (id === "snackTime") {
-    state.abilities.snackTime = 20;
+    state.abilities.snackTime = 20 + timingBonus * 4;
     adjustHerdStress(state, -6);
     addLog(state, `Snack Time spent ${squeakCost} Squeaks to boost happiness and rare bean odds.`);
   } else {
-    state.abilities.zoomieMode = 12;
+    state.abilities.zoomieMode = 12 + timingBonus * 3;
     addLog(state, `Zoomie Mode spent ${squeakCost} Squeaks. The cage is now a traffic study.`);
   }
 
@@ -761,11 +781,13 @@ export function getAutomationDirectives(): AutomationDirectiveDefinition[] {
 }
 
 export function canSetAutomationDirective(state: GameState, id: AutomationDirectiveId): boolean {
+  if (id === "rareGuard" && (state.tech?.levels?.rareGuardProtocol ?? 0) <= 0) return false;
   return hasAutomationTool(state) && state.automation.directive !== id;
 }
 
 export function getAutomationDirectiveStatus(state: GameState, id: AutomationDirectiveId): string {
   if (!hasAutomationTool(state)) return "Needs automation";
+  if (id === "rareGuard" && (state.tech?.levels?.rareGuardProtocol ?? 0) <= 0) return "Unlock protocol";
   if (state.automation.directive === id) return "Active";
   return "Select";
 }
@@ -811,10 +833,14 @@ export function runSingularityExperiment(state: GameState): boolean {
   if (!canRunSingularityExperiment(state)) return false;
 
   const cost = getSingularityExperimentCost(state);
+  const stabilizerLevel = state.tech?.levels?.singularityStabilizers ?? 0;
   state.compost -= cost.compost;
   state.squeaks -= cost.squeaks;
-  pullPoopsTowardCenter(state, 0.45);
-  state.contracts.rareEventBoost = Math.max(state.contracts.rareEventBoost, hasWisdomSpecialization(state, "rareBeanAlchemy") ? 3 : 2);
+  pullPoopsTowardCenter(state, 0.45 + stabilizerLevel * 0.06);
+  state.contracts.rareEventBoost = Math.max(
+    state.contracts.rareEventBoost,
+    (hasWisdomSpecialization(state, "rareBeanAlchemy") ? 3 : 2) + Math.floor(stabilizerLevel / 2),
+  );
   spawnEventPoop(
     state,
     "cursed",
@@ -1205,6 +1231,7 @@ export function prestige(state: GameState): boolean {
   state.lateGame.cavyCouncil = false;
   state.lateGame.squeakChoir = false;
   state.lateGame.beanSingularity = false;
+  state.tech.levels = {};
   state.event.active = null;
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;
@@ -1268,6 +1295,10 @@ function getAbilityName(id: AbilityId): string {
   return names[id];
 }
 
+function hasAbilityLicense(state: GameState, id: AbilityId): boolean {
+  return (state.tech?.levels?.[ABILITY_TECH_NODES[id]] ?? 0) > 0;
+}
+
 function hasAutomationTool(state: GameState): boolean {
   return Boolean(state.robot) || state.furniture.litterTray;
 }
@@ -1302,16 +1333,21 @@ function applyMysteryBean(state: GameState): void {
 
 function getHabitatTendCost(state: GameState, zoneId: CageZoneId): { resource: "beans" | "compost"; amount: number } {
   const gentleCare = hasWisdomSpecialization(state, "gentleCare");
+  const stewardDiscount = state.tech?.levels?.habitatStewardKit ?? 0;
   if (zoneId === "litterCorner") {
     const compostCost = gentleCare ? 3 : 4;
-    return state.compost >= compostCost ? { resource: "compost", amount: compostCost } : { resource: "beans", amount: gentleCare ? 14 : 18 };
+    return state.compost >= compostCost
+      ? { resource: "compost", amount: Math.max(1, compostCost - Math.floor(stewardDiscount / 2)) }
+      : { resource: "beans", amount: Math.max(8, (gentleCare ? 14 : 18) - stewardDiscount) };
   }
-  if (zoneId === "hayCorner" || zoneId === "waterBottle") return { resource: "beans", amount: gentleCare ? 8 : 10 };
-  return { resource: "beans", amount: gentleCare ? 11 : 14 };
+  if (zoneId === "hayCorner" || zoneId === "waterBottle") {
+    return { resource: "beans", amount: Math.max(5, (gentleCare ? 8 : 10) - stewardDiscount) };
+  }
+  return { resource: "beans", amount: Math.max(7, (gentleCare ? 11 : 14) - stewardDiscount) };
 }
 
 function getFurnitureCareCost(state: GameState, id: FurnitureId): { resource: "beans" | "compost"; amount: number } {
-  const discount = hasWisdomSpecialization(state, "gentleCare") ? 3 : 0;
+  const discount = (hasWisdomSpecialization(state, "gentleCare") ? 3 : 0) + (state.tech?.levels?.furnitureCareKit ?? 0);
   if (id === "litterTray" && state.compost >= 3) return { resource: "compost", amount: Math.max(2, 3 - (discount > 0 ? 1 : 0)) };
   const condition = getFurnitureCareEntry(state, id).condition;
   if (condition < 32) return { resource: "beans", amount: Math.max(10, 18 - discount) };

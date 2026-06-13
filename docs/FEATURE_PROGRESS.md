@@ -4,14 +4,15 @@
 
 - Pig identity basics: names, breeds, traits, favorite foods, quirks, and roster display.
 - Special poop types: Normal, Golden, Compost, Stinky, Blessed, Mega, Mystery, Hay, Royal, and Cursed beans with distinct values, visuals, and log messages.
-- Cleanliness loop: poop lowers cage cleanliness, and low needs/cleanliness affect pig mood and production.
-- Automation: Poop Roomba can be purchased from Shop, then fueled and directed from Furniture.
+- Cleanliness loop: poop lowers cage cleanliness, and low needs/cleanliness affect pig mood, production, and status bubbles.
+- Automation: Poop Roomba is unlocked from the Tech Tree, then fueled and directed from Furniture.
 - Combo cleaning: quick consecutive cleanups build a timed Clean Streak and award bonus Beans.
 - Contracts and records: Contracts drive active short-term goals, while quest and achievement milestones live as Records in the Log.
 - Funny cage log: milestone, cleanup, pig, resource, and automation messages surface game personality.
 - Expanded breeds and traits: Skinny Pig, Silkie, Crested, Royal Pig, Shy Beaner, Hay Goblin, Drama Pig, and Compost Mystic are now in the pig generator.
 - Cage zones: fixed Hay Area, Tunnel Zone, Litter Tray corner, Hidey Zone, and Play/Compost areas now influence targeting, movement, cleanliness, and aging.
-- Cage furniture: Hidey House, Tunnel, Litter Tray, Chew Toy, Snuggle Sack, Cardboard Castle, and Royal Throne are one-time static unlocks with distinct buffs.
+- Tech Tree: One always-visible dock button opens a branch-based progression map for run unlocks, levelled upgrades, recipes, automation access, abilities, and permanent Wisdom Legacy nodes.
+- Cage furniture: Hidey House, Tunnel, Litter Tray, Chew Toy, Snuggle Sack, Cardboard Castle, and Royal Throne are one-time static Tech Tree unlocks with distinct buffs.
 - Furniture synergies: matching static furniture pairs now unlock combo bonuses for comfort, Zoomies, cleanup automation, and royal/compost strategy.
 - Additional needs/resources: Enrichment, Socialization, Space, Compost, Squeaks, Golden Beans, and Cavy Wisdom are tracked.
 - Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger with three response choices each.
@@ -19,16 +20,16 @@
 - Pig social mechanics: bonded pairs are assigned as pigs join, and herd size contributes socialization.
 - Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides.
 - Dev constants editor: local Vite dev servers expose `/constants` for source-backed tuning of selected scalar literals in `src/simulation/balance.ts`; saves rewrite the source file and production builds do not serve the route.
-- Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode are available with cooldowns.
+- Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode unlock from the Tech Tree, then remain operational cooldown actions in Abilities.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
-- Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds a branching Wisdom tree.
+- Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds the Tech Tree's permanent Wisdom Legacy branch.
 - Wisdom specializations: after tier-3 Wisdom, the player chooses one permanent Caretaker Philosophy: Gentle Care, Automation Steward, or Rare Bean Alchemy.
 - Late-game systems: Hay Dimension is now a Better Hay capstone, Squeak Choir is folded into Chorus Training Wisdom, Cavy Council seats automatically from herd size, Golden Scoop turns cleanup into a run-limited magnet tool, and Bean Singularity now lives as the repeatable Singularity Experiment recipe; Bean Exchange remains the rare-resource trade track.
-- Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent perks.
+- Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent Tech Tree perks.
 - Cage ecology: Fixed zones now track mess, comfort, traffic, appeal, pig occupants, and next actions; pigs have favorite zones and stress, and habitat pressure affects happiness, movement, production, bean odds, events, and requests.
 - Automation directives: Roomba and Litter Tray can be switched between Balanced Sweep, Protect Cleanliness, Litter Focus, and Rare Guard modes from the Furniture modal, where Fuel Automation also lives.
 - Furniture care: Owned furniture now tracks condition, can become well-loved or overworked, and can be tended from the Furniture modal for zone and automation benefits.
-- Progressive mechanics reveal: Fresh runs show only Care, Shop, Herd, Goals, and Log; Furniture, Abilities, Recipes, Wisdom, Habitat Care, automation operations, and Caretaker Philosophy reveal when progress makes them actionable.
+- Progressive mechanics reveal: Fresh runs show Care, Shop, Tech Tree, Herd, Goals, and Log; Furniture, Abilities, Recipes, Habitat Care, automation operations, and Caretaker Philosophy reveal when progress makes them actionable.
 - Contract-led progression campaign: Intro Contracts now pace major mechanic reveals for Furniture, Abilities, Recipes, Automation, and Wisdom before ordinary rotating offers take over.
 
 ## Current Progression Records
@@ -36,7 +37,7 @@
 - Clean 10 beans.
 - Reach 100 Beans.
 - Adopt a second pig.
-- Buy Better Scoop.
+- Unlock Better Scoop.
 - Hit Clean Streak x5.
 - Unlock Poop Roomba.
 - Add cage furniture.
@@ -65,7 +66,7 @@
 - Cage zones now have derived ecology, but they are still fixed regions rather than player-placeable tiles.
 - Furniture is auto-placed at fixed locations as one-time unlocks, not freely placed with footprints.
 - Random events are ecology-weighted and interactive, but not yet driven by quest chains or event decks.
-- Wisdom perks now use a first-pass branching tree with prerequisites and a mutually exclusive Caretaker Philosophy layer.
+- Wisdom perks now live in the Tech Tree's Wisdom Legacy branch with prerequisites and a mutually exclusive Caretaker Philosophy layer.
 - Late-game systems now live inside their owning sections, but they can still gain deeper section-level interactions later.
 - Minigames are still intentionally deferred until the main loop has more tuning data.
 
@@ -111,6 +112,7 @@
 - Pig favorite zones and stress make individual pigs respond differently to the same cage state; comfortable favorite zones slightly improve output, while stress slows production and raises messy outcomes.
 - Ecology incidents such as Litter Revolt, Hidey Squabble, and Zoomie Traffic reuse the event response UI with zone-specific tradeoffs.
 - Pig lifecycle choices now distinguish seeking from acting: hungry or thirsty pigs travel to the hay rack or water bottle before consuming, while play-seeking pigs look for a partner before falling back to play furniture or the Play Run.
+- Active lifecycle statuses now surface as periodic over-pig thought bubbles instead of pig sprite color shifts.
 
 ## Systems Backlog Tickets
 
@@ -214,7 +216,22 @@ Acceptance criteria:
 
 - Specializations unlock after tier-3 Wisdom.
 - Choices provide distinct permanent bonuses.
-- Prestige or Wisdom UI explains the tradeoff.
+- Prestige or the Tech Tree explains the tradeoff.
+
+### SYS-009: Tech Tree Progression Map
+
+Status: First pass implemented.
+
+Description: Centralize one-time run unlocks and permanent Wisdom into a single progression tree while keeping repeatable operations in their existing gameplay sections.
+
+Acceptance criteria:
+
+- Tech Tree is visible from a fresh run as the progression map.
+- Shop, Furniture, Recipes, and Wisdom no longer expose duplicate permanent unlock purchase buttons.
+- Existing owned upgrades, furniture, recipes, late-game flags, Wisdom perks, and philosophies derive completed Tech Tree nodes from current save state.
+- Multi-level tech nodes must be fully completed before child nodes unlock.
+- New tech levels visibly affect care drain, cleaning combos, furniture care, habitat tending, automation, rare odds, abilities, and Singularity runs.
+- Unlocks produce HUD state, cage log text, modal state changes, and scene feedback.
 
 ### No-Orphan-System Checklist
 
@@ -269,7 +286,7 @@ Acceptance criteria:
 Implementation notes:
 
 - Keep this as a visual layer over existing movement and targeting.
-- Start with simple sprite scale/rotation/tint changes before adding new animation frames.
+- Use simple sprite scale/rotation changes plus short-lived thought bubbles before adding new animation frames; avoid pig color shifts for lifecycle status.
 - Use short-lived Phaser image or text objects for bubbles.
 
 ### PB-003: Dock Badges And Availability Indicators
@@ -283,7 +300,7 @@ Description: Add small badges to the bottom section dock so players know where a
 Acceptance criteria:
 
 - Care shows a badge or pulse when hay/water is low or an event response is ready.
-- Shop/Furniture/Recipes/Wisdom show availability when at least one visible action can be purchased or unlocked.
+- Shop/Furniture/Recipes/Tech Tree show availability when at least one visible action can be purchased, unlocked, or used.
 - Abilities shows availability when at least one ability can be used.
 - Goals shows a marker when Contract progress changes meaningfully.
 - Log shows a marker for new entries or milestone Records since the last time the log modal was opened.
@@ -305,10 +322,10 @@ Description: Disabled modal buttons should explain why they cannot be used. This
 
 Acceptance criteria:
 
-- Shop buttons explain missing Beans, capacity, Golden Beans, Compost, or prerequisite state.
-- Furniture buttons explain missing Beans or unlocked state.
+- Shop buttons explain missing Beans, capacity, Golden Beans, Compost, or prerequisite state for operational actions.
+- Tech Tree nodes explain missing resources, incomplete prerequisites, current level, or already-active state.
 - Ability buttons explain cooldowns or missing Squeaks.
-- Recipe, late-game, Wisdom, and Prestige buttons explain missing resources or already-active state.
+- Recipe, late-game, Tech Tree, Wisdom Legacy, and Prestige buttons explain missing resources, prerequisites, or already-active state.
 - Reason text fits inside modal buttons on desktop and mobile.
 - Enabled buttons still emphasize their cost or action status.
 

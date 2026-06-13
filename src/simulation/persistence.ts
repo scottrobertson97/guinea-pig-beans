@@ -3,6 +3,7 @@ import { HAY_DIMENSION_FEED_LEVEL } from "./balance";
 import { ensureContractOffers, normalizeContractsState } from "./contracts";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, normalizeCageZoneId, normalizeStewardshipState, refreshEcology } from "./ecology";
 import { normalizeFurnitureCareState } from "./furnitureCare";
+import { normalizeTechState } from "./techTree";
 import type { GameState, Pig, PigGoal, WisdomSpecializationId } from "./types";
 import { isRecord, normalizePercent, normalizeTimer } from "./utils";
 
@@ -138,6 +139,7 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
   hydrated.ecology = hydrated.ecology ?? createInitialEcologyState(hydrated.cage.width, hydrated.cage.height);
   hydrated.ecology.stewardship = normalizeStewardshipState(hydrated.ecology.stewardship);
   hydrated.furnitureCare = normalizeFurnitureCareState(hydrated.furnitureCare);
+  hydrated.tech = normalizeTechState(hydrated.tech);
   hydrated.contracts = normalizeContractsState(hydrated.contracts);
   hydrated.automation.directive = normalizeAutomationDirective(hydrated.automation.directive);
   hydrated.wisdomSpecialization = normalizeWisdomSpecialization(hydrated.wisdomSpecialization);

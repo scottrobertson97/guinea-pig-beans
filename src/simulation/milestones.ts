@@ -47,7 +47,7 @@ const questDefinitions: MilestoneDefinition[] = [
   },
   {
     id: "buy-scoop",
-    title: "Buy Better Scoop",
+    title: "Unlock Better Scoop",
     complete: (state) => state.upgrades.scoopLevel >= 1,
     progress: (state) => `${Math.min(state.upgrades.scoopLevel, 1)}/1`,
     log: "Quest complete: your scoop technology has advanced.",

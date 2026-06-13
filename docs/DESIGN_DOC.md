@@ -32,7 +32,7 @@ Moment-to-moment, the player:
 - Buys upgrades that make cleaning, care, and production stronger.
 - Adds furniture that changes pig behavior and cage stats.
 - Responds to short-lived events and pig requests.
-- Converts rare resources into abilities, recipes, automation fuel, mythic systems, and permanent Wisdom.
+- Converts rare resources into Tech Tree unlocks, abilities, recipes, automation fuel, mythic systems, and permanent Wisdom.
 
 ## Current Player Interface
 
@@ -46,10 +46,11 @@ The persistent screen shows:
 - A current Contract prompt.
 - Persistent utility controls for sound, save status, and reset.
 
-The fresh-run section dock opens the core loop first:
+The fresh-run section dock opens the core loop and progression map first:
 
 - Care
 - Shop
+- Tech Tree
 - Herd
 - Goals
 - Log
@@ -59,7 +60,6 @@ Advanced sections reveal when the player has a reason to use them:
 - Furniture
 - Abilities
 - Recipes
-- Wisdom
 
 High-frequency care information stays visible. Deeper decisions live behind dock sections.
 
@@ -94,7 +94,7 @@ The main loop is:
 3. The player clicks beans to clean them.
 4. Cleaning awards Beans and sometimes rare resources.
 5. Quick repeated cleaning builds a Clean Streak for bonus Beans.
-6. Beans purchase upgrades, pigs, cage expansions, furniture, and automation.
+6. Beans purchase pigs and Tech Tree unlocks for upgrades, cage expansions, furniture, automation, abilities, and recipes.
 7. Better care, more space, furniture, abilities, events, and Wisdom improve production.
 8. More production creates more mess and more opportunities.
 
@@ -112,7 +112,7 @@ Every new or surviving system should connect to at least two other systems and o
 Examples:
 
 - Contracts connect care, ecology, automation, recipes, herd management, and Log feedback.
-- Wisdom philosophies change multiple systems and show their tradeoff in the Wisdom modal.
+- Wisdom philosophies change multiple systems and show their tradeoff in the Tech Tree.
 - Furniture and Habitat Stewardship affect pig stress, ecology, automation, requests, Contracts, and cage feedback.
 
 A system is not considered complete if it only changes hidden state.
@@ -123,7 +123,7 @@ Mechanics should also reveal themselves at the moment they create a useful decis
 
 ### Beans
 
-Beans are the main currency. The player earns them primarily by cleaning beans in the cage. Beans buy pigs, upgrades, furniture, automation, late-game unlocks, and some event or trade choices.
+Beans are the main currency. The player earns them primarily by cleaning beans in the cage. Beans buy pigs, Tech Tree unlocks, and some event or trade choices.
 
 Lifetime Beans also drive prestige progress.
 
@@ -162,7 +162,7 @@ Golden Beans are used for:
 
 ### Cavy Wisdom
 
-Cavy Wisdom is the prestige currency. It is gained through the Great Composting and spent on permanent Wisdom perks.
+Cavy Wisdom is the prestige currency. It is gained through the Great Composting and spent on permanent Wisdom Legacy nodes in the Tech Tree.
 
 Wisdom perks are permanent run-to-run progression.
 
@@ -378,11 +378,13 @@ Current moods:
 
 Mood is based on hunger, thirst, cleanliness, happiness, and space.
 
-Mood affects movement and visual state:
+Mood affects movement and periodic thought-bubble status messages:
 
 - Content pigs move normally.
-- Hungry or thirsty pigs move less efficiently.
-- Messy pigs move slower and look visually subdued.
+- Hungry or thirsty pigs move less efficiently and can periodically ask for hay or water in the cage.
+- Messy or stressed pigs move slower and can periodically complain about the cage state.
+
+Pigs keep their normal body colors when their mood changes. Lifecycle and welfare status are communicated through short over-pig messages instead of status color shifts.
 
 ## Care, Happiness, And Survival
 
@@ -630,9 +632,49 @@ Cleanliness can receive small bonuses:
 
 Dirty cages are visible in the playfield through floor tint, dirt wash, and dirt patches. Stinky beans and Mess Piles also create local dirty areas.
 
+## Tech Tree
+
+The Tech Tree is the always-visible progression map. It owns one-time unlock decisions for run upgrades, furniture, automation access, ability licenses, bean recipes, late-game unlocks, Great Composting, Wisdom perks, and Caretaker Philosophies.
+
+The original sections still own repeatable operations:
+
+- Shop handles pig adoption and legendary pig adoption.
+- Furniture handles automation fuel, automation directives, furniture care, and habitat tending.
+- Abilities handles using unlocked active abilities.
+- Recipes handles Bean Exchange trades and running Singularity.
+- Herd handles Cavy Council decrees.
+
+Nodes can be locked, available, or complete. A child node only becomes available after every prerequisite node is complete. For multi-level nodes, every level must be bought before child nodes unlock.
+
+The Tech Tree has five branches:
+
+- Care & Cage: Better Hay, Better Scoop, Bigger Cage, Hay Dimension, Clean Streak Training, and Care Routines.
+- Habitat: furniture unlocks, furniture synergy completion, Furniture Care Kit, and Habitat Steward Kit.
+- Automation: Poop Roomba, Compost Overdrive access, Automation Directives, Roomba Sensors, Litter Method, and Rare Guard Protocol.
+- Abilities & Rare Beans: active ability licenses, Squeak Training, Rare Catalog, bean recipes, Bean Exchange, Golden Scoop, Singularity Experiment, and Singularity Stabilizers.
+- Wisdom Legacy: Great Composting, all permanent Wisdom perks, and the three Caretaker Philosophies.
+
+The tree does not add a new currency. Nodes spend the same resources their systems already use: Beans, Compost, Squeaks, Golden Beans, or Cavy Wisdom.
+
+Existing save fields remain the source of truth for existing unlocks. If a save already has upgrades, furniture, recipes, late-game flags, Wisdom perks, or a philosophy, the matching Tech Tree nodes show as complete. New levelled tech nodes use `tech.levels` save data and reset with the rest of the run during Great Composting.
+
+Current levelled tech nodes:
+
+| Node | Max level | Main effect |
+| --- | ---: | --- |
+| Clean Streak Training | 3 | Adds combo window time and stronger combo bonus scaling. |
+| Care Routines | 3 | Reduces hay and water drain. |
+| Furniture Care Kit | 3 | Reduces care costs, increases condition restore, and slows furniture wear. |
+| Habitat Steward Kit | 3 | Reduces habitat tend cost and cooldown while increasing care gain. |
+| Roomba Sensors | 3 | Improves Roomba speed and sensor range. |
+| Litter Method | 3 | Improves Litter Tray trigger chance and radius. |
+| Squeak Training | 3 | Improves Wheek Call, ability costs, durations, and cooldowns. |
+| Rare Catalog | 3 | Improves rare bean odds. |
+| Singularity Stabilizers | 3 | Lowers Singularity cost and strengthens its pull and rare boost. |
+
 ## Shop Progression
 
-Shop is the growth/build surface. It groups herd growth separately from cage growth so early purchases stay easy to scan.
+Shop is the herd growth surface. It keeps adoption easy to scan while the Tech Tree owns one-time upgrade and unlock purchases.
 
 Ongoing operating choices, such as fueling automation or choosing automation directives, live in Furniture with the systems they control.
 
@@ -654,6 +696,8 @@ The cage has a pig capacity. Current capacity:
 
 ### Better Hay
 
+Better Hay is unlocked from the Care & Cage Tech Tree branch.
+
 Better Hay improves production by multiplying the pig production interval by 0.9 per level.
 
 Current pricing:
@@ -661,6 +705,8 @@ Current pricing:
 - `18 * 1.6 ^ level`, rounded up.
 
 ### Better Scoop
+
+Better Scoop is unlocked from the Care & Cage Tech Tree branch.
 
 Better Scoop increases manual cleanup radius and makes the Roomba cheaper.
 
@@ -670,7 +716,9 @@ Current pricing:
 
 ### Poop Roomba
 
-Purchases an automatic cleaner that wanders the cage, detects nearby beans, and sweeps them.
+Poop Roomba is unlocked from the Automation Tech Tree branch.
+
+Unlocks an automatic cleaner that wanders the cage, detects nearby beans, and sweeps them.
 
 Current pricing:
 
@@ -680,6 +728,8 @@ Current pricing:
 - Minimum cost is 45 Beans.
 
 ### Bigger Cage
+
+Bigger Cage is unlocked from the Care & Cage Tech Tree branch.
 
 Expands the cage and increases pig capacity.
 
@@ -706,7 +756,7 @@ Current cost:
 
 ## Furniture
 
-Furniture is currently purchased as one-time static cage unlocks. The player does not place furniture manually yet.
+Furniture is unlocked as one-time static cage objects from the Habitat Tech Tree branch. The player does not place furniture manually yet.
 
 Current furniture:
 
@@ -832,7 +882,7 @@ Directives are meant to create a management tradeoff: protect the cage, clean a 
 
 ## Active Abilities
 
-Abilities are direct player interventions. Most cost Squeaks and then enter cooldown.
+Abilities are direct player interventions. They are licensed through the Tech Tree and then used from the Abilities modal. Most cost Squeaks and then enter cooldown.
 
 | Ability | Base cost | Effect |
 | --- | ---: | --- |
@@ -846,6 +896,7 @@ Abilities are direct player interventions. Most cost Squeaks and then enter cool
 Ability costs can be reduced by:
 
 - Chorus Training Wisdom, which also helps the herd generate Squeaks over time.
+- Squeak Training Tech Tree levels, which improve Wheek Call first, then reduce costs and improve timing.
 
 ## Contracts And Records
 
@@ -860,15 +911,15 @@ The player can have one active Contract at a time. When no Contract is active, t
 Current first-pass Contract offers:
 
 - Fresh Cage Delivery: clean beans, refill hay or water, then hold high cleanliness.
-- Room to Nest: introduce Furniture by unlocking or caring for one cage piece.
-- First Wheek: introduce Abilities by using Wheek Call or another active care move.
+- Room to Nest: introduce Furniture by unlocking a habitat node or caring for one cage piece.
+- First Wheek: introduce Abilities by unlocking and using Wheek Call or another active care move.
 - Habitat Reset: tend different habitat zones, care for or unlock furniture, then keep average stress low.
 - Cleanup Route: choose a cleanup automation directive, let automation clean beans, and handle the Litter Corner.
 - Compost Starter: introduce Bean Recipes by turning Compost or rare cleanup into recipe momentum.
 - Rare Sample Order: clean a rare bean, reach a Clean Streak, and hold Gold or Squeaks.
-- Recipe Commission: clean recipe-minded beans, use an ability, and unlock a recipe or hold Compost.
+- Recipe Commission: clean recipe-minded beans, use an ability, and unlock a recipe through the Tech Tree or hold Compost.
 - Council Session: keep an 8-pig herd happy and pass a Cavy Council decree.
-- Great Composting Rumor: introduce Wisdom by pointing a strong run toward permanent Great Composting progress.
+- Great Composting Rumor: introduce the Wisdom Legacy branch by pointing a strong run toward permanent Great Composting progress.
 
 Contracts can reward Beans, Squeaks, Compost, or a short rare-bean odds boost. They are meant to nudge the player across care, ecology, automation, abilities, recipes, herd management, and rare resources without forcing a single play style.
 
@@ -883,7 +934,7 @@ Current progression records:
 - Clean 10 beans.
 - Reach 100 Beans.
 - Expand for a bigger herd.
-- Buy Better Scoop.
+- Unlock Better Scoop.
 - Hit Clean Streak x5.
 - Unlock Poop Roomba.
 - Add cage furniture.
@@ -1021,7 +1072,7 @@ Choices:
 
 ## Bean Recipes
 
-Bean Recipes are mid-to-late progression unlocks that convert rare resource history into permanent run bonuses.
+Bean Recipes are mid-to-late Tech Tree unlocks that convert rare resource history into run bonuses. Once unlocked, any repeatable recipe operation stays in the Recipes modal.
 
 Current recipes:
 
@@ -1089,11 +1140,12 @@ Late-game systems make the game stranger and add deeper resource conversion, but
 Current homes:
 
 - Hay Dimension is no longer a standalone purchase. It opens automatically as the Better Hay capstone.
-- Bean Exchange appears in Bean Recipes because it shapes rare-resource conversion.
+- Bean Exchange unlocks through the Tech Tree, then its trades appear in Bean Recipes because they shape rare-resource conversion.
+- Golden Scoop unlocks through the Tech Tree and then works as a run-limited cleanup tool.
 - Bean Singularity is no longer a standalone purchase. Its effects live in the Singularity Experiment recipe.
 - Cavy Council seats itself in Herd when the player manages a large herd, then offers repeatable decrees.
 - Squeak Choir is folded into Chorus Training Wisdom because both shape the Squeak ability economy.
-- Great Composting appears in Wisdom because it turns a run into permanent Cavy Wisdom.
+- Great Composting appears in the Wisdom Legacy branch of the Tech Tree because it turns a run into permanent Cavy Wisdom.
 
 ### Better Hay Capstone: Hay Dimension
 
@@ -1157,7 +1209,7 @@ Effects:
 
 ## Prestige: The Great Composting
 
-The Great Composting is the prestige reset.
+The Great Composting is the prestige reset and is run from the Wisdom Legacy branch of the Tech Tree.
 
 Requirement:
 
@@ -1178,6 +1230,7 @@ On prestige:
 - Reset furniture.
 - Reset recipes.
 - Reset late-game unlocks.
+- Reset run-scoped Tech Tree levels and ability licenses.
 - Restore hay, water, and cleanliness.
 - Return the herd to two pigs.
 - Reset events and Contracts.
@@ -1186,9 +1239,9 @@ On prestige:
 
 The Great Composting should feel like turning a messy, productive run into permanent caretaking knowledge.
 
-## Wisdom Tree
+## Tech Tree: Wisdom Legacy
 
-Wisdom is permanent progression purchased with Cavy Wisdom.
+Wisdom Legacy is permanent progression purchased with Cavy Wisdom inside the Tech Tree.
 
 The tree has four branches:
 
@@ -1243,7 +1296,7 @@ After learning any tier-3 Wisdom perk, the player can choose one permanent Caret
 | Automation Steward | Operational cleanup mastery. | Automation fuel, directives, Roomba overdrive, cleanup Contracts, Furniture. |
 | Rare Bean Alchemy | Strange-bean economy. | Rare bean odds, Singularity Experiment, rare Contracts, recipes. |
 
-The Wisdom modal explains the tradeoff before selection. The chosen philosophy is meant to make later runs feel more like a caretaker style than another checklist perk.
+The Tech Tree explains the tradeoff before selection. The chosen philosophy is meant to make later runs feel more like a caretaker style than another checklist perk.
 
 ## Progression Arc
 
@@ -1255,7 +1308,7 @@ Primary beats:
 - See Beans increase.
 - Refill hay and water.
 - Hit first Clean Streak.
-- Buy Better Scoop or Better Hay.
+- Unlock Better Scoop or Better Hay.
 
 Design goal:
 

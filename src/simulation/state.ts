@@ -197,6 +197,9 @@ export function createInitialState(): GameState {
       squeakChoir: false,
       beanSingularity: false,
     },
+    tech: {
+      levels: {},
+    },
     combo: {
       count: 0,
       timer: 0,
@@ -583,6 +586,7 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
   const stressRarePenalty = pig.stress >= 70 ? -0.018 : pig.stress >= 50 ? -0.01 : 0;
   const eventBonus = state.event.active?.id === "greatWheeking" ? 0.08 : 0;
   const abilityBonus = state.abilities.snackTime > 0 ? 0.05 : 0;
+  const rareCatalogBonus = (state.tech?.levels?.rareCatalog ?? 0) * 0.01;
   const recipeRareBonus = state.recipes.beanBlessing ? 0.025 : 0;
   const wisdomRareBonus = state.wisdom.rareInstinct ? 0.025 : 0;
   const alchemyRareBonus = hasWisdomSpecialization(state, "rareBeanAlchemy") ? 0.018 : 0;
@@ -596,6 +600,7 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     happinessBonus +
     favoriteZoneBonus +
     stressRarePenalty +
+    rareCatalogBonus +
     recipeRareBonus +
     wisdomRareBonus +
     alchemyRareBonus +

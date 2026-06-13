@@ -1,5 +1,6 @@
 export const PLAYER_ACTION_EVENT = "guinea-pig-player-action";
 export const UI_SOUND_EVENT = "guinea-pig-ui-sound";
+export const DEV_LIFECYCLE_STATUS_EVENT = "guinea-pig-dev-lifecycle-status";
 
 export type PlayerActionId =
   | "cleanBean"
@@ -77,4 +78,8 @@ export function emitPlayerAction(action: PlayerActionId): void {
 
 export function emitUiSound(sound: UiSoundId): void {
   window.dispatchEvent(new CustomEvent<UiSoundDetail>(UI_SOUND_EVENT, { detail: { sound } }));
+}
+
+export function emitDevLifecycleStatusSeeded(): void {
+  window.dispatchEvent(new Event(DEV_LIFECYCLE_STATUS_EVENT));
 }
