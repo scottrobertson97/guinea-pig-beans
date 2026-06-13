@@ -18,7 +18,7 @@
 - Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger with three response choices each.
 - Pig requests: one pig at a time can ask for a short-lived favor tied to care, cleanup, abilities, furniture, combo, or Compost.
 - Pig social mechanics: bonded pairs are assigned as pigs join, and herd size contributes socialization.
-- Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides.
+- Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides, then leave consume/rest actions after a short satisfied-action timer.
 - Dev constants editor: local Vite dev servers expose `/constants` for source-backed tuning of selected scalar literals in `src/simulation/balance.ts`; saves rewrite the source file and production builds do not serve the route.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode unlock from the Tech Tree, then remain operational cooldown actions in Abilities.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.

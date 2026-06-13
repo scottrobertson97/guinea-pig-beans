@@ -319,8 +319,12 @@ export function chooseTarget(state: GameState, pig: Pig): void {
     return;
   }
 
-  if (pig.goal === "seekSleep" || pig.goal === "sleep") {
+  if (pig.goal === "seekSleep") {
     targetSleepSpot(state, pig);
+    return;
+  }
+
+  if (pig.goal === "sleep") {
     return;
   }
 

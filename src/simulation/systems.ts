@@ -342,6 +342,7 @@ function movePigTowardTarget(state: GameState, pig: Pig, deltaSeconds: number): 
   const distance = Math.hypot(dx, dy);
 
   if (distance < 6) {
+    if (pig.goal !== "roam") return;
     chooseTarget(state, pig);
     return;
   }
@@ -585,29 +586,40 @@ function updateFurniturePlayingPig(state: GameState, pig: Pig, deltaSeconds: num
 
 function updateEatingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
   if (state.needs.hay <= 0) return;
-  pig.goalTimer = Math.max(pig.goalTimer, 2.4);
-  const intake = Math.min(state.needs.hay, (pig.trait === "Hay Goblin" ? 1.55 : 1.18) * deltaSeconds);
-  state.needs.hay = Math.max(0, state.needs.hay - intake);
-  pig.hunger = clampNeed(pig.hunger + intake * (pig.trait === "Hay Goblin" ? 15 : 18));
-  pig.goalTimer -= deltaSeconds;
+  if (pig.goalTimer <= 0) pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.eatDuration;
+  if (pig.hunger < NEED_SATISFIED_THRESHOLD) {
+    const intake = Math.min(state.needs.hay, (pig.trait === "Hay Goblin" ? 1.55 : 1.18) * deltaSeconds);
+    state.needs.hay = Math.max(0, state.needs.hay - intake);
+    pig.hunger = clampNeed(pig.hunger + intake * (pig.trait === "Hay Goblin" ? 15 : 18));
+  }
+  pig.goalTimer = Math.max(0, pig.goalTimer - deltaSeconds);
   if (pig.hunger >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
 }
 
 function updateDrinkingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
   if (state.needs.water <= 0 || state.event.bottleJammed) return;
-  pig.goalTimer = Math.max(pig.goalTimer, 2);
-  const intake = Math.min(state.needs.water, 1 * deltaSeconds);
-  state.needs.water = Math.max(0, state.needs.water - intake);
-  pig.thirst = clampNeed(pig.thirst + intake * 20);
-  pig.goalTimer -= deltaSeconds;
+  if (pig.goalTimer <= 0) pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.drinkDuration;
+  if (pig.thirst < NEED_SATISFIED_THRESHOLD) {
+    const intake = Math.min(state.needs.water, 1 * deltaSeconds);
+    state.needs.water = Math.max(0, state.needs.water - intake);
+    pig.thirst = clampNeed(pig.thirst + intake * 20);
+  }
+  pig.goalTimer = Math.max(0, pig.goalTimer - deltaSeconds);
   if (pig.thirst >= NEED_SATISFIED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
 }
 
 function updateSleepingPig(state: GameState, pig: Pig, deltaSeconds: number): void {
-  pig.goalTimer = Math.max(pig.goalTimer, state.furniture.snuggleSack || state.furniture.hideyHouse ? 4.5 : 5.5);
-  const restRate = (state.furniture.snuggleSack ? 18 : state.furniture.hideyHouse ? 15 : 13) * deltaSeconds;
-  pig.energy = clampNeed(pig.energy + restRate);
-  pig.goalTimer -= deltaSeconds;
+  if (pig.goalTimer <= 0) {
+    pig.goalTimer =
+      state.furniture.snuggleSack || state.furniture.hideyHouse
+        ? PIG_LIFECYCLE_THRESHOLDS.sleepDurationWithFurniture
+        : PIG_LIFECYCLE_THRESHOLDS.sleepDurationWithoutFurniture;
+  }
+  if (pig.energy < ENERGY_RESTED_THRESHOLD) {
+    const restRate = (state.furniture.snuggleSack ? 18 : state.furniture.hideyHouse ? 15 : 13) * deltaSeconds;
+    pig.energy = clampNeed(pig.energy + restRate);
+  }
+  pig.goalTimer = Math.max(0, pig.goalTimer - deltaSeconds);
   if (pig.energy >= ENERGY_RESTED_THRESHOLD && pig.goalTimer <= 0) returnToRoam(state, pig);
 }
 
