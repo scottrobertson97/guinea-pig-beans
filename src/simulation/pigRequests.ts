@@ -1,6 +1,15 @@
 import { addLog } from "./state";
 import { advanceContractProgress } from "./contracts";
 import { getCageZoneName, getPigZoneId, getZoneMetrics } from "./ecology";
+import {
+  adjustRelationshipConnection,
+  getPigRelationships,
+  getRelationshipKindLabel,
+  getRelationshipPartnerId,
+  getRelationshipRequestTitle,
+  getRelationshipThought,
+  getRequestRelationshipForPig,
+} from "./relationships";
 import type { GameState, Pig, PigRequestId, PigRequestProgressKind } from "./types";
 import { awardBeans, pickWeighted, randomBetween } from "./utils";
 
@@ -233,17 +242,25 @@ function createRequest(state: GameState, pig: Pig, id: PigRequestId): NonNullabl
     };
   }
   if (id === "bondSupportFavor") {
-    const partner = state.pigs.find((candidate) => candidate.id === pig.bondedPigId);
+    const relationship = getRequestRelationshipForPig(state, pig.id);
+    const partnerId = relationship ? getRelationshipPartnerId(relationship, pig.id) : pig.bondedPigId;
+    const partner = partnerId === null ? null : state.pigs.find((candidate) => candidate.id === partnerId);
+    const relationshipKind = relationship?.kind ?? "bonded";
+    const title = getRelationshipRequestTitle(relationshipKind);
+    const relationshipLabel = getRelationshipKindLabel(relationshipKind).toLowerCase();
     return {
       id,
       pigId: pig.id,
-      title: "Bond Support",
-      description: `${pig.name}${partner ? ` and ${partner.name}` : ""} want 10s together in a comfortable zone.`,
+      relationshipId: relationship?.id,
+      relationshipTargetPigId: partner?.id,
+      relationshipKind,
+      title,
+      description: `${pig.name}${partner ? ` and ${partner.name}` : ""} want 10s together in a comfortable zone to steady their ${relationshipLabel} rhythm.`,
       progress: 0,
       target: 10,
       timer: 105,
       rewardText: "+24 Beans, +1 Squeak",
-      thought: "Together?",
+      thought: getRelationshipThought(relationshipKind),
       token,
     };
   }
@@ -288,9 +305,13 @@ function applyReward(state: GameState, active: NonNullable<GameState["pigRequest
     awardBeans(state, 24);
     state.squeaks += 1;
     const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
-    const partner = pig ? state.pigs.find((candidate) => candidate.id === pig.bondedPigId) : null;
+    const partnerId = active.relationshipTargetPigId ?? pig?.bondedPigId ?? null;
+    const partner = partnerId === null ? null : state.pigs.find((candidate) => candidate.id === partnerId);
     if (pig) pig.stress = Math.max(0, pig.stress - 12);
     if (partner) partner.stress = Math.max(0, partner.stress - 12);
+    if (active.relationshipId) {
+      adjustRelationshipConnection(state, active.relationshipId, active.relationshipKind === "rival" ? 8 : 10, active.relationshipKind === "rival" ? -18 : -7);
+    }
   } else {
     awardBeans(state, 18);
     state.compost += 4;
@@ -308,7 +329,7 @@ function chooseRequestId(state: GameState, pig: Pig): PigRequestId {
     { id: "compostFavor", weight: pig.trait === "Compost Mystic" || state.compost >= 3 ? 1.6 : 0.5 },
     { id: "favoriteCornerFavor", weight: getZoneMetrics(state, pig.favoriteZone).mess >= 18 ? 2.1 : 0.8 },
     { id: "quietZoneFavor", weight: pig.stress >= 42 || state.ecology.averageStress >= 34 ? 1.9 : 0.45 },
-    { id: "bondSupportFavor", weight: pig.bondedPigId !== null ? 1.25 : 0 },
+    { id: "bondSupportFavor", weight: getPigRelationships(state, pig.id).length > 0 ? 1.25 : 0 },
   ];
   return pickWeighted(options);
 }
@@ -349,7 +370,8 @@ function updatePassiveRequestProgress(
 ): void {
   if (active.id !== "bondSupportFavor") return;
   const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
-  const partner = pig ? state.pigs.find((candidate) => candidate.id === pig.bondedPigId) : null;
+  const partnerId = active.relationshipTargetPigId ?? pig?.bondedPigId ?? null;
+  const partner = partnerId === null ? null : state.pigs.find((candidate) => candidate.id === partnerId);
   if (!pig || !partner) return;
 
   const zoneId = getPigZoneId(state, pig);

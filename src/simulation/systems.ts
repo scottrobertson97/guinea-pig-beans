@@ -17,6 +17,14 @@ import { getPoopZoneId, getZoneMetrics, refreshEcology, updateHabitatStewardship
 import { getFurnitureAutomationMultiplier, getFurnitureStatBonus, updateFurnitureCare } from "./furnitureCare";
 import { updateMilestones } from "./milestones";
 import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
+import { updatePigWelcome } from "./pigWelcome";
+import {
+  adjustRelationshipBetween,
+  getRelationshipPlayScore,
+  getRelationshipSocializationBonus,
+  getRelationshipTensionPressure,
+  syncRelationshipWeb,
+} from "./relationships";
 import { addLog, chooseTarget, createMessPile, getStaticFurniturePlacement, setPigGoal, spawnPoop } from "./state";
 import type { AutomationDirectiveId, GameState, Pig, PigGoal, PigMood, Poop, Robot } from "./types";
 import { clamp, pickWeighted, randomBetween } from "./utils";
@@ -57,6 +65,7 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateHeldPigRequestProgress(state);
   updateContracts(state, deltaSeconds);
   refreshEcology(state);
+  updatePigWelcome(state, deltaSeconds);
   updateMilestones(state);
 }
 
@@ -99,6 +108,7 @@ function startRandomEvent(state: GameState): void {
   const playZone = getZoneMetrics(state, "playRun");
   const hayZone = getZoneMetrics(state, "hayCorner");
   const waterZone = getZoneMetrics(state, "waterBottle");
+  const relationshipTension = getRelationshipTensionPressure(state);
   const events: Array<{ event: NonNullable<GameState["event"]["active"]>; weight: number }> = [
     { event: { id: "zoomies", name: "Zoomies", timer: 15 }, weight: state.cage.enrichment > 70 || playZone.appeal > 72 ? 1.9 : 1 },
     { event: { id: "hayFrenzy", name: "Hay Frenzy", timer: 18 }, weight: state.needs.hay < 35 || hayZone.comfort < 38 ? 2.5 : 1 },
@@ -108,7 +118,7 @@ function startRandomEvent(state: GameState): void {
     { event: { id: "compostBloom", name: "Compost Bloom", timer: 18 }, weight: state.compost > 20 || state.recipes.compostCatalyst || litterZone.mess > 45 ? 2 : 1 },
     { event: { id: "greatWheeking", name: "The Great Wheeking", timer: 16 }, weight: state.squeaks > 8 || state.wisdom.chorusTraining ? 2 : 1 },
     { event: { id: "litterRevolt", name: "Litter Revolt", timer: 18 }, weight: litterZone.mess > 48 || litterZone.traffic > 68 ? 2.2 : 0.35 },
-    { event: { id: "hideySquabble", name: "Hidey Squabble", timer: 18 }, weight: hideyZone.traffic > 62 || state.ecology.averageStress > 42 ? 2.1 : 0.35 },
+    { event: { id: "hideySquabble", name: "Hidey Squabble", timer: 18 }, weight: hideyZone.traffic > 62 || state.ecology.averageStress > 42 || relationshipTension > 55 ? 2.1 + Math.min(1.1, relationshipTension / 90) : 0.35 },
     { event: { id: "zoomieTraffic", name: "Zoomie Traffic", timer: 16 }, weight: playZone.traffic > 62 || hasFurnitureSynergy(state, "zoomiePlayground") ? 1.8 : 0.4 },
   ];
   const event = pickWeighted(events, "event");
@@ -164,7 +174,8 @@ function updateDerivedCageStats(state: GameState): void {
       (hasFurnitureSynergy(state, "cozyCorner") ? 8 : 0) +
       bondBonus -
       unsupportedPenalty +
-      councilSocialBonus,
+      councilSocialBonus +
+      getRelationshipSocializationBonus(state),
   );
   state.cage.space = Math.max(
     0,
@@ -268,6 +279,7 @@ function removePigFromHerd(state: GameState, pig: Pig, cause: DeathCause): void 
   for (const survivor of state.pigs) {
     if (survivor.bondedPigId === pig.id) survivor.bondedPigId = null;
   }
+  syncRelationshipWeb(state);
 
   if (state.pigRequest.active?.pigId === pig.id) {
     state.pigRequest.active = null;
@@ -554,14 +566,16 @@ function updateSeekingPlayPig(state: GameState, pig: Pig, deltaSeconds: number):
 }
 
 function getNearbyPlayPartner(state: GameState, pig: Pig): Pig | null {
-  return (
-    state.pigs.find(
-      (candidate) =>
-        candidate.id !== pig.id &&
-        candidate.goal === "seekPlay" &&
-        Math.hypot(candidate.x - pig.x, candidate.y - pig.y) <= PIG_LIFECYCLE_THRESHOLDS.playPartnerDistance,
-    ) ?? null
+  const candidates = state.pigs.filter(
+    (candidate) =>
+      candidate.id !== pig.id &&
+      candidate.goal === "seekPlay" &&
+      Math.hypot(candidate.x - pig.x, candidate.y - pig.y) <= PIG_LIFECYCLE_THRESHOLDS.playPartnerDistance,
   );
+  candidates.sort((first, second) => getRelationshipPlayScore(state, pig.id, second.id) - getRelationshipPlayScore(state, pig.id, first.id));
+  const candidate = candidates[0] ?? null;
+  if (!candidate || getRelationshipPlayScore(state, pig.id, candidate.id) < -3) return null;
+  return candidate;
 }
 
 function startSocialPlay(state: GameState, pig: Pig, partner: Pig): void {
@@ -569,6 +583,7 @@ function startSocialPlay(state: GameState, pig: Pig, partner: Pig): void {
   setPigGoal(state, partner, "playWithPig");
   pig.goalTimer = PIG_LIFECYCLE_THRESHOLDS.socialPlayDuration;
   partner.goalTimer = PIG_LIFECYCLE_THRESHOLDS.socialPlayDuration;
+  adjustRelationshipBetween(state, pig.id, partner.id, 5, -3);
 }
 
 function updateSocialPlayingPig(state: GameState, pig: Pig, deltaSeconds: number): void {

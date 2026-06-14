@@ -20,6 +20,7 @@ import {
   getCouncilDecreeStatus,
   getCouncilDecrees,
   canUseEventChoice,
+  completePigWelcome,
   getEventChoiceStatus,
   getEventChoices,
   getAutomationDirectiveName,
@@ -93,6 +94,14 @@ import {
   unlockTechNode,
 } from "../simulation/techTree";
 import { getActivePigRequestView } from "../simulation/pigRequests";
+import {
+  getIncompletePigWelcomeViews,
+  getPigWelcomeTraitTip,
+  getReadyPigWelcomeCount,
+  isPigWelcomeComplete,
+  type PigWelcomeView,
+} from "../simulation/pigWelcome";
+import { getPigRelationshipLine } from "../simulation/relationships";
 import type {
   AbilityId,
   AutomationDirectiveId,
@@ -326,6 +335,7 @@ export class Hud {
   private previousGoalSignature: string | null = null;
   private previousLogSignature: string | null = null;
   private previousContractListSignature: string | null = null;
+  private previousPigWelcomeSignature: string | null = null;
   private previousFurnitureCareSignature: string | null = null;
   private previousEcologySignature: string | null = null;
   private previousTechTreeSignature: string | null = null;
@@ -798,15 +808,26 @@ export class Hud {
     const records = document.querySelector<HTMLUListElement>("#record-list");
     if (records) renderRecordList(records, getMilestoneRecordViews(this.state));
 
+    this.renderPigWelcome();
+
     const roster = document.querySelector<HTMLUListElement>("#pig-roster");
     if (roster) {
       const rosterItems = this.state.pigs.map((pig) => {
         const item = document.createElement("li");
         const identity = document.createElement("strong");
         const details = document.createElement("span");
+        const relationship = document.createElement("span");
+        const welcomeDiscovery = document.createElement("span");
         identity.textContent = pig.name;
         details.textContent = `${pig.breed} ${pig.trait} - ${getPigGoalLabel(pig)} - ${getPigWeakestNeedLabel(pig)} - ${getPigEcologyLabel(pig)} - ${pig.quirk}`;
-        item.append(identity, details);
+        relationship.className = "pig-relationship";
+        relationship.textContent = getPigRelationshipLine(this.state, pig);
+        item.append(identity, details, relationship);
+        if (isPigWelcomeComplete(this.state, pig.id)) {
+          welcomeDiscovery.className = "pig-welcome-discovery";
+          welcomeDiscovery.textContent = `Trait discovered: ${getPigWelcomeTraitTip(pig)}`;
+          item.append(welcomeDiscovery);
+        }
         return item;
       });
       if (this.state.pigs.length <= 2 && this.state.stats.pigsAdopted <= 2) {
@@ -819,6 +840,66 @@ export class Hud {
     const achievementViews = getAchievementViews(this.state);
     this.renderContracts();
     this.updateMilestoneFeedback(questViews, achievementViews);
+  }
+
+  private renderPigWelcome(): void {
+    const panel = document.getElementById("pig-welcome-panel");
+    const list = document.querySelector<HTMLUListElement>("#pig-welcome-list");
+    if (!panel || !list) return;
+
+    const views = getIncompletePigWelcomeViews(this.state);
+    panel.hidden = views.length === 0;
+    if (views.length === 0) {
+      this.previousPigWelcomeSignature = "empty";
+      list.replaceChildren();
+      return;
+    }
+
+    const signature = getPigWelcomeRenderSignature(views);
+    if (signature === this.previousPigWelcomeSignature && list.childElementCount > 0) return;
+    this.previousPigWelcomeSignature = signature;
+
+    list.replaceChildren(...views.map((view) => this.createPigWelcomeItem(view)));
+  }
+
+  private createPigWelcomeItem(view: PigWelcomeView): HTMLLIElement {
+    const item = document.createElement("li");
+    const title = document.createElement("strong");
+    const details = document.createElement("span");
+    const requirement = document.createElement("em");
+    const button = document.createElement("button");
+    const buttonLabel = document.createElement("span");
+    const buttonStatus = document.createElement("strong");
+
+    item.className = view.ready ? "pig-welcome-card ready" : "pig-welcome-card";
+    title.textContent = `${view.name}: ${view.trait}`;
+    details.textContent = `Favorite zone: ${view.favoriteZone}`;
+    requirement.textContent = view.ready ? view.status : view.requirement;
+
+    button.type = "button";
+    button.className = view.ready ? "available-now" : "locked-now";
+    button.disabled = !view.ready;
+    buttonLabel.textContent = "Welcome";
+    buttonStatus.textContent = view.ready ? view.rewardText : view.status;
+    button.append(buttonLabel, buttonStatus);
+    button.addEventListener("click", () =>
+      this.runAction(
+        () => completePigWelcome(this.state, view.pigId),
+        button,
+        {
+          category: "adoption",
+          target: "herd",
+          label: "Welcomed",
+          resourceText: view.rewardText,
+          color: 0xf0d56b,
+        },
+        "welcomePig",
+        "pig",
+      ),
+    );
+
+    item.append(title, details, requirement, button);
+    return item;
   }
 
   private renderContracts(): void {
@@ -1084,6 +1165,7 @@ export class Hud {
     }
     emitUiSound(wasOpen ? "button" : "modalOpen");
     if (section === "shop") emitPlayerAction("openShop");
+    if (section === "herd") emitPlayerAction("openHerd");
 
     if (section === "goals") {
       this.hasGoalUpdate = false;
@@ -1199,11 +1281,13 @@ export class Hud {
       "exchange-gold-to-beans",
       "exchange-squeaks-to-gold",
     ]), "available");
-    this.setDockIndicator("herd", countEnabled(this.buttons, [
+    const readyWelcomeCount = getReadyPigWelcomeCount(this.state);
+    const councilActionCount = countEnabled(this.buttons, [
       "council-care-mandate",
       "council-cleanup-ordinance",
       "council-herd-charter",
-    ]), "available");
+    ]);
+    this.setDockIndicator("herd", readyWelcomeCount > 0 ? readyWelcomeCount : councilActionCount, "available");
     this.setDockIndicator("wisdom", getAvailableTechUnlockCount(this.state), "available");
     const contractBoard = getContractBoardView(this.state);
     this.setDockIndicator(
@@ -1846,6 +1930,10 @@ function getContractCardRenderSignature(card: ReturnType<typeof getContractBoard
     card.rewardText,
     card.requirements.map((requirement) => `${requirement.label}:${requirement.progressText}:${requirement.complete}`).join(","),
   ].join(":");
+}
+
+function getPigWelcomeRenderSignature(views: PigWelcomeView[]): string {
+  return views.map((view) => `${view.pigId}:${view.name}:${view.trait}:${view.ready}:${view.requirement}`).join("|");
 }
 
 function getContractPulseState(state: GameState): ContractPulseState {

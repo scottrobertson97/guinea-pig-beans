@@ -199,6 +199,7 @@ export type PigRequestId =
   | "favoriteCornerFavor"
   | "quietZoneFavor"
   | "bondSupportFavor";
+export type PigRelationshipKind = "bonded" | "buddy" | "napPartner" | "shyFollower" | "rival";
 export type PigRequestProgressKind =
   | "clean"
   | "hayRefill"
@@ -304,6 +305,20 @@ export interface Pig {
   bondedPigId: number | null;
 }
 
+export interface PigRelationship {
+  id: string;
+  pigId: number;
+  targetPigId: number;
+  kind: PigRelationshipKind;
+  warmth: number;
+  tension: number;
+}
+
+export interface PigWelcomeState {
+  progressByPigId: Record<string, number>;
+  completedPigIds: number[];
+}
+
 export interface Poop {
   id: number;
   type: PoopType;
@@ -344,6 +359,9 @@ export interface ActiveObjective {
 export interface ActivePigRequest {
   id: PigRequestId;
   pigId: number;
+  relationshipId?: string;
+  relationshipTargetPigId?: number;
+  relationshipKind?: PigRelationshipKind;
   title: string;
   description: string;
   progress: number;
@@ -433,6 +451,8 @@ export interface GameState {
   goldenBeans: number;
   cavyWisdom: number;
   pigs: Pig[];
+  relationships: PigRelationship[];
+  pigWelcome: PigWelcomeState;
   poops: Poop[];
   robot: Robot | null;
   upgrades: {

@@ -7,6 +7,8 @@ import {
   unlockRobot,
 } from "../simulation/actions";
 import { getZoneMetrics, refreshEcology } from "../simulation/ecology";
+import { PIG_WELCOME_READY_SECONDS } from "../simulation/pigWelcome";
+import { setRelationshipForPair, syncRelationshipWeb } from "../simulation/relationships";
 import { addLog, addPig, chooseTarget, setPigGoal, spawnDebugPoop, spawnEventPoop } from "../simulation/state";
 import type { GameState, PoopType } from "../simulation/types";
 import { emitDevLifecycleStatusSeeded } from "./events";
@@ -52,6 +54,8 @@ export class DevTools {
       this.createButton("Spawn Stinky", () => this.spawnPoop("stinky")),
       this.createButton("Seed Lifecycle Status", () => this.seedLifecycleStatus()),
       this.createButton("Seed Ecology Stress", () => this.seedEcologyStress()),
+      this.createButton("Seed Pig Welcome Ready", () => this.seedPigWelcomeReady()),
+      this.createButton("Seed Relationship Web", () => this.seedRelationshipWeb()),
       this.createButton("Buy/Unlock Roomba", () => unlockRobot(this.state)),
       this.createButton("Clear Poops", () => clearPoops(this.state)),
     );
@@ -142,5 +146,67 @@ export class DevTools {
     }
     refreshEcology(this.state);
     addLog(this.state, "Dev tools seeded a dirty, crowded ecology state.");
+  }
+
+  private seedPigWelcomeReady(): void {
+    while (this.state.pigs.length < 2) {
+      addPig(this.state);
+    }
+
+    clearPoops(this.state);
+    this.state.needs.hay = Math.max(this.state.needs.hay, 70);
+    this.state.needs.water = Math.max(this.state.needs.water, 70);
+    this.state.cage.cleanliness = 100;
+
+    const seededPigIds = this.state.pigs.slice(0, 2).map((pig) => pig.id);
+    this.state.pigWelcome.completedPigIds = this.state.pigWelcome.completedPigIds.filter((pigId) => !seededPigIds.includes(pigId));
+    for (const pig of this.state.pigs.slice(0, 2)) {
+      const zone = getZoneMetrics(this.state, pig.favoriteZone);
+      pig.x = zone.x;
+      pig.y = zone.y;
+      pig.targetX = zone.x;
+      pig.targetY = zone.y;
+      pig.stress = Math.min(pig.stress, 12);
+      this.state.pigWelcome.progressByPigId[String(pig.id)] = PIG_WELCOME_READY_SECONDS;
+    }
+
+    refreshEcology(this.state);
+    addLog(this.state, "Dev tools readied the starter pigs for Pig Welcome.");
+  }
+
+  private seedRelationshipWeb(): void {
+    while (this.state.pigs.length < 10) {
+      addPig(this.state);
+    }
+
+    for (const pig of this.state.pigs) {
+      pig.bondedPigId = null;
+      pig.stress = 18;
+    }
+
+    const [bondedA, bondedB, buddyA, buddyB, napA, napB, follower, anchor, rivalA, rivalB] = this.state.pigs;
+    if (bondedA && bondedB) {
+      bondedA.bondedPigId = bondedB.id;
+      bondedB.bondedPigId = bondedA.id;
+    }
+
+    syncRelationshipWeb(this.state);
+    if (bondedA && bondedB) setRelationshipForPair(this.state, bondedA.id, bondedB.id, "bonded", 78, 0);
+    if (buddyA && buddyB) setRelationshipForPair(this.state, buddyA.id, buddyB.id, "buddy", 66, 5);
+    if (napA && napB) setRelationshipForPair(this.state, napA.id, napB.id, "napPartner", 62, 4);
+    if (follower && anchor) setRelationshipForPair(this.state, follower.id, anchor.id, "shyFollower", 54, 10);
+    if (rivalA && rivalB) setRelationshipForPair(this.state, rivalA.id, rivalB.id, "rival", 28, 68);
+
+    const hidey = getZoneMetrics(this.state, "hideyZone");
+    for (const [index, pig] of this.state.pigs.entries()) {
+      if (index >= 10) break;
+      pig.x = hidey.x + (index - 4.5) * 10;
+      pig.y = hidey.y + (index % 2 === 0 ? -14 : 14);
+      pig.targetX = pig.x;
+      pig.targetY = pig.y;
+    }
+
+    refreshEcology(this.state);
+    addLog(this.state, "Dev tools seeded bonded, buddy, nap partner, shy follower, and rival relationships.");
   }
 }

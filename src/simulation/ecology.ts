@@ -1,5 +1,6 @@
 import { hasFurnitureSynergy } from "./balance";
 import { getFurnitureEcologyBonus } from "./furnitureCare";
+import { adjustRelationshipConnection, getPigRelationships, getRelationshipPartnerId } from "./relationships";
 import type { CageEcologyState, CageZoneId, CageZoneMetrics, CageZoneRole, CageZoneStewardship, GameState, Pig, Poop } from "./types";
 import { clamp, isRecord, normalizePercent, normalizeTimer, pickWeighted, randomBetween } from "./utils";
 
@@ -172,6 +173,7 @@ export function updatePigEcology(state: GameState, pig: Pig, deltaSeconds: numbe
   const partnerSameZone = partner ? getPigZoneId(state, partner) === zone.id : false;
   const favoriteComfort = zone.id === pig.favoriteZone && zone.comfort >= 55 ? 13 : 0;
   const partnerComfort = partnerSameZone && zone.comfort >= 45 ? 9 : 0;
+  const relationshipComfort = getRelationshipComfort(state, pig, zone.id, zone.comfort, zone.mess, zone.traffic, deltaSeconds);
   const eventPressure =
     (state.event.active?.id === "litterRevolt" && zone.id === "litterCorner") ||
     (state.event.active?.id === "hideySquabble" && zone.id === "hideyZone") ||
@@ -185,6 +187,7 @@ export function updatePigEcology(state: GameState, pig: Pig, deltaSeconds: numbe
       eventPressure -
       favoriteComfort -
       partnerComfort -
+      relationshipComfort -
       Math.max(zoneStewardship.care, favoriteStewardship.care) * 0.1,
     0,
     100,
@@ -347,16 +350,57 @@ function getRoleAppealBonus(state: GameState, definition: CageZoneDefinition): n
 function choosePreferredRoamZone(state: GameState, pig: Pig): CageZoneMetrics {
   const partner = state.pigs.find((candidate) => candidate.id === pig.bondedPigId);
   const partnerZoneId = partner ? getPigZoneId(state, partner) : null;
+  const relationships = getPigRelationships(state, pig.id);
   const options = getEcologyZones(state).map((zone) => {
     let weight = Math.max(4, zone.appeal + zone.comfort * 0.2 - zone.mess * 0.28 - zone.traffic * 0.12);
     if (zone.id === pig.favoriteZone) weight += 26;
     if (zone.id === partnerZoneId) weight += 12;
+    for (const relationship of relationships) {
+      const targetPigId = getRelationshipPartnerId(relationship, pig.id);
+      const targetPig = targetPigId === null ? null : state.pigs.find((candidate) => candidate.id === targetPigId);
+      const targetZoneId = targetPig ? getPigZoneId(state, targetPig) : null;
+      if (relationship.kind === "buddy" && zone.id === targetZoneId) weight += 14;
+      if (relationship.kind === "napPartner" && zone.role === "rest") weight += 12;
+      if (relationship.kind === "shyFollower" && zone.id === targetZoneId) weight += pig.stress >= 35 ? 16 : 8;
+      if (relationship.kind === "rival" && zone.id === targetZoneId) {
+        weight += zone.mess > 30 || zone.traffic > 56 ? -18 : 3;
+      }
+    }
     if (zone.id === getTraitZone(pig)) weight += 18;
     if (pig.stress >= 55 && (zone.role === "rest" || zone.id === pig.favoriteZone)) weight += 12;
     if (pig.trait === "Gremlin" && zone.mess > 25) weight += 10;
     return { id: zone, weight };
   });
   return pickWeighted(options);
+}
+
+function getRelationshipComfort(
+  state: GameState,
+  pig: Pig,
+  zoneId: CageZoneId,
+  comfort: number,
+  mess: number,
+  traffic: number,
+  deltaSeconds: number,
+): number {
+  let comfortOffset = 0;
+  for (const relationship of getPigRelationships(state, pig.id)) {
+    const partnerId = getRelationshipPartnerId(relationship, pig.id);
+    const partner = partnerId === null ? null : state.pigs.find((candidate) => candidate.id === partnerId);
+    if (!partner || getPigZoneId(state, partner) !== zoneId) continue;
+
+    if (relationship.kind === "rival") {
+      const pressured = mess >= 35 || traffic >= 58 || comfort < 45;
+      comfortOffset += pressured ? -Math.min(12, 4 + relationship.tension * 0.12) : Math.min(5, 2 + relationship.warmth * 0.03);
+      if (pig.id < partner.id) adjustRelationshipConnection(state, relationship.id, pressured ? 0.2 * deltaSeconds : 0.35 * deltaSeconds, pressured ? 0.8 * deltaSeconds : -0.7 * deltaSeconds);
+      continue;
+    }
+
+    const strength = relationship.kind === "bonded" ? 5 : relationship.kind === "buddy" ? 7 : relationship.kind === "shyFollower" ? 6 : 4;
+    comfortOffset += comfort >= 45 && mess < 55 ? strength : Math.max(1, strength - 3);
+    if (pig.id < partner.id) adjustRelationshipConnection(state, relationship.id, 0.45 * deltaSeconds, comfort >= 45 && mess < 55 ? -0.4 * deltaSeconds : 0.15 * deltaSeconds);
+  }
+  return comfortOffset;
 }
 
 function getTraitZone(pig: Pig): CageZoneId {

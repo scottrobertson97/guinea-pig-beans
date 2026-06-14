@@ -17,7 +17,7 @@
 - Additional needs/resources: Enrichment, Socialization, Space, Compost, Squeaks, Golden Beans, and Cavy Wisdom are tracked.
 - Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger with three response choices each.
 - Pig requests: one pig at a time can ask for a short-lived favor tied to care, cleanup, abilities, furniture, combo, or Compost.
-- Pig social mechanics: bonded pairs are assigned as pigs join, and herd size contributes socialization.
+- Pig social mechanics: bonded pairs, buddies, nap partners, shy followers, and gentle rivalries affect socialization, stress, zone preferences, requests, and Herd roster copy.
 - Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides, then leave consume/rest actions after a short satisfied-action timer.
 - Dev constants editor: local Vite dev servers expose `/constants` for source-backed tuning of selected scalar literals in `src/simulation/balance.ts`; saves rewrite the source file and production builds do not serve the route.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode unlock from the Tech Tree, then remain operational cooldown actions in Abilities.
@@ -31,6 +31,7 @@
 - Furniture care: Owned furniture now tracks condition, can become well-loved or overworked, and can be tended from the Furniture modal for zone and automation benefits.
 - Progressive mechanics reveal: Fresh runs show Care, Shop, Tech Tree, Herd, Goals, and Log; Furniture, Abilities, Recipes, Habitat Care, automation operations, and Caretaker Philosophy reveal when progress makes them actionable.
 - Contract-led progression campaign: Intro Contracts now pace major mechanic reveals for Furniture, Abilities, Recipes, Automation, and Wisdom before ordinary rotating offers take over.
+- Pig Welcome: early Herd cards let players settle pigs in their favorite zones, discover trait behavior, and earn small starter Beans/Squeaks/Happiness rewards.
 
 ## Current Progression Records
 
@@ -68,6 +69,7 @@
 - Random events are ecology-weighted and interactive, but not yet driven by quest chains or event decks.
 - Wisdom perks now live in the Tech Tree's Wisdom Legacy branch with prerequisites and a mutually exclusive Caretaker Philosophy layer.
 - Late-game systems now live inside their owning sections, but they can still gain deeper section-level interactions later.
+- Pig relationships now have a first-pass web, but future passes can add deeper relationship history, more relationship-specific events, and richer long-run arcs.
 - Minigames are still intentionally deferred until the main loop has more tuning data.
 
 ## Design Decisions Needed Later
@@ -113,6 +115,8 @@
 - Ecology incidents such as Litter Revolt, Hidey Squabble, and Zoomie Traffic reuse the event response UI with zone-specific tradeoffs.
 - Pig lifecycle choices now distinguish seeking from acting: hungry or thirsty pigs travel to the hay rack or water bottle before consuming, while play-seeking pigs look for a partner before falling back to play furniture or the Play Run.
 - Active lifecycle statuses now surface as periodic over-pig thought bubbles instead of pig sprite color shifts.
+- Relationship state now backfills old saves, appears in the Herd modal, changes socialization, stress, roaming, and play choices, feeds relationship requests, and nudges Hidey Squabble/Rebond outcomes.
+- Pig Welcome adds a light trait-discovery step to the early Herd modal so the first pigs teach favorite zones and personality effects before deeper progression takes over.
 
 ## Systems Backlog Tickets
 
@@ -133,7 +137,7 @@ Acceptance criteria:
 
 ### SYS-002: Pig Relationship Web
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Expand bonded pairs into lightweight herd relationships such as buddies, nap partners, shy followers, and rivals.
 

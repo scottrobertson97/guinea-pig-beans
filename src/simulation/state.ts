@@ -10,6 +10,7 @@ import {
 import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, getZoneTarget, isPigComfortableInFavoriteZone } from "./ecology";
 import { createInitialFurnitureCareState } from "./furnitureCare";
 import { getFurnitureDefinition, getFurnitureName } from "./furnitureDefinitions";
+import { getPigRelationships, getRelationshipPartnerId, syncRelationshipWeb } from "./relationships";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
 import { clamp, pickWeighted, randomBetween } from "./utils";
 
@@ -87,6 +88,11 @@ export function createInitialState(): GameState {
     goldenBeans: 0,
     cavyWisdom: 0,
     pigs: [],
+    relationships: [],
+    pigWelcome: {
+      progressByPigId: {},
+      completedPigIds: [],
+    },
     poops: [],
     robot: null,
     upgrades: {
@@ -305,6 +311,7 @@ function createPig(state: GameState, legendary: boolean): Pig {
     const partner = state.pigs.find((candidate) => candidate.id === pig.bondedPigId);
     if (partner) partner.bondedPigId = pig.id;
   }
+  syncRelationshipWeb(state);
   return pig;
 }
 
@@ -534,6 +541,15 @@ function targetNearFurniture(
 }
 
 function targetSleepSpot(state: GameState, pig: Pig): void {
+  const napRelationship = getPigRelationships(state, pig.id).find((relationship) => relationship.kind === "napPartner");
+  const napPartnerId = napRelationship ? getRelationshipPartnerId(napRelationship, pig.id) : null;
+  const napPartner = napPartnerId === null ? null : state.pigs.find((candidate) => candidate.id === napPartnerId);
+  if (napPartner && (napPartner.goal === "sleep" || napPartner.goal === "seekSleep")) {
+    pig.targetX = clamp(napPartner.x + randomBetween(-34, 34), CAGE_PADDING, state.cage.width - CAGE_PADDING);
+    pig.targetY = clamp(napPartner.y + randomBetween(-26, 26), CAGE_PADDING, state.cage.height - CAGE_PADDING);
+    return;
+  }
+
   if (pig.trait === "Shy Beaner" && state.furniture.hideyHouse) {
     targetNearFurniture(state, pig, "hideyHouse", 116, state.cage.height - 108, 36);
     return;

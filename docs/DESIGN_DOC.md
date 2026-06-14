@@ -82,6 +82,7 @@ A fresh run begins with:
 - No recipes.
 - No mythic systems.
 - Fresh Contract offers in the Goals modal.
+- Pig Welcome cards in the Herd modal.
 
 The two starting pigs enter as a bonded pair. This matters because bonding contributes to the socialization layer, and because the game treats two pigs as the healthy baseline herd.
 
@@ -235,12 +236,22 @@ Each pig has:
 - Body colors.
 - Movement speed.
 - Bonded partner, if any.
+- Visible relationship state.
+- Pig Welcome trait-discovery status.
 - Legendary status, if applicable.
 - Individual Hunger, Thirst, and Energy.
 - Current goal.
 - Current mood.
 
 The roster is meant to make pigs feel like individual residents rather than anonymous production units.
+
+### Pig Welcome
+
+Pig Welcome is an early Herd feature that teaches the starter pigs as individuals before the player reaches deeper progression.
+
+A pig becomes ready to welcome after spending 6 seconds settled in its favorite zone while hay and water are at 45%+, cleanliness is at 65%+, and the favorite zone is not heavily messy.
+
+Claiming a welcome discovers that pig's trait tip, grants a small starter reward, lowers that pig's stress, and leaves the trait tip visible in the roster. This connects early care, favorite zones, pig identity, and Herd feedback without adding a new resource.
 
 ### Breeds
 
@@ -297,11 +308,20 @@ Legendary pigs are late-midgame adoptions that cost Beans plus 1 Golden Bean.
 
 Legendary pigs use special names and draw from stronger thematic breeds and traits. Their cost scales with the number of legendary pigs adopted and can be discounted by rare-bean systems.
 
-### Bonds
+### Bonds And Relationships
 
 Pigs can enter as bonded pairs. Bonded pigs add socialization, and Wisdom can increase the value of bonds.
 
-If a pig dies, any surviving bonded partner loses that bond.
+The herd also tracks lightweight relationship pairs:
+
+- Buddies seek each other for play and add social stability.
+- Nap partners prefer rest context and can settle near each other.
+- Shy followers use a trusted herdmate as a comfort anchor when stressed.
+- Rivals create mild friction in dirty or crowded zones, but clean comfortable spaces and relationship requests can turn that friction into a truce.
+
+Relationships contribute to socialization, zone preference, stress, social-play partner choice, Herd roster copy, pig requests, and Hidey Squabble/Rebond outcomes. Rivalry is cozy management tension, not a failure spiral.
+
+If a pig dies, any surviving bonded partner loses that bond, and invalid relationship links are removed or backfilled during save hydration.
 
 ### Individual Needs
 
@@ -981,8 +1001,9 @@ Current requests:
 | Snack Favor | Use any active ability. | +1 Squeak, +6 Happiness |
 | Furniture Favor | Unlock one new furniture item. | +26 Beans |
 | Compost Favor | Reach 8 Compost. | +18 Beans, +4 Compost |
+| Bond Support / Buddy Check-In / Nap Pact / Follow-Along / Rival Treaty | Keep a related pair together in a comfortable zone. | +24 Beans, +1 Squeak, stress relief |
 
-Request selection is weighted by the pig's trait and the current cage state. For example, Neat Freaks are more likely to ask for tidying, Hay Goblins for hay, Drama Pigs for water, and Compost Mystics for compost.
+Request selection is weighted by the pig's trait, relationship state, and the current cage state. For example, Neat Freaks are more likely to ask for tidying, Hay Goblins for hay, Drama Pigs for water, Compost Mystics for compost, and pigs with active relationship needs for pair-focused favors.
 
 ## Random Events
 
@@ -1069,6 +1090,10 @@ Choices:
 - Answer the Chorus: gain Squeaks.
 - Conduct the Herd: spend Beans for happiness and Squeaks.
 - Echo Into Gold: spend Squeaks for a Golden Bean.
+
+### Ecology Incidents
+
+Zone pressure can trigger ecology-specific events such as Litter Revolt, Hidey Squabble, and Zoomie Traffic. Hidey Squabble is more likely when relationship tension is high, and Rebond Pair lowers relationship tension as well as herd stress.
 
 ## Bean Recipes
 
@@ -1393,7 +1418,7 @@ These are current design areas that are intentionally first-pass or still need d
 - Wisdom perks are non-exclusive. Future versions may add mutually exclusive choices.
 - Special bean aging currently mixes reward and cleanliness pressure. Future tuning should decide how much the game should reward waiting.
 - Late-game systems have first-pass effects but need deeper decisions and clearer section-level interactions.
-- Pig relationships could expand beyond bonded pairs into buddies, rivals, nap partners, or shy followers.
+- Pig relationships have a first-pass web; future versions may add deeper history, more events, and longer arcs.
 - Furniture care could later gain piece-specific events, pig preferences, or recipe-family hooks.
 - Contracts could gain deeper offer weighting, pig-request tie-ins, event-chain handoffs, and recipe-family commissions.
 - Automation directives could later gain deeper mode-specific upgrades or event interactions.

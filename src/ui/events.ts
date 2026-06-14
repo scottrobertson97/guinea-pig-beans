@@ -5,6 +5,8 @@ export const DEV_LIFECYCLE_STATUS_EVENT = "guinea-pig-dev-lifecycle-status";
 export type PlayerActionId =
   | "cleanBean"
   | "refillCare"
+  | "openHerd"
+  | "welcomePig"
   | "openShop"
   | "buyFirstUpgrade"
   | "useAbility"

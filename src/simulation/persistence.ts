@@ -3,6 +3,8 @@ import { HAY_DIMENSION_FEED_LEVEL } from "./balance";
 import { ensureContractOffers, normalizeContractsState } from "./contracts";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, normalizeCageZoneId, normalizeStewardshipState, refreshEcology } from "./ecology";
 import { normalizeFurnitureCareState } from "./furnitureCare";
+import { normalizePigWelcomeState } from "./pigWelcome";
+import { normalizeRelationshipWeb } from "./relationships";
 import { normalizeTechState } from "./techTree";
 import type { GameState, Pig, PigGoal, WisdomSpecializationId } from "./types";
 import { isRecord, normalizePercent, normalizeTimer } from "./utils";
@@ -146,6 +148,8 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
   if (hydrated.upgrades.feedLevel >= HAY_DIMENSION_FEED_LEVEL) hydrated.lateGame.hayDimension = true;
   if (hydrated.lateGame.beanSingularity) hydrated.recipes.singularityExperiment = true;
   hydrated.pigs = hydrated.pigs.map((pig, index) => hydratePigLifeState(pig, index));
+  hydrated.relationships = normalizeRelationshipWeb(hydrated, hydrated.relationships);
+  hydrated.pigWelcome = normalizePigWelcomeState(hydrated, hydrated.pigWelcome);
   refreshEcology(hydrated);
   ensureContractOffers(hydrated);
   return hydrated;

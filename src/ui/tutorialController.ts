@@ -6,6 +6,8 @@ const TUTORIAL_DISMISSED_KEY = "gpb-tutorial-dismissed";
 const TUTORIAL_STEPS: Array<{ action: PlayerActionId; text: string }> = [
   { action: "cleanBean", text: "Clean a bean to start the cage economy." },
   { action: "refillCare", text: "Top off hay or water before the herd files paperwork." },
+  { action: "openHerd", text: "Open Herd to meet the pigs and learn what makes them different." },
+  { action: "welcomePig", text: "Welcome a settled pig to discover its trait." },
   { action: "openShop", text: "Open Shop from the dock when you have a few Beans." },
   { action: "buyFirstUpgrade", text: "Buy Better Hay or Better Scoop for your first upgrade." },
 ];

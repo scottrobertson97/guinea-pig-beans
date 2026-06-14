@@ -50,6 +50,8 @@ import {
 } from "./furnitureCare";
 import { updateMilestones } from "./milestones";
 import { advancePigRequest, updateHeldPigRequestProgress } from "./pigRequests";
+import { getPigWelcomeTraitTip, markPigWelcomeComplete } from "./pigWelcome";
+import { calmRelationshipTension, getPigRelationshipLine, syncRelationshipWeb } from "./relationships";
 import { addLegendaryPig, addLog, addPig, spawnEventPoop, syncCageDimensionsToLevel } from "./state";
 import type {
   AbilityId,
@@ -437,7 +439,23 @@ export function buyPig(state: GameState): boolean {
   state.beans -= cost;
   const pig = addPig(state);
   state.stats.pigsAdopted += 1;
-  addLog(state, `${pig.name} joined as a ${pig.breed} ${pig.trait}. Favorite: ${pig.favoriteFood}; zone: ${getCageZoneName(pig.favoriteZone)}.`);
+  addLog(
+    state,
+    `${pig.name} joined as a ${pig.breed} ${pig.trait}. Favorite: ${pig.favoriteFood}; zone: ${getCageZoneName(pig.favoriteZone)}; ${getPigRelationshipLine(state, pig)}.`,
+  );
+  updateMilestones(state);
+  return true;
+}
+
+export function completePigWelcome(state: GameState, pigId: number): boolean {
+  const pig = state.pigs.find((candidate) => candidate.id === pigId);
+  if (!pig || !markPigWelcomeComplete(state, pigId)) return false;
+
+  awardBeans(state, 12);
+  state.squeaks += 1;
+  state.cage.happiness = clamp(state.cage.happiness + 3, 0, 100);
+  pig.stress = Math.max(0, pig.stress - 8);
+  addLog(state, `${pig.name} is welcomed. Trait discovered: ${getPigWelcomeTraitTip(pig)}`);
   updateMilestones(state);
   return true;
 }
@@ -645,7 +663,10 @@ export function buyRarePig(state: GameState): boolean {
   const pig = addLegendaryPig(state);
   state.stats.pigsAdopted += 1;
   state.stats.legendaryPigsAdopted += 1;
-  addLog(state, `${pig.name} arrived as a legendary ${pig.breed} ${pig.trait} who favors ${getCageZoneName(pig.favoriteZone)}.`);
+  addLog(
+    state,
+    `${pig.name} arrived as a legendary ${pig.breed} ${pig.trait} who favors ${getCageZoneName(pig.favoriteZone)}; ${getPigRelationshipLine(state, pig)}.`,
+  );
   updateMilestones(state);
   return true;
 }
@@ -1169,8 +1190,9 @@ export function respondToEventChoice(state: GameState, id: EventChoiceId): boole
   } else if (id === "hideyRebond") {
     state.squeaks -= 2;
     adjustHerdStress(state, -10);
+    calmRelationshipTension(state, 16);
     state.cage.socialization += 4;
-    addLog(state, "Two Squeaks rebonded the herd. Social stability improved.");
+    addLog(state, "Two Squeaks rebonded the herd. Relationship tension eased and social stability improved.");
   } else if (id === "trafficLanes") {
     state.combo.timer = Math.max(state.combo.timer, 5);
     state.combo.count = Math.max(state.combo.count, 3);
@@ -1210,6 +1232,11 @@ export function prestige(state: GameState): boolean {
   state.automation.directive = "balanced";
   state.pigs.splice(2);
   while (state.pigs.length < 2) addPig(state);
+  if (state.pigs[0] && state.pigs[1]) {
+    state.pigs[0].bondedPigId = state.pigs[1].id;
+    state.pigs[1].bondedPigId = state.pigs[0].id;
+  }
+  syncRelationshipWeb(state);
   state.upgrades.feedLevel = 0;
   state.upgrades.scoopLevel = 0;
   state.upgrades.cageLevel = 0;
