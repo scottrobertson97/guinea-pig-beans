@@ -4,6 +4,7 @@ Use this folder for long-form project references, planning notes, and production
 
 ## Current Game
 
+- [GAME_RECREATION_BRIEF.md](GAME_RECREATION_BRIEF.md): full handoff spec for recreating the game from scratch.
 - [DESIGN_DOC.md](DESIGN_DOC.md): player-facing design shape, current mechanics, and system rules.
 - [FEATURE_PROGRESS.md](FEATURE_PROGRESS.md): implemented systems, current progression records, backlog, and implementation notes.
 
