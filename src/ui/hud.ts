@@ -73,6 +73,7 @@ import {
   canChooseWisdomSpecialization,
 } from "../simulation/balance";
 import { getCageZoneName, getEcologyConcernCount, getEcologyStatusLine } from "../simulation/ecology";
+import { getActiveEventChainText, getEventChainGoalView } from "../simulation/eventChains";
 import { getHerdLifeStatusText, getPigLifeSummaryText } from "../simulation/lifecycle";
 import {
   getAchievementViews,
@@ -908,13 +909,29 @@ export class Hud {
     if (!list) return;
 
     const board = getContractBoardView(this.state);
-    const signature = getContractBoardRenderSignature(board);
+    const signature = `${getContractBoardRenderSignature(board)}|${getEventChainRenderSignature(this.state)}`;
     if (this.previousContractListSignature === signature && list.childElementCount > 0) return;
     this.previousContractListSignature = signature;
 
     renderContractList(list, board, (contractId, button) =>
       this.runAction(() => selectContract(this.state, contractId), button, undefined, undefined, "button"),
     );
+    this.appendEventChainGoal(list);
+  }
+
+  private appendEventChainGoal(list: HTMLUListElement): void {
+    const chain = getEventChainGoalView(this.state);
+    if (!chain) return;
+    const item = document.createElement("li");
+    item.className = "contract-card active-contract";
+    const title = document.createElement("span");
+    const status = document.createElement("strong");
+    const description = document.createElement("em");
+    title.textContent = chain.title;
+    status.textContent = chain.status;
+    description.textContent = chain.description;
+    item.append(title, status, description);
+    list.prepend(item);
   }
 
   private runAction(
@@ -1733,7 +1750,10 @@ export class Hud {
     }
 
     this.eventChoiceTitle.textContent = event.name;
-    this.eventChoiceSummary.textContent = `${Math.ceil(event.timer)}s remaining. Pick one response.`;
+    const chainText = getActiveEventChainText(this.state);
+    this.eventChoiceSummary.textContent = chainText
+      ? `${Math.ceil(event.timer)}s remaining. ${chainText}`
+      : `${Math.ceil(event.timer)}s remaining. Pick one response.`;
 
     const slots = Object.entries(this.eventChoiceButtons) as [EventChoiceSlotId, HTMLButtonElement][];
     for (let index = 0; index < slots.length; index += 1) {
@@ -1920,6 +1940,15 @@ function getContractBoardRenderSignature(board: ReturnType<typeof getContractBoa
     board.lastResult
       ? `${board.lastResult.token}:${board.lastResult.completed}:${board.lastResult.title}:${board.lastResult.rewardText}`
       : "none",
+  ].join("|");
+}
+
+function getEventChainRenderSignature(state: GameState): string {
+  const chain = state.eventChains.active;
+  const result = state.eventChains.lastResult;
+  return [
+    chain ? `${chain.id}:${chain.step}:${chain.choices.join(",")}` : "none",
+    result ? `${result.token}:${result.id}:${result.summary}` : "none",
   ].join("|");
 }
 

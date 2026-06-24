@@ -16,6 +16,7 @@
 - Furniture synergies: matching static furniture pairs now unlock combo bonuses for comfort, Zoomies, cleanup automation, and royal/compost strategy.
 - Additional needs/resources: Enrichment, Socialization, Space, Compost, Squeaks, Golden Beans, and Cavy Wisdom are tracked.
 - Random events: Zoomies, Hay Frenzy, Nap Time, Bottle Jam, Cage Inspection, Compost Bloom, and The Great Wheeking can trigger with three response choices each.
+- Event chains: Hidey Squabble and Hay Frenzy can now start short lifecycle arcs whose follow-up beats reuse existing event choices and resolve into small relationship, stress, hay, or hunger recovery.
 - Pig requests: one pig at a time can ask for a short-lived favor tied to care, cleanup, abilities, furniture, combo, or Compost.
 - Pig social mechanics: bonded pairs, buddies, nap partners, shy followers, and gentle rivalries affect socialization, stress, zone preferences, requests, and Herd roster copy.
 - Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides, then leave consume/rest actions after a short satisfied-action timer.
@@ -67,7 +68,7 @@
 
 - Cage zones now have derived ecology, but they are still fixed regions rather than player-placeable tiles.
 - Furniture is auto-placed at fixed locations as one-time unlocks, not freely placed with footprints.
-- Random events are ecology-weighted and interactive, but not yet driven by quest chains or event decks.
+- Random events are ecology-weighted and interactive, with a first-pass chain layer for Hidey Recovery and Hay Pantry arcs; broader event decks remain future depth.
 - Wisdom perks now live in the Tech Tree's Wisdom Legacy branch with prerequisites and a mutually exclusive Caretaker Philosophy layer.
 - Late-game systems now live inside their owning sections, but they can still gain deeper section-level interactions later.
 - Pig relationships now have a first-pass web, but future passes can add deeper relationship history, more relationship-specific events, and richer long-run arcs.
@@ -119,6 +120,7 @@
 - Relationship state now backfills old saves, appears in the Herd modal, changes socialization, stress, roaming, and play choices, feeds relationship requests, and nudges Hidey Squabble/Rebond outcomes.
 - Pig Welcome adds a light trait-discovery step to the early Herd modal so the first pigs teach favorite zones and personality effects before deeper progression takes over.
 - Lifecycle pressure is now the shared internal driver for timing-sensitive systems: care shortages, rest/play/social pressure, stress, favorite-zone mess, relationship tension, and herd recovery shape requests, event odds, Contract offers, automation cleanup priorities, rare bean odds, and status copy.
+- Event chains now let lifecycle-weighted events carry one beat of memory: Hidey Squabble can lead to Quiet Recovery, Hay Frenzy can lead to Pantry Prep, and active chains appear in Goals/Log while nudging related Contract offers.
 
 ## Systems Backlog Tickets
 
@@ -164,7 +166,7 @@ Acceptance criteria:
 
 ### SYS-004: Event Chains
 
-Status: Not started.
+Status: First pass implemented.
 
 Description: Upgrade random events into short stateful arcs where choices influence later event weights and rewards.
 

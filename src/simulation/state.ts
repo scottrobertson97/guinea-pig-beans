@@ -11,6 +11,7 @@ import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTa
 import { createInitialFurnitureCareState } from "./furnitureCare";
 import { getFurnitureDefinition, getFurnitureName } from "./furnitureDefinitions";
 import { getPigLifeSnapshot } from "./lifecycle";
+import { createInitialEventChainsState } from "./eventChains";
 import { getPigRelationships, getRelationshipPartnerId, syncRelationshipWeb } from "./relationships";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
 import { clamp, pickWeighted, randomBetween } from "./utils";
@@ -164,6 +165,7 @@ export function createInitialState(): GameState {
       bottleJammed: false,
       responseReady: false,
     },
+    eventChains: createInitialEventChainsState(),
     objective: {
       id: "cleanBurst",
       title: "Clean 3 beans quickly",

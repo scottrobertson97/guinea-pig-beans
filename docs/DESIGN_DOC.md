@@ -1025,7 +1025,18 @@ Request selection is weighted by the pig's trait, relationship state, and the cu
 
 Events are timed situations that temporarily change the cage and offer three response choices.
 
-Events become available based on timers and weighted conditions. After an event ends, the next event is scheduled later.
+Events become available based on timers, lifecycle pressure, and weighted conditions. After an event ends, the next event is scheduled later.
+
+### Event Chains
+
+Some lifecycle-heavy events can start a short two-beat chain. Chains are saved because they span multiple event windows, but they do not add a new player-facing section. Care shows the active chain context, Goals shows a compact chain row, and the Log records the start, follow-up, and resolution.
+
+Current chains:
+
+- Hidey Recovery: Hidey Squabble can lead into Quiet Recovery, then resolve with lower hidey-zone stress and warmer or less tense relationships.
+- Hay Pantry: Hay Frenzy can lead into Pantry Prep, then resolve with steadier hay supply and small hunger recovery.
+
+Chains reuse the existing three-choice event responses. The first choice shapes the follow-up, and the follow-up choice applies a small recovery result rather than a new resource or permanent unlock.
 
 Current events:
 
@@ -1110,6 +1121,8 @@ Choices:
 ### Ecology Incidents
 
 Zone pressure can trigger ecology-specific events such as Litter Revolt, Hidey Squabble, and Zoomie Traffic. Hidey Squabble is more likely when relationship tension is high, and Rebond Pair lowers relationship tension as well as herd stress.
+
+Hidey Squabble can also start the Hidey Recovery chain when stress, traffic, mess, or relationship pressure is high.
 
 ## Bean Recipes
 

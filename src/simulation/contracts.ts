@@ -9,6 +9,7 @@ import {
   hasWisdomSpecialization,
 } from "./balance";
 import { getHerdLifeSnapshot } from "./lifecycle";
+import { getEventChainContractBias } from "./eventChains";
 import type {
   ActiveContractState,
   ContractOfferState,
@@ -452,7 +453,10 @@ function rankContractTemplatesByLifecycle(
   return templates
     .map((template, index) => ({
       template,
-      score: getLifecycleContractScore(state, template.id) + ((length - ((index + seed) % length)) / length) * 0.08,
+      score:
+        getLifecycleContractScore(state, template.id) +
+        getEventChainContractBias(state, template.id) +
+        ((length - ((index + seed) % length)) / length) * 0.08,
     }))
     .sort((first, second) => second.score - first.score)
     .map((entry) => entry.template);

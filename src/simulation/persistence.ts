@@ -2,6 +2,7 @@ import { addLog, createInitialState, syncCageDimensionsToLevel, syncEntityIdCoun
 import { HAY_DIMENSION_FEED_LEVEL } from "./balance";
 import { ensureContractOffers, normalizeContractsState } from "./contracts";
 import { chooseFavoriteZoneForPig, createInitialEcologyState, normalizeCageZoneId, normalizeStewardshipState, refreshEcology } from "./ecology";
+import { normalizeEventChainsState } from "./eventChains";
 import { normalizeFurnitureCareState } from "./furnitureCare";
 import { normalizePigWelcomeState } from "./pigWelcome";
 import { normalizeRelationshipWeb } from "./relationships";
@@ -143,6 +144,7 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
   hydrated.furnitureCare = normalizeFurnitureCareState(hydrated.furnitureCare);
   hydrated.tech = normalizeTechState(hydrated.tech);
   hydrated.contracts = normalizeContractsState(hydrated.contracts);
+  hydrated.eventChains = normalizeEventChainsState(hydrated.eventChains);
   hydrated.automation.directive = normalizeAutomationDirective(hydrated.automation.directive);
   hydrated.wisdomSpecialization = normalizeWisdomSpecialization(hydrated.wisdomSpecialization);
   if (hydrated.upgrades.feedLevel >= HAY_DIMENSION_FEED_LEVEL) hydrated.lateGame.hayDimension = true;

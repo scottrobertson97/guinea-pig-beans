@@ -14,6 +14,7 @@ import {
 } from "./balance";
 import { advanceContractProgress, updateContracts } from "./contracts";
 import { getPoopZoneId, getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
+import { getDueEventChainFollowUp, maybeStartEventChainForEvent } from "./eventChains";
 import { getFurnitureAutomationMultiplier, getFurnitureStatBonus, updateFurnitureCare } from "./furnitureCare";
 import { getHerdLifeSnapshot, getPigLifeSnapshot, type PigLifeSnapshot } from "./lifecycle";
 import { updateMilestones } from "./milestones";
@@ -111,6 +112,14 @@ function startDueRandomEvent(state: GameState): void {
 }
 
 function startRandomEvent(state: GameState): void {
+  const chainFollowUp = getDueEventChainFollowUp(state);
+  if (chainFollowUp) {
+    state.event.active = chainFollowUp;
+    state.event.responseReady = true;
+    addLog(state, `${chainFollowUp.name}! The ongoing event chain needs one more care choice.`);
+    return;
+  }
+
   const litterZone = getZoneMetrics(state, "litterCorner");
   const hideyZone = getZoneMetrics(state, "hideyZone");
   const playZone = getZoneMetrics(state, "playRun");
@@ -172,6 +181,7 @@ function startRandomEvent(state: GameState): void {
   const timerBonus = event.id === "zoomies" && hasFurnitureSynergy(state, "zoomiePlayground") ? 4 : 0;
   state.event.active = { ...event, timer: event.timer + timerBonus };
   state.event.responseReady = true;
+  maybeStartEventChainForEvent(state, state.event.active);
   if (event.id === "bottleJam") state.event.bottleJammed = true;
   if (event.id === "greatWheeking") state.squeaks += 5;
   if (event.id === "hideySquabble") {

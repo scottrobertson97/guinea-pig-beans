@@ -147,6 +147,8 @@ export type EventId =
   | "litterRevolt"
   | "hideySquabble"
   | "zoomieTraffic";
+export type EventChainId = "hideyRecovery" | "hayPantry";
+export type EventChainStep = "base" | "followUpPending" | "followUp";
 export type EventChoiceId =
   | "zoomiesGuide"
   | "zoomiesChaos"
@@ -346,6 +348,7 @@ export interface ActiveEvent {
   id: EventId;
   name: string;
   timer: number;
+  chainId?: EventChainId;
 }
 
 export interface ActiveObjective {
@@ -421,6 +424,29 @@ export interface ContractsState {
   completedTemplates: Partial<Record<ContractTemplateId, number>>;
 }
 
+export interface ActiveEventChain {
+  id: EventChainId;
+  title: string;
+  step: EventChainStep;
+  sourceEventId: EventId;
+  followUpEventId: EventId;
+  choices: EventChoiceId[];
+}
+
+export interface EventChainResult {
+  id: EventChainId;
+  title: string;
+  summary: string;
+  completed: boolean;
+  token: number;
+}
+
+export interface EventChainsState {
+  active: ActiveEventChain | null;
+  completed: Partial<Record<EventChainId, number>>;
+  lastResult: EventChainResult | null;
+}
+
 export interface TechState {
   levels: Partial<Record<TechNodeId, number>>;
 }
@@ -490,6 +516,7 @@ export interface GameState {
     bottleJammed: boolean;
     responseReady: boolean;
   };
+  eventChains: EventChainsState;
   objective: ActiveObjective;
   contracts: ContractsState;
   pigRequest: {

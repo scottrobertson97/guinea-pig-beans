@@ -39,6 +39,7 @@ import {
   getZoneStewardship,
   refreshEcology,
 } from "./ecology";
+import { createInitialEventChainsState, recordEventChainChoice } from "./eventChains";
 import {
   FURNITURE_IDS,
   createInitialFurnitureCareState,
@@ -1211,6 +1212,7 @@ export function respondToEventChoice(state: GameState, id: EventChoiceId): boole
 
   state.event.responseReady = false;
   state.stats.eventResponses += 1;
+  recordEventChainChoice(state, event, id);
   updateMilestones(state);
   return true;
 }
@@ -1263,6 +1265,7 @@ export function prestige(state: GameState): boolean {
   state.event.nextTimer = 20;
   state.event.bottleJammed = false;
   state.event.responseReady = false;
+  state.eventChains = createInitialEventChainsState();
   for (const pig of state.pigs) pig.stress = 0;
   refreshEcology(state);
   state.survival.deathCheckTimer = 12;
