@@ -21,6 +21,13 @@ interface SceneData {
   onStateChanged: () => void;
 }
 
+interface PigPopcornPresentation {
+  lift: number;
+  rotation: number;
+  stretch: number;
+  shadowScale: number;
+}
+
 const HUD_ACTION_EFFECT_EVENT = "guinea-pig-action-effect";
 
 const CLEANLINESS_PATCHES = [
@@ -97,6 +104,14 @@ const PIG_STATUS_THOUGHT_ACTIVE_MIN_MS = 5500;
 const PIG_STATUS_THOUGHT_ACTIVE_MAX_MS = 9500;
 const PIG_STATUS_THOUGHT_IDLE_MIN_MS = 1600;
 const PIG_STATUS_THOUGHT_IDLE_MAX_MS = 2800;
+const PIG_POPCORN_HAPPINESS_THRESHOLD = 82;
+const PIG_POPCORN_STRESS_MAX = 42;
+const PIG_POPCORN_DURATION_MS = 620;
+const PIG_POPCORN_FIRST_MIN_MS = 1200;
+const PIG_POPCORN_FIRST_MAX_MS = 3400;
+const PIG_POPCORN_REPEAT_MIN_MS = 9000;
+const PIG_POPCORN_REPEAT_MAX_MS = 17000;
+const PIG_POPCORN_LIFT = 24;
 
 export class GameScene extends Phaser.Scene {
   private state!: GameState;
@@ -107,6 +122,8 @@ export class GameScene extends Phaser.Scene {
   private furnitureViews = new Map<FurnitureId, Phaser.GameObjects.Container>();
   private pigThoughtCooldowns = new Map<number, number>();
   private pigActionCooldowns = new Map<number, number>();
+  private pigPopcornNextTimes = new Map<number, number>();
+  private pigPopcornStartedAt = new Map<number, number>();
   private seenActivePigRequestToken = 0;
   private seenPigRequestResultToken = 0;
   private robotView: Phaser.GameObjects.Image | null = null;
@@ -386,17 +403,18 @@ export class GameScene extends Phaser.Scene {
       }
 
       const dx = pig.targetX - pig.x;
-      view.setPosition(pig.x, pig.y);
       const activePlay = pig.goal === "playWithPig" || pig.goal === "playWithFurniture";
-      view.setRotation(
+      const popcorn = this.getPigPopcornPresentation(pig);
+      const rotation =
         pig.goal === "sleep"
           ? Math.sin(this.time.now / 480 + pig.id) * 0.015
           : activePlay
             ? Math.sin(this.time.now / 110 + pig.id) * 0.065
-            : Math.sin(this.time.now / 220 + pig.id) * 0.035,
-      );
+            : Math.sin(this.time.now / 220 + pig.id) * 0.035;
+      view.setPosition(pig.x, pig.y - popcorn.lift);
+      view.setRotation(rotation + popcorn.rotation);
       view.setScale(dx < 0 ? -1 : 1, 1);
-      this.applyPigPresentation(view, pig);
+      this.applyPigPresentation(view, pig, popcorn);
       this.maybeShowPigThought(pig);
     }
 
@@ -406,6 +424,8 @@ export class GameScene extends Phaser.Scene {
         this.pigViews.delete(id);
         this.pigThoughtCooldowns.delete(id);
         this.pigActionCooldowns.delete(id);
+        this.pigPopcornNextTimes.delete(id);
+        this.pigPopcornStartedAt.delete(id);
       }
     }
     this.syncPigRequestFeedback();
@@ -576,7 +596,8 @@ export class GameScene extends Phaser.Scene {
     return view;
   }
 
-  private applyPigPresentation(view: Phaser.GameObjects.Container, pig: Pig): void {
+  private applyPigPresentation(view: Phaser.GameObjects.Container, pig: Pig, popcorn: PigPopcornPresentation): void {
+    const shadow = view.list[0] as Phaser.GameObjects.Ellipse;
     const sprite = view.list[1] as Phaser.GameObjects.Image;
     const nearHay = Math.hypot(pig.x - 88, pig.y - 88) < 90;
     const nearWater = Math.hypot(pig.x - (this.state.cage.width - 90), pig.y - 82) < 90;
@@ -604,7 +625,73 @@ export class GameScene extends Phaser.Scene {
       displayWidth *= 1 + Math.abs(idleWiggle);
       displayHeight *= 1 - Math.abs(idleWiggle) * 0.5;
     }
-    sprite.setDisplaySize(displayWidth, displayHeight);
+    sprite.setDisplaySize(displayWidth * popcorn.stretch, displayHeight / popcorn.stretch);
+    shadow.setDisplaySize(PIG_SHADOW_WIDTH * popcorn.shadowScale, PIG_SHADOW_HEIGHT / Math.max(1, popcorn.shadowScale * 0.8));
+    shadow.setAlpha(popcorn.lift > 0 ? 0.09 : 0.13);
+  }
+
+  private getPigPopcornPresentation(pig: Pig): PigPopcornPresentation {
+    const startedAt = this.pigPopcornStartedAt.get(pig.id);
+    if (startedAt !== undefined) {
+      const progress = Phaser.Math.Clamp((this.time.now - startedAt) / PIG_POPCORN_DURATION_MS, 0, 1);
+      if (progress < 1) {
+        if (this.prefersReducedMotion) return { lift: 0, rotation: 0, stretch: 1, shadowScale: 1 };
+
+        const arc = Math.sin(progress * Math.PI);
+        const snap = Math.sin(progress * Math.PI * 2);
+        return {
+          lift: arc * PIG_POPCORN_LIFT,
+          rotation: snap * 0.11,
+          stretch: 1 + arc * 0.16,
+          shadowScale: 1 - arc * 0.22,
+        };
+      }
+      this.pigPopcornStartedAt.delete(pig.id);
+    }
+
+    this.maybeStartPigPopcorn(pig);
+    return { lift: 0, rotation: 0, stretch: 1, shadowScale: 1 };
+  }
+
+  private maybeStartPigPopcorn(pig: Pig): void {
+    if (!this.isPigPopcornEligible(pig)) {
+      this.pigPopcornStartedAt.delete(pig.id);
+      this.pigPopcornNextTimes.set(pig.id, this.time.now + this.getPigPopcornDelay(pig, true));
+      return;
+    }
+
+    const nextTime = this.pigPopcornNextTimes.get(pig.id);
+    if (nextTime === undefined) {
+      this.pigPopcornNextTimes.set(pig.id, this.time.now + this.getPigPopcornDelay(pig, true));
+      return;
+    }
+    if (this.time.now < nextTime) return;
+
+    this.pigPopcornStartedAt.set(pig.id, this.time.now);
+    this.pigPopcornNextTimes.set(pig.id, this.time.now + this.getPigPopcornDelay(pig, false));
+    this.showPigReaction(pig, Phaser.Math.Between(0, 1) === 0 ? "Pop!" : "Wheek!", 780, 1900);
+  }
+
+  private isPigPopcornEligible(pig: Pig): boolean {
+    if (this.state.cage.happiness < PIG_POPCORN_HAPPINESS_THRESHOLD) return false;
+    if (pig.mood !== "content") return false;
+    if (pig.stress > PIG_POPCORN_STRESS_MAX) return false;
+    if (pig.hunger <= 55 || pig.thirst <= 55 || pig.energy <= 32) return false;
+    if (pig.goal === "eat" || pig.goal === "drink" || pig.goal === "sleep") return false;
+    if (pig.goal === "seekFood" || pig.goal === "seekWater" || pig.goal === "seekSleep") return false;
+    if ((this.pigActionCooldowns.get(pig.id) ?? 0) > this.time.now) return false;
+    return true;
+  }
+
+  private getPigPopcornDelay(pig: Pig, initial: boolean): number {
+    const min = initial ? PIG_POPCORN_FIRST_MIN_MS : PIG_POPCORN_REPEAT_MIN_MS;
+    const max = initial ? PIG_POPCORN_FIRST_MAX_MS : PIG_POPCORN_REPEAT_MAX_MS;
+    const playfulness =
+      (pig.trait === "Zoomer" ? 0.75 : 1) *
+      (pig.goal === "playWithPig" || pig.goal === "playWithFurniture" ? 0.78 : 1) *
+      (this.state.event.active?.id === "zoomies" || this.state.event.active?.id === "greatWheeking" ? 0.76 : 1) *
+      (this.state.abilities.zoomieMode > 0 ? 0.72 : 1);
+    return Phaser.Math.Between(Math.round(min * playfulness), Math.round(max * playfulness));
   }
 
   private createPoopView(poop: Poop): Phaser.GameObjects.Image {

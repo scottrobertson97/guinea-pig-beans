@@ -290,12 +290,14 @@ Acceptance criteria:
 - Trait-driven behavior is visible: Neat Freaks care about litter trays, Hay Goblins seek hay, and Shy Beaners prefer hidey objects.
 - Animations do not obscure bean cleanup targets.
 - Multiple pigs can react without cluttering the cage.
+- Happy, content pigs can occasionally do small ambient popcorn jumps when the cage is well cared for.
 
 Implementation notes:
 
 - Keep this as a visual layer over existing movement and targeting.
 - Use simple sprite scale/rotation changes plus short-lived thought bubbles before adding new animation frames; avoid pig color shifts for lifecycle status.
 - Use short-lived Phaser image or text objects for bubbles.
+- Popcorn jumps are scene-local cosmetic feedback and do not add saved pig fields or change production tuning.
 
 ### PB-003: Dock Badges And Availability Indicators
 

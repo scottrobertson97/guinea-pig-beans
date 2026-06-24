@@ -53,6 +53,7 @@ export class DevTools {
       this.createButton("Spawn Royal", () => this.spawnPoop("royal")),
       this.createButton("Spawn Stinky", () => this.spawnPoop("stinky")),
       this.createButton("Seed Lifecycle Status", () => this.seedLifecycleStatus()),
+      this.createButton("Seed Happy Popcorn", () => this.seedHappyPopcorn()),
       this.createButton("Seed Ecology Stress", () => this.seedEcologyStress()),
       this.createButton("Seed Pig Welcome Ready", () => this.seedPigWelcomeReady()),
       this.createButton("Seed Relationship Web", () => this.seedRelationshipWeb()),
@@ -93,6 +94,40 @@ export class DevTools {
     clearPoops(this.state);
     spawnEventPoop(this.state, "normal", this.state.cage.width / 2, this.state.cage.height / 2);
     addLog(this.state, "Dev tools seeded a smoke-test bean.");
+  }
+
+  private seedHappyPopcorn(): void {
+    while (this.state.pigs.length < 3) {
+      addPig(this.state);
+    }
+
+    clearPoops(this.state);
+    this.state.needs.hay = 100;
+    this.state.needs.water = 100;
+    this.state.cage.cleanliness = 100;
+    this.state.cage.happiness = Math.max(this.state.cage.happiness, 96);
+    this.state.event.active = null;
+    this.state.event.bottleJammed = false;
+    this.state.event.responseReady = false;
+
+    const centerX = this.state.cage.width / 2;
+    const centerY = this.state.cage.height / 2;
+    for (const [index, pig] of this.state.pigs.slice(0, 3).entries()) {
+      pig.x = centerX + (index - 1) * 54;
+      pig.y = centerY + (index % 2 === 0 ? -18 : 20);
+      pig.hunger = 92;
+      pig.thirst = 92;
+      pig.energy = 82;
+      pig.stress = 0;
+      setPigGoal(this.state, pig, "roam");
+      pig.targetX = pig.x;
+      pig.targetY = pig.y;
+      pig.goalTimer = 8;
+    }
+
+    refreshEcology(this.state);
+    addLog(this.state, "Dev tools settled a happy herd for popcorn jumps.");
+    emitDevLifecycleStatusSeeded();
   }
 
   private seedLifecycleStatus(): void {
