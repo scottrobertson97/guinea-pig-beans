@@ -6,6 +6,7 @@ Use this folder for long-form project references, planning notes, and production
 
 - [GAME_RECREATION_BRIEF.md](GAME_RECREATION_BRIEF.md): full handoff spec for recreating the game from scratch.
 - [DESIGN_DOC.md](DESIGN_DOC.md): player-facing design shape, current mechanics, and system rules.
+- [PIG_LIFECYCLE_DIAGRAM.md](PIG_LIFECYCLE_DIAGRAM.md): Mermaid state diagram for how pigs move between lifecycle goals.
 - [FEATURE_PROGRESS.md](FEATURE_PROGRESS.md): implemented systems, current progression records, backlog, and implementation notes.
 
 ## Developer Tooling
