@@ -15,8 +15,9 @@ import {
 import { advanceContractProgress, updateContracts } from "./contracts";
 import { getPoopZoneId, getZoneMetrics, refreshEcology, updateHabitatStewardship, updatePigEcology } from "./ecology";
 import { getFurnitureAutomationMultiplier, getFurnitureStatBonus, updateFurnitureCare } from "./furnitureCare";
+import { getHerdLifeSnapshot, getPigLifeSnapshot, type PigLifeSnapshot } from "./lifecycle";
 import { updateMilestones } from "./milestones";
-import { updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
+import { spawnDuePigRequest, updateHeldPigRequestProgress, updatePigRequests } from "./pigRequests";
 import { updatePigWelcome } from "./pigWelcome";
 import {
   adjustRelationshipBetween,
@@ -50,8 +51,8 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateFurnitureCare(state, deltaSeconds);
   updateDerivedCageStats(state);
   refreshEcology(state);
-  updateEvent(state, deltaSeconds);
-  updatePigRequests(state, deltaSeconds);
+  updateEventTimer(state, deltaSeconds);
+  updatePigRequests(state, deltaSeconds, { spawnDue: false });
   refreshEcology(state);
   updateHappiness(state);
   updateNeeds(state, deltaSeconds);
@@ -64,6 +65,9 @@ export function updateSimulation(state: GameState, deltaSeconds: number): void {
   updateCleanliness(state);
   updateHeldPigRequestProgress(state);
   updateContracts(state, deltaSeconds);
+  refreshEcology(state);
+  startDueRandomEvent(state);
+  spawnDuePigRequest(state);
   refreshEcology(state);
   updatePigWelcome(state, deltaSeconds);
   updateMilestones(state);
@@ -84,7 +88,7 @@ function updateAutomation(state: GameState, deltaSeconds: number): void {
   state.automation.overdrive = Math.max(0, state.automation.overdrive - deltaSeconds);
 }
 
-function updateEvent(state: GameState, deltaSeconds: number): void {
+function updateEventTimer(state: GameState, deltaSeconds: number): void {
   if (state.event.active) {
     state.event.active.timer -= deltaSeconds;
     if (state.event.active.timer <= 0) {
@@ -98,8 +102,12 @@ function updateEvent(state: GameState, deltaSeconds: number): void {
     return;
   }
 
-  state.event.nextTimer -= deltaSeconds;
-  if (state.event.nextTimer <= 0) startRandomEvent(state);
+  state.event.nextTimer = Math.max(0, state.event.nextTimer - deltaSeconds);
+}
+
+function startDueRandomEvent(state: GameState): void {
+  if (state.event.active || state.event.nextTimer > 0) return;
+  startRandomEvent(state);
 }
 
 function startRandomEvent(state: GameState): void {
@@ -108,18 +116,57 @@ function startRandomEvent(state: GameState): void {
   const playZone = getZoneMetrics(state, "playRun");
   const hayZone = getZoneMetrics(state, "hayCorner");
   const waterZone = getZoneMetrics(state, "waterBottle");
+  const life = getHerdLifeSnapshot(state);
   const relationshipTension = getRelationshipTensionPressure(state);
   const events: Array<{ event: NonNullable<GameState["event"]["active"]>; weight: number }> = [
-    { event: { id: "zoomies", name: "Zoomies", timer: 15 }, weight: state.cage.enrichment > 70 || playZone.appeal > 72 ? 1.9 : 1 },
-    { event: { id: "hayFrenzy", name: "Hay Frenzy", timer: 18 }, weight: state.needs.hay < 35 || hayZone.comfort < 38 ? 2.5 : 1 },
-    { event: { id: "napTime", name: "Nap Time", timer: 12 }, weight: state.cage.happiness > 82 ? 1.7 : 1 },
-    { event: { id: "bottleJam", name: "Bottle Jam", timer: 20 }, weight: state.needs.water < 40 || waterZone.traffic > 60 ? 2.5 : 1 },
-    { event: { id: "cageInspection", name: "Cage Inspection", timer: 22 }, weight: state.cage.cleanliness > 85 || state.poops.length > 18 || litterZone.mess > 55 ? 1.9 : 0.8 },
-    { event: { id: "compostBloom", name: "Compost Bloom", timer: 18 }, weight: state.compost > 20 || state.recipes.compostCatalyst || litterZone.mess > 45 ? 2 : 1 },
-    { event: { id: "greatWheeking", name: "The Great Wheeking", timer: 16 }, weight: state.squeaks > 8 || state.wisdom.chorusTraining ? 2 : 1 },
-    { event: { id: "litterRevolt", name: "Litter Revolt", timer: 18 }, weight: litterZone.mess > 48 || litterZone.traffic > 68 ? 2.2 : 0.35 },
-    { event: { id: "hideySquabble", name: "Hidey Squabble", timer: 18 }, weight: hideyZone.traffic > 62 || state.ecology.averageStress > 42 || relationshipTension > 55 ? 2.1 + Math.min(1.1, relationshipTension / 90) : 0.35 },
-    { event: { id: "zoomieTraffic", name: "Zoomie Traffic", timer: 16 }, weight: playZone.traffic > 62 || hasFurnitureSynergy(state, "zoomiePlayground") ? 1.8 : 0.4 },
+    {
+      event: { id: "zoomies", name: "Zoomies", timer: 15 },
+      weight:
+        0.8 +
+        life.playPressure / 55 +
+        life.socialPressure / 120 +
+        (state.cage.enrichment > 70 || playZone.appeal > 72 ? 0.7 : 0),
+    },
+    {
+      event: { id: "hayFrenzy", name: "Hay Frenzy", timer: 18 },
+      weight: 0.7 + life.foodPressure / 36 + (hayZone.comfort < 38 ? 0.6 : 0),
+    },
+    {
+      event: { id: "napTime", name: "Nap Time", timer: 12 },
+      weight: 0.7 + life.restPressure / 48 + (state.cage.happiness > 82 ? 0.7 : 0),
+    },
+    {
+      event: { id: "bottleJam", name: "Bottle Jam", timer: 20 },
+      weight: 0.7 + life.waterPressure / 36 + (waterZone.traffic > 60 ? 0.65 : 0),
+    },
+    {
+      event: { id: "cageInspection", name: "Cage Inspection", timer: 22 },
+      weight: 0.65 + life.cleanupPressure / 60 + (state.cage.cleanliness > 85 ? 0.55 : 0),
+    },
+    {
+      event: { id: "compostBloom", name: "Compost Bloom", timer: 18 },
+      weight: 0.75 + (state.compost > 20 || state.recipes.compostCatalyst ? 1 : 0) + litterZone.mess / 90,
+    },
+    {
+      event: { id: "greatWheeking", name: "The Great Wheeking", timer: 16 },
+      weight: 0.75 + life.socialPressure / 70 + (state.squeaks > 8 || state.wisdom.chorusTraining ? 0.8 : 0),
+    },
+    {
+      event: { id: "litterRevolt", name: "Litter Revolt", timer: 18 },
+      weight: 0.35 + life.cleanupPressure / 45 + Math.max(litterZone.mess, litterZone.traffic) / 90,
+    },
+    {
+      event: { id: "hideySquabble", name: "Hidey Squabble", timer: 18 },
+      weight:
+        0.35 +
+        life.stressPressure / 48 +
+        life.relationshipPressure / 70 +
+        (hideyZone.traffic > 62 || relationshipTension > 55 ? 0.8 + Math.min(1.1, relationshipTension / 90) : 0),
+    },
+    {
+      event: { id: "zoomieTraffic", name: "Zoomie Traffic", timer: 16 },
+      weight: 0.35 + life.playPressure / 55 + playZone.traffic / 110 + (hasFurnitureSynergy(state, "zoomiePlayground") ? 0.6 : 0),
+    },
   ];
   const event = pickWeighted(events, "event");
   const timerBonus = event.id === "zoomies" && hasFurnitureSynergy(state, "zoomiePlayground") ? 4 : 0;
@@ -190,6 +237,7 @@ function updateDerivedCageStats(state: GameState): void {
 }
 
 function updateHappiness(state: GameState): void {
+  const life = getHerdLifeSnapshot(state);
   const needsScore = (state.needs.hay + state.needs.water) / 2;
   const cleanScore = state.cage.cleanliness;
   const enrichmentScore = Math.min(100, 45 + state.cage.enrichment);
@@ -200,10 +248,10 @@ function updateHappiness(state: GameState): void {
   const synergyBonus = hasFurnitureSynergy(state, "cozyCorner") ? 4 : 0;
   const dramaPenalty =
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
-  const lonePigPenalty = state.pigs.length === 1 ? 14 : 0;
+  const lonePigPenalty = life.recoveryState === "single" ? 14 : 0;
   const councilHappinessBonus = hasCavyCouncilEffect(state) ? 5 : 0;
-  const ecologyStressPenalty = Math.min(16, state.ecology.averageStress * 0.18);
-  const ecologyComfortBonus = state.ecology.zones.some((zone) => zone.appeal >= 80 && zone.pigIds.length > 0) ? 4 : 0;
+  const ecologyStressPenalty = Math.min(16, life.stressPressure * 0.18);
+  const ecologyComfortBonus = life.dominantMotive !== "comfort" && state.ecology.zones.some((zone) => zone.appeal >= 80 && zone.pigIds.length > 0) ? 4 : 0;
   state.cage.happiness = Math.max(
     0,
     Math.min(
@@ -444,29 +492,30 @@ function updatePigGoal(state: GameState, pig: Pig, deltaSeconds: number): void {
 type PigActivity = "roam" | "food" | "water" | "sleep" | "play";
 
 function chooseWeightedPigActivity(state: GameState, pig: Pig): void {
-  const urgentActivity = getUrgentActivity(pig);
+  const life = getPigLifeSnapshot(state, pig);
+  const urgentActivity = getUrgentActivity(life);
   if (urgentActivity) {
     startPigActivity(state, pig, urgentActivity);
     return;
   }
 
   const activity = pickWeighted<PigActivity>([
-    { id: "roam", weight: PIG_ACTIVITY_WEIGHTS.roam },
-    { id: "food", weight: getFoodActivityWeight(pig) },
-    { id: "water", weight: getWaterActivityWeight(pig) },
-    { id: "sleep", weight: getSleepActivityWeight(pig) },
-    { id: "play", weight: getPlayActivityWeight(state, pig) },
+    { id: "roam", weight: getRoamActivityWeight(life) },
+    { id: "food", weight: getFoodActivityWeight(pig, life) },
+    { id: "water", weight: getWaterActivityWeight(pig, life) },
+    { id: "sleep", weight: getSleepActivityWeight(pig, life) },
+    { id: "play", weight: getPlayActivityWeight(state, pig, life) },
   ]);
   startPigActivity(state, pig, activity);
 }
 
-function getUrgentActivity(pig: Pig): PigActivity | null {
-  const hungry = pig.hunger <= HUNGER_GOAL_THRESHOLD;
-  const thirsty = pig.thirst <= THIRST_GOAL_THRESHOLD;
-  if (hungry && thirsty) return pig.thirst <= pig.hunger ? "water" : "food";
-  if (thirsty) return "water";
-  if (hungry) return "food";
-  if (pig.energy <= ENERGY_GOAL_THRESHOLD) return "sleep";
+function getUrgentActivity(life: PigLifeSnapshot): PigActivity | null {
+  if (life.urgency !== "urgent" && life.urgency !== "blocked") return null;
+  if (life.motive === "food") return "food";
+  if (life.motive === "water") return "water";
+  if (life.motive === "rest") return "sleep";
+  if (life.motive === "play" || life.motive === "social") return "play";
+  if (life.motive === "comfort" && life.pressures.rest >= 20) return "sleep";
   return null;
 }
 
@@ -503,52 +552,41 @@ function returnToRoam(state: GameState, pig: Pig): void {
   pig.goalTimer = randomBetween(PIG_LIFECYCLE_THRESHOLDS.roamDecisionMin, PIG_LIFECYCLE_THRESHOLDS.roamDecisionMax);
 }
 
-function getFoodActivityWeight(pig: Pig): number {
-  const desire = getNeedDesireWeight(
-    pig.hunger,
-    PIG_LIFECYCLE_THRESHOLDS.hungerDesire,
-    HUNGER_GOAL_THRESHOLD,
-    4.2,
-  );
+function getRoamActivityWeight(life: PigLifeSnapshot): number {
+  const comfortRoam = life.pressures.comfort >= 35 || life.pressures.cleanup >= 32 ? 1.4 : 0;
+  return PIG_ACTIVITY_WEIGHTS.roam + comfortRoam;
+}
+
+function getFoodActivityWeight(pig: Pig, life: PigLifeSnapshot): number {
+  const desire = getNeedDesireWeight(life.pressures.food, 4.2);
   const traitMultiplier = pig.trait === "Hay Goblin" ? 2.2 : pig.trait === "Chonker" ? 1.25 : 1;
   return (PIG_ACTIVITY_WEIGHTS.food + desire) * traitMultiplier;
 }
 
-function getWaterActivityWeight(pig: Pig): number {
-  const desire = getNeedDesireWeight(
-    pig.thirst,
-    PIG_LIFECYCLE_THRESHOLDS.thirstDesire,
-    THIRST_GOAL_THRESHOLD,
-    4.4,
-  );
+function getWaterActivityWeight(pig: Pig, life: PigLifeSnapshot): number {
+  const desire = getNeedDesireWeight(life.pressures.water, 4.4);
   const traitMultiplier = pig.trait === "Drama Pig" ? 2.2 : 1;
   return (PIG_ACTIVITY_WEIGHTS.water + desire) * traitMultiplier;
 }
 
-function getSleepActivityWeight(pig: Pig): number {
-  const desire = getNeedDesireWeight(
-    pig.energy,
-    PIG_LIFECYCLE_THRESHOLDS.energyDesire,
-    ENERGY_GOAL_THRESHOLD,
-    3.5,
-  );
+function getSleepActivityWeight(pig: Pig, life: PigLifeSnapshot): number {
+  const desire = getNeedDesireWeight(life.pressures.rest, 3.5);
+  const comfortRest = life.pressures.comfort >= 48 ? 0.9 : 0;
   const traitMultiplier = pig.trait === "Shy Beaner" ? 1.8 : pig.trait === "Zoomer" ? 0.82 : 1;
-  return (PIG_ACTIVITY_WEIGHTS.sleep + desire) * traitMultiplier;
+  return (PIG_ACTIVITY_WEIGHTS.sleep + desire + comfortRest) * traitMultiplier;
 }
 
-function getPlayActivityWeight(state: GameState, pig: Pig): number {
-  const enrichmentNeed = Math.max(0, 42 - state.cage.enrichment) * 0.035;
-  const socialNeed = Math.max(0, 38 - state.cage.socialization) * 0.03;
+function getPlayActivityWeight(state: GameState, pig: Pig, life: PigLifeSnapshot): number {
+  const enrichmentNeed = life.pressures.play * 0.035;
+  const socialNeed = life.pressures.social * 0.03;
   const zoomieMultiplier =
     state.event.active?.id === "zoomies" || state.event.active?.id === "zoomieTraffic" || state.abilities.zoomieMode > 0 ? 1.75 : 1;
   const traitMultiplier = pig.trait === "Zoomer" ? 1.8 : pig.trait === "Shy Beaner" ? 0.86 : 1;
   return (PIG_ACTIVITY_WEIGHTS.play + enrichmentNeed + socialNeed) * zoomieMultiplier * traitMultiplier;
 }
 
-function getNeedDesireWeight(value: number, desireStart: number, urgentThreshold: number, scale: number): number {
-  if (value >= desireStart) return 0;
-  const range = Math.max(1, desireStart - urgentThreshold);
-  return ((desireStart - value) / range) * scale;
+function getNeedDesireWeight(pressure: number, scale: number): number {
+  return (Math.max(0, pressure) / 100) * scale;
 }
 
 function updateSeekingPlayPig(state: GameState, pig: Pig, deltaSeconds: number): void {
@@ -785,25 +823,33 @@ function chooseAutomationPoop(
   source: Pick<Robot, "x" | "y">,
 ): Poop | null {
   const available = directive === "rareGuard" ? candidates.filter((poop) => !isRareGuardProtected(poop)) : candidates;
+  const life = getHerdLifeSnapshot(state);
   let best: { poop: Poop; score: number } | null = null;
   for (const poop of available) {
     const distance = Math.hypot(poop.x - source.x, poop.y - source.y);
     const mess = getPoopMessPressure(poop);
-    const litterBonus = getPoopZoneId(state, poop) === "litterCorner" ? 120 : 0;
+    const zoneId = getPoopZoneId(state, poop);
+    const litterBonus = zoneId === "litterCorner" ? 120 : 0;
+    const lifecycleZoneBonus =
+      zoneId === life.dominantCareZone
+        ? life.cleanupPressure * (directive === "balanced" ? 0.9 : directive === "rareGuard" ? 0.35 : 1.1) +
+          life.stressPressure * 0.22
+        : 0;
     const score =
       directive === "cleanliness"
-        ? mess * 11 + poop.age * 0.08 - distance * 0.32
+        ? mess * 11 + poop.age * 0.08 + lifecycleZoneBonus - distance * 0.32
         : directive === "litterFocus"
-          ? litterBonus + mess * 6 - distance * 0.36
+          ? litterBonus + mess * 6 + lifecycleZoneBonus - distance * 0.36
           : directive === "rareGuard"
-            ? mess * 8 - distance * 0.28
-            : -distance;
+            ? mess * 8 + lifecycleZoneBonus - distance * 0.28
+            : lifecycleZoneBonus + mess * 0.6 - distance;
     if (!best || score > best.score) best = { poop, score };
   }
   return best?.poop ?? null;
 }
 
 function chooseRobotTarget(state: GameState, robot: Robot): void {
+  const life = getHerdLifeSnapshot(state);
   if (state.automation.directive === "litterFocus") {
     const litter = getZoneMetrics(state, "litterCorner");
     robot.targetX = litter.x + randomBetween(-28, 28);
@@ -818,6 +864,13 @@ function chooseRobotTarget(state: GameState, robot: Robot): void {
       robot.targetY = messiestZone.y + randomBetween(-Math.min(28, messiestZone.radius * 0.22), Math.min(28, messiestZone.radius * 0.22));
       return;
     }
+  }
+
+  if (life.dominantCareZone && (life.cleanupPressure >= 35 || life.stressPressure >= 42)) {
+    const zone = getZoneMetrics(state, life.dominantCareZone);
+    robot.targetX = zone.x + randomBetween(-Math.min(34, zone.radius * 0.25), Math.min(34, zone.radius * 0.25));
+    robot.targetY = zone.y + randomBetween(-Math.min(28, zone.radius * 0.22), Math.min(28, zone.radius * 0.22));
+    return;
   }
 
   robot.targetX = randomBetween(CAGE_PADDING, state.cage.width - CAGE_PADDING);

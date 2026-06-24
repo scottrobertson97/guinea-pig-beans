@@ -1,6 +1,7 @@
 import { addLog } from "./state";
 import { advanceContractProgress } from "./contracts";
 import { getCageZoneName, getPigZoneId, getZoneMetrics } from "./ecology";
+import { getPigLifeSnapshot, getPigLifeSummaryText } from "./lifecycle";
 import {
   adjustRelationshipConnection,
   getPigRelationships,
@@ -24,7 +25,7 @@ export interface PigRequestView {
 
 let nextRequestToken = 1;
 
-export function updatePigRequests(state: GameState, deltaSeconds: number): void {
+export function updatePigRequests(state: GameState, deltaSeconds: number, options: { spawnDue?: boolean } = {}): void {
   const requestState = ensurePigRequestState(state);
   const active = requestState.active;
 
@@ -50,7 +51,13 @@ export function updatePigRequests(state: GameState, deltaSeconds: number): void 
   }
 
   requestState.nextTimer = Math.max(0, requestState.nextTimer - deltaSeconds);
-  if (requestState.nextTimer <= 0) spawnPigRequest(state);
+  if ((options.spawnDue ?? true) && requestState.nextTimer <= 0) spawnPigRequest(state);
+}
+
+export function spawnDuePigRequest(state: GameState): void {
+  const requestState = ensurePigRequestState(state);
+  if (requestState.active || requestState.nextTimer > 0) return;
+  spawnPigRequest(state);
 }
 
 export function advancePigRequest(
@@ -81,10 +88,11 @@ export function getActivePigRequestView(state: GameState): PigRequestView | null
   const active = ensurePigRequestState(state).active;
   if (!active) return null;
   const pig = state.pigs.find((candidate) => candidate.id === active.pigId);
+  const lifeCue = pig ? getPigLifeSummaryText(state, pig).replace("Life: ", "") : null;
   return {
     pigName: pig?.name ?? "A pig",
     title: active.title,
-    description: active.description,
+    description: lifeCue ? `${active.description} Current cue: ${lifeCue}.` : active.description,
     progress: `${Math.floor(active.progress)}/${active.target}`,
     timer: `${Math.ceil(active.timer)}s`,
     rewardText: active.rewardText,
@@ -319,34 +327,45 @@ function applyReward(state: GameState, active: NonNullable<GameState["pigRequest
 }
 
 function chooseRequestId(state: GameState, pig: Pig): PigRequestId {
+  const life = getPigLifeSnapshot(state, pig);
+  const relationshipCount = getPigRelationships(state, pig.id).length;
+  const urgencyBonus = life.urgency === "urgent" || life.urgency === "blocked" ? 1.25 : life.urgency === "desire" ? 0.45 : 0;
   const options: Array<{ id: PigRequestId; weight: number }> = [
-    { id: "tidyFavor", weight: pig.trait === "Neat Freak" || state.poops.length >= 5 ? 2.4 : 1 },
-    { id: "hayFavor", weight: pig.trait === "Hay Goblin" || state.needs.hay < 55 ? 2.4 : 0.9 },
-    { id: "waterFavor", weight: pig.trait === "Drama Pig" || state.needs.water < 55 ? 2.1 : 0.85 },
-    { id: "zoomieFavor", weight: pig.trait === "Zoomer" || state.furniture.tunnel ? 1.8 : 0.9 },
-    { id: "snackFavor", weight: state.squeaks >= 1 ? 1.2 : 0.4 },
-    { id: "furnitureFavor", weight: hasLockedFurniture(state) ? 1.1 : 0 },
-    { id: "compostFavor", weight: pig.trait === "Compost Mystic" || state.compost >= 3 ? 1.6 : 0.5 },
-    { id: "favoriteCornerFavor", weight: getZoneMetrics(state, pig.favoriteZone).mess >= 18 ? 2.1 : 0.8 },
-    { id: "quietZoneFavor", weight: pig.stress >= 42 || state.ecology.averageStress >= 34 ? 1.9 : 0.45 },
-    { id: "bondSupportFavor", weight: getPigRelationships(state, pig.id).length > 0 ? 1.25 : 0 },
+    { id: "tidyFavor", weight: 0.75 + life.pressures.cleanup / 36 + (pig.trait === "Neat Freak" ? 0.85 : 0) },
+    { id: "hayFavor", weight: 0.45 + life.pressures.food / 30 + (pig.trait === "Hay Goblin" ? 0.85 : 0) + (life.motive === "food" ? urgencyBonus : 0) },
+    { id: "waterFavor", weight: 0.45 + life.pressures.water / 30 + (pig.trait === "Drama Pig" ? 0.8 : 0) + (life.motive === "water" ? urgencyBonus : 0) },
+    { id: "zoomieFavor", weight: 0.55 + life.pressures.play / 42 + (pig.trait === "Zoomer" || state.furniture.tunnel ? 0.75 : 0) },
+    { id: "snackFavor", weight: (state.squeaks >= 1 ? 0.85 : 0.25) + life.pressures.comfort / 55 + life.pressures.rest / 90 },
+    { id: "furnitureFavor", weight: hasLockedFurniture(state) ? 0.35 + Math.max(life.pressures.comfort, life.pressures.play) / 58 : 0 },
+    { id: "compostFavor", weight: 0.35 + (pig.trait === "Compost Mystic" ? 0.85 : 0) + (state.compost >= 3 ? 0.55 : 0) },
+    { id: "favoriteCornerFavor", weight: 0.5 + life.favoriteZoneMess / 28 + (life.motive === "cleanup" ? urgencyBonus : 0) },
+    { id: "quietZoneFavor", weight: 0.25 + life.pressures.comfort / 34 + life.pressures.recovery / 80 },
+    { id: "bondSupportFavor", weight: relationshipCount > 0 ? 0.4 + life.pressures.social / 36 + life.relationshipPressure / 42 : 0 },
   ];
   return pickWeighted(options);
 }
 
 function chooseRequestPig(state: GameState): Pig | null {
   if (state.pigs.length === 0) return null;
-  const weightedPigs = state.pigs.map((pig) => ({
-    id: pig,
-    weight:
-      1 +
-      (pig.trait === "Neat Freak" && state.poops.length >= 3 ? 1 : 0) +
-      (pig.trait === "Hay Goblin" && state.needs.hay < 65 ? 1 : 0) +
-      (pig.trait === "Drama Pig" && state.needs.water < 65 ? 1 : 0) +
-      (pig.trait === "Compost Mystic" && state.compost >= 2 ? 1 : 0) +
-      (pig.stress >= 45 ? 1.4 : 0) +
-      (getZoneMetrics(state, pig.favoriteZone).mess >= 24 ? 1 : 0),
-  }));
+  const weightedPigs = state.pigs.map((pig) => {
+    const life = getPigLifeSnapshot(state, pig);
+    const strongestPressure = Math.max(
+      life.pressures.food,
+      life.pressures.water,
+      life.pressures.rest,
+      life.pressures.social,
+      life.pressures.comfort,
+      life.pressures.cleanup,
+    );
+    return {
+      id: pig,
+      weight:
+        1 +
+        strongestPressure / 38 +
+        life.relationshipPressure / 55 +
+        (life.urgency === "urgent" || life.urgency === "blocked" ? 1.4 : life.urgency === "desire" ? 0.6 : 0),
+    };
+  });
   return pickWeighted(weightedPigs);
 }
 

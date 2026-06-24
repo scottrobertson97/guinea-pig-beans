@@ -387,6 +387,22 @@ Sleep and play also use a seek-then-act pattern:
 
 After satisfying a goal, the pig returns to roaming.
 
+### Lifecycle As System Driver
+
+The game treats each pig's daily life as the main simulation readout. A derived lifecycle model looks at hunger, thirst, energy, current goal, mood, stress, favorite-zone comfort, favorite-zone mess, relationship pressure, and herd recovery state. It does not add a saved resource or a new player-facing section.
+
+Systems use that lifecycle readout to decide what deserves attention:
+
+- Pigs choose food, water, rest, play, social, comfort, cleanup, or roaming pressure through one shared read model.
+- Pig requests come from the pig whose current life pressure is clearest.
+- Events weight toward the herd's current pressure, such as hay, water, rest, play traffic, cleanup, relationship tension, or stressed hidey areas.
+- Contract offers still preserve intro reveal pacing, but ordinary offers prefer the herd's current lifecycle needs.
+- Automation cleanup can favor zones where mess is affecting pig comfort, while Rare Guard still protects valuable beans.
+- Rare bean odds use pig comfort, stress, favorite-zone presence, and relationship warmth from the same lifecycle readout.
+- Herd roster and status copy name the current lifecycle cause so the player can see why care, cleanup, rest, play, or relationship comfort matters.
+
+This keeps lifecycle as the connective tissue between existing systems rather than adding aging, breeding, illness, or harsher survival pressure.
+
 ### Pig Mood
 
 Current moods:

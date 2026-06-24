@@ -7,9 +7,10 @@ import {
   hasWisdomSpecialization,
   MAX_LOG_ITEMS,
 } from "./balance";
-import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, getZoneTarget, isPigComfortableInFavoriteZone } from "./ecology";
+import { chooseFavoriteZoneForPig, createInitialEcologyState, getPreferredRoamTarget, getZoneTarget } from "./ecology";
 import { createInitialFurnitureCareState } from "./furnitureCare";
 import { getFurnitureDefinition, getFurnitureName } from "./furnitureDefinitions";
+import { getPigLifeSnapshot } from "./lifecycle";
 import { getPigRelationships, getRelationshipPartnerId, syncRelationshipWeb } from "./relationships";
 import type { FurnitureId, GameState, Pig, PigBreed, PigGoal, PigTrait, Poop, PoopType } from "./types";
 import { clamp, pickWeighted, randomBetween } from "./utils";
@@ -600,10 +601,12 @@ function getStartingSpeed(breed: PigBreed, trait: PigTrait): number {
 }
 
 function choosePoopType(state: GameState, pig: Pig): PoopType {
+  const life = getPigLifeSnapshot(state, pig);
   const enrichmentBonus = Math.min(0.06, state.cage.enrichment / 1200);
   const happinessBonus = state.cage.happiness >= 90 ? 0.04 : state.cage.happiness >= 75 ? 0.02 : 0;
-  const favoriteZoneBonus = isPigComfortableInFavoriteZone(state, pig) ? 0.022 : 0;
-  const stressRarePenalty = pig.stress >= 70 ? -0.018 : pig.stress >= 50 ? -0.01 : 0;
+  const favoriteZoneBonus = life.currentZone === life.favoriteZone && life.favoriteZoneComfort >= 62 ? 0.022 : 0;
+  const relationshipComfortBonus = life.relationshipWarmth >= 70 && life.relationshipPressure < 28 ? 0.008 : 0;
+  const stressRarePenalty = life.stressBand === "stressed" ? -0.018 : life.stressBand === "uneasy" ? -0.01 : 0;
   const eventBonus = state.event.active?.id === "greatWheeking" ? 0.08 : 0;
   const abilityBonus = state.abilities.snackTime > 0 ? 0.05 : 0;
   const rareCatalogBonus = (state.tech?.levels?.rareCatalog ?? 0) * 0.01;
@@ -619,6 +622,7 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     eventBonus +
     happinessBonus +
     favoriteZoneBonus +
+    relationshipComfortBonus +
     stressRarePenalty +
     rareCatalogBonus +
     recipeRareBonus +
@@ -641,7 +645,7 @@ function choosePoopType(state: GameState, pig: Pig): PoopType {
     (state.wisdom.royalMemory && state.furniture.royalThrone ? 0.025 : 0) +
     (royalCompostCourt ? 0.018 : 0);
   const cursedChance = hasSingularityExperimentEffect(state) || state.cage.cleanliness < 20 ? 0.025 : 0.004;
-  const stressStinkyBonus = pig.stress >= 70 ? 0.1 : pig.stress >= 50 ? 0.055 : 0;
+  const stressStinkyBonus = life.stressBand === "stressed" ? 0.1 : life.stressBand === "uneasy" ? 0.055 : 0;
   const stinkyChance =
     (pig.trait === "Gremlin" && state.cage.cleanliness < 60
       ? 0.24

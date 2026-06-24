@@ -8,6 +8,7 @@ import {
   hasCavyCouncilEffect,
   hasWisdomSpecialization,
 } from "./balance";
+import { getHerdLifeSnapshot } from "./lifecycle";
 import type {
   ActiveContractState,
   ContractOfferState,
@@ -435,12 +436,62 @@ function createContractOffers(state: GameState): ContractOfferState[] {
       !ONE_TIME_INTRO_CONTRACT_IDS.has(template.id) &&
       template.eligible(state),
   );
-  const start = ordinaryEligible.length > 0 ? seed % ordinaryEligible.length : 0;
-  const rotated = [...ordinaryEligible.slice(start), ...ordinaryEligible.slice(0, start)];
-  const selectedTemplates = introTemplate ? [introTemplate, ...rotated.slice(0, 2)] : rotated.slice(0, 3);
+  const ranked = rankContractTemplatesByLifecycle(state, ordinaryEligible, seed);
+  const selectedTemplates = introTemplate ? [introTemplate, ...ranked.slice(0, 2)] : ranked.slice(0, 3);
   const offers = selectedTemplates.map((template, index) => createOfferFromTemplate(state, template, seed + index));
   state.contracts.nextOfferSeed += Math.max(1, offers.length + 1);
   return offers;
+}
+
+function rankContractTemplatesByLifecycle(
+  state: GameState,
+  templates: ContractTemplate[],
+  seed: number,
+): ContractTemplate[] {
+  const length = Math.max(1, templates.length);
+  return templates
+    .map((template, index) => ({
+      template,
+      score: getLifecycleContractScore(state, template.id) + ((length - ((index + seed) % length)) / length) * 0.08,
+    }))
+    .sort((first, second) => second.score - first.score)
+    .map((entry) => entry.template);
+}
+
+function getLifecycleContractScore(state: GameState, id: ContractTemplateId): number {
+  const life = getHerdLifeSnapshot(state);
+  const urgentBonus = life.urgency === "urgent" || life.urgency === "blocked" ? 1 : life.urgency === "desire" ? 0.35 : 0;
+  if (id === "freshCageDelivery") {
+    return 1.1 + life.averageNeedPressure / 42 + life.cleanupPressure / 85 + urgentBonus;
+  }
+  if (id === "roomToNest") {
+    return 0.9 + Math.max(life.stressPressure, life.playPressure, life.socialPressure) / 70;
+  }
+  if (id === "firstWheek") {
+    return 0.85 + Math.max(life.foodPressure, life.waterPressure, life.playPressure) / 76;
+  }
+  if (id === "habitatReset") {
+    return 0.8 + life.stressPressure / 34 + life.relationshipPressure / 70;
+  }
+  if (id === "cleanupRoute") {
+    return 0.75 + life.cleanupPressure / 34 + (life.dominantCareZone === "litterCorner" ? 0.8 : 0);
+  }
+  if (id === "compostStarter") {
+    return 0.55 + (state.compost > 0 || state.stats.compostCleaned > 0 ? 0.9 : 0) + life.cleanupPressure / 120;
+  }
+  if (id === "rareSampleOrder") {
+    return 0.5 + (state.stats.rarePoopsCleaned > 0 || state.goldenBeans > 0 ? 1 : 0) + Math.max(0, 65 - life.stressPressure) / 120;
+  }
+  if (id === "recipeCommission") {
+    return 0.45 + (state.compost >= 10 || state.squeaks >= 4 ? 1 : 0) + life.averageNeedPressure / 160;
+  }
+  if (id === "herdCouncilSession") {
+    return 0.5 + life.socialPressure / 38 + (life.recoveryState === "steady" ? 0.35 : 0);
+  }
+  if (id === "greatCompostingRumor") {
+    return 0.4 + Math.max(0, 70 - life.averageNeedPressure) / 100;
+  }
+  return 0.7 + Math.max(life.stressPressure, life.socialPressure, life.averageNeedPressure) / 70;
 }
 
 function getNextIntroContractTemplate(state: GameState): ContractTemplate | null {

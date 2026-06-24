@@ -19,6 +19,7 @@
 - Pig requests: one pig at a time can ask for a short-lived favor tied to care, cleanup, abilities, furniture, combo, or Compost.
 - Pig social mechanics: bonded pairs, buddies, nap partners, shy followers, and gentle rivalries affect socialization, stress, zone preferences, requests, and Herd roster copy.
 - Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides, then leave consume/rest actions after a short satisfied-action timer.
+- Lifecycle-driven orchestration: a derived pig/herd lifecycle read model now drives pig activity weights, event weights, pig-request selection, Contract offer priority, automation cleanup targeting, rare bean comfort/stress modifiers, Herd roster copy, and urgent status-line feedback without adding save fields.
 - Dev constants editor: local Vite dev servers expose `/constants` for source-backed tuning of selected scalar literals in `src/simulation/balance.ts`; saves rewrite the source file and production builds do not serve the route.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode unlock from the Tech Tree, then remain operational cooldown actions in Abilities.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
@@ -117,6 +118,7 @@
 - Active lifecycle statuses now surface as periodic over-pig thought bubbles instead of pig sprite color shifts.
 - Relationship state now backfills old saves, appears in the Herd modal, changes socialization, stress, roaming, and play choices, feeds relationship requests, and nudges Hidey Squabble/Rebond outcomes.
 - Pig Welcome adds a light trait-discovery step to the early Herd modal so the first pigs teach favorite zones and personality effects before deeper progression takes over.
+- Lifecycle pressure is now the shared internal driver for timing-sensitive systems: care shortages, rest/play/social pressure, stress, favorite-zone mess, relationship tension, and herd recovery shape requests, event odds, Contract offers, automation cleanup priorities, rare bean odds, and status copy.
 
 ## Systems Backlog Tickets
 

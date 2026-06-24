@@ -73,6 +73,7 @@ import {
   canChooseWisdomSpecialization,
 } from "../simulation/balance";
 import { getCageZoneName, getEcologyConcernCount, getEcologyStatusLine } from "../simulation/ecology";
+import { getHerdLifeStatusText, getPigLifeSummaryText } from "../simulation/lifecycle";
 import {
   getAchievementViews,
   getMilestoneRecordViews,
@@ -819,7 +820,7 @@ export class Hud {
         const relationship = document.createElement("span");
         const welcomeDiscovery = document.createElement("span");
         identity.textContent = pig.name;
-        details.textContent = `${pig.breed} ${pig.trait} - ${getPigGoalLabel(pig)} - ${getPigWeakestNeedLabel(pig)} - ${getPigEcologyLabel(pig)} - ${pig.quirk}`;
+        details.textContent = `${pig.breed} ${pig.trait} - ${getPigGoalLabel(pig)} - ${getPigLifeSummaryText(this.state, pig)} - ${getPigWeakestNeedLabel(pig)} - ${getPigEcologyLabel(pig)} - ${pig.quirk}`;
         relationship.className = "pig-relationship";
         relationship.textContent = getPigRelationshipLine(this.state, pig);
         item.append(identity, details, relationship);
@@ -2135,8 +2136,6 @@ function getStatusLine(
     const careNeed = getFurnitureCareViews(state).find((view) => view.condition < 58);
     if (careNeed) return `${careNeed.label} is ${careNeed.conditionLabel.toLowerCase()}. Open Furniture Care to tend it.`;
   }
-  const contractQuick = getContractQuickView(state);
-  if (!contractQuick.active) return "Choose a Contract in Goals to focus the next few minutes of care.";
   if (state.automation.overdrive > 0) return `Automation overdrive is sweeping faster for ${Math.ceil(state.automation.overdrive)}s.`;
   if (state.robot || state.furniture.litterTray) return `Automation directive: ${getAutomationDirectiveName(state.automation.directive)}.`;
   if (state.event.active && state.event.responseReady)
@@ -2144,6 +2143,10 @@ function getStatusLine(
   if (state.event.active) return `${state.event.active.name} is active for ${Math.ceil(state.event.active.timer)}s.`;
   const request = getActivePigRequestView(state);
   if (request) return `${request.pigName} has a request: ${request.title}.`;
+  const herdLifeLine = getHerdLifeStatusText(state);
+  if (herdLifeLine) return herdLifeLine;
+  const contractQuick = getContractQuickView(state);
+  if (!contractQuick.active) return "Choose a Contract in Goals to focus the next few minutes of care.";
   if (state.pigs.length === 0) return "The cage is empty. Adopt Pig is free so the herd can restart.";
   if (state.pigs.length === 1) return "The last pig needs a companion. Adopt Pig is free until the pair is restored.";
   if (state.needs.hay <= 0) return "The hay rack is empty. The pigs have filed a complaint.";
