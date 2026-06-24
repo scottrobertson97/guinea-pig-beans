@@ -7,7 +7,7 @@ Start here as the lead agent. Your job is to understand the request, choose the 
 - Phaser 3 + TypeScript + Vite browser game.
 - GitHub Pages deploys the Vite `dist` output from `main`.
 - The app combines a Phaser canvas with DOM HUD controls and modal sections.
-- Core docs: `docs/FEATURE_PROGRESS.md`, `docs/DESIGN_DOC.md`, `docs/POLISHING_PLAN.md`, `docs/ART_ASSET_PLAN.md`, `docs/OUTLINE.md`, and `docs/PROJECT_TICKETS.md`.
+- Core docs: `docs/GAME_RECREATION_BRIEF.md`, `docs/FEATURE_PROGRESS.md`, `docs/DESIGN_DOC.md`, `docs/POLISHING_PLAN.md`, `docs/ART_ASSET_PLAN.md`, `docs/OUTLINE.md`, and `docs/PROJECT_TICKETS.md`.
 
 ## Lead-Agent Operating Model
 
@@ -54,6 +54,7 @@ Start here as the lead agent. Your job is to understand the request, choose the 
 
 | Task | Use |
 | --- | --- |
+| Docs-only design writeups, handoff specs, repo guides, or planning notes | Read `docs/README.md`, then update the most relevant file under `docs/` without changing gameplay source |
 | Simulation rules, resources, progression, pig autonomy, persistence, or feature backlog updates | `$guinea-pig-beans-gameplay-systems` |
 | HUD layout, dock/modal behavior, player-facing copy, scene feedback, polish passes, or CSS/UI responsiveness | `$guinea-pig-beans-ui-hud-polish` |
 | Build checks, strict-port Vite runs, browser smoke tests, Playwright scripts, stale localhost diagnosis, or verification notes | `$guinea-pig-beans-browser-verification` |
@@ -101,6 +102,7 @@ Review the current Guinea Pig Beans changes for bugs, regressions, missing tests
 
 ## Universal Implementation Rules
 
+- For a from-scratch recreation handoff or broad product description, start with `docs/GAME_RECREATION_BRIEF.md` and keep it aligned with `docs/DESIGN_DOC.md`.
 - Put resource math and player action outcomes in the simulation layer before exposing them through HUD or scene feedback.
 - Keep high-frequency care/status information visible; use the existing dock and modal pattern for deeper controls.
 - New persistent fields need save hydration or migration thought in `src/simulation/persistence.ts`. Current save key: `gpb-save-v1`.
