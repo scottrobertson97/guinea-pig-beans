@@ -17,8 +17,6 @@ import {
   fuelAutomation,
   getBeanExchangeTradeStatus,
   getBeanExchangeTrades,
-  getCouncilDecreeStatus,
-  getCouncilDecrees,
   canUseEventChoice,
   completePigWelcome,
   getEventChoiceStatus,
@@ -38,14 +36,12 @@ import {
   tendHabitatZone,
   unlockBeanRecipe,
   unlockLateGameSystem,
-  useCouncilDecree,
   useAbility,
   type EventChoiceView,
 } from "../simulation/actions";
 import { assetPath } from "../assetPaths";
 import { getContractBoardView, getContractQuickView, selectContract } from "../simulation/contracts";
 import {
-  CAVY_COUNCIL_HERD_SIZE,
   HAY_DIMENSION_FEED_LEVEL,
   SINGULARITY_RECIPE_COMPOST_COST,
   SINGULARITY_RECIPE_CURSED_CLEANED,
@@ -67,7 +63,6 @@ import {
   getWisdomPerks,
   getWisdomSpecialization,
   getWisdomSpecializations,
-  hasCavyCouncilEffect,
   hasGoldenScoopEffect,
   hasSingularityExperimentEffect,
   canChooseWisdomSpecialization,
@@ -86,15 +81,26 @@ import {
   canUnlockTechNode,
   getAbilityTechNodeId,
   getAvailableTechUnlockCount,
-  getTechBranches,
   getTechLevel,
   getTechNodeDefinition,
   getTechNodeDefinitions,
   getTechNodeStatusText,
+  getVisibleTechNodeDefinitions,
   isAbilityTechUnlocked,
   isTechComplete,
+  isTechNodeStarted,
   unlockTechNode,
 } from "../simulation/techTree";
+import {
+  TECH_BRANCH_VISUALS,
+  TECH_MAP_HEIGHT,
+  TECH_MAP_WIDTH,
+  TECH_NODE_HEIGHT,
+  TECH_NODE_ICONS,
+  TECH_NODE_LAYOUT,
+  TECH_NODE_WIDTH,
+  getTechLinkPath,
+} from "./techTreeConstellation";
 import { getActivePigRequestView } from "../simulation/pigRequests";
 import {
   getIncompletePigWelcomeViews,
@@ -109,7 +115,6 @@ import type {
   AutomationDirectiveId,
   BeanExchangeTradeId,
   BeanRecipeId,
-  CouncilDecreeId,
   EventChoiceId,
   FurnitureId,
   GameState,
@@ -186,9 +191,6 @@ type ButtonId =
   | "exchange-compost-to-squeaks"
   | "exchange-gold-to-beans"
   | "exchange-squeaks-to-gold"
-  | "council-care-mandate"
-  | "council-cleanup-ordinance"
-  | "council-herd-charter"
   | "wisdom-roomy-start"
   | "wisdom-steady-supplies"
   | "wisdom-fresh-start"
@@ -293,18 +295,23 @@ const BEAN_EXCHANGE_BUTTONS: Record<BeanExchangeTradeId, ButtonId> = {
   squeaksToGold: "exchange-squeaks-to-gold",
 };
 
-const COUNCIL_DECREE_BUTTONS: Record<CouncilDecreeId, ButtonId> = {
-  careMandate: "council-care-mandate",
-  cleanupOrdinance: "council-cleanup-ordinance",
-  herdCharter: "council-herd-charter",
-};
-
 const AUTOMATION_DIRECTIVE_BUTTONS: Record<AutomationDirectiveId, ButtonId> = {
   balanced: "automation-balanced",
   cleanliness: "automation-cleanliness",
   litterFocus: "automation-litter-focus",
   rareGuard: "automation-rare-guard",
 };
+
+const TECH_VISIBLE_MAP_PADDING = 112;
+const TECH_VISIBLE_MAP_MIN_WIDTH = 720;
+const TECH_VISIBLE_MAP_MIN_HEIGHT = 520;
+
+interface TechMapViewport {
+  originX: number;
+  originY: number;
+  width: number;
+  height: number;
+}
 
 export class Hud {
   private buttons: Record<ButtonId, HTMLButtonElement>;
@@ -323,7 +330,6 @@ export class Hud {
   private resetRunButton: HTMLButtonElement;
   private saveStatus: HTMLElement;
   private beanExchangePanel: HTMLElement;
-  private cavyCouncilPanel: HTMLElement;
   private automationPanel: HTMLElement;
   private furnitureCarePanel: HTMLElement;
   private habitatCarePanel: HTMLElement;
@@ -410,9 +416,6 @@ export class Hud {
       "exchange-compost-to-squeaks": getButton("exchange-compost-to-squeaks"),
       "exchange-gold-to-beans": getButton("exchange-gold-to-beans"),
       "exchange-squeaks-to-gold": getButton("exchange-squeaks-to-gold"),
-      "council-care-mandate": getButton("council-care-mandate"),
-      "council-cleanup-ordinance": getButton("council-cleanup-ordinance"),
-      "council-herd-charter": getButton("council-herd-charter"),
       "wisdom-roomy-start": getButton("wisdom-roomy-start"),
       "wisdom-steady-supplies": getButton("wisdom-steady-supplies"),
       "wisdom-fresh-start": getButton("wisdom-fresh-start"),
@@ -485,7 +488,6 @@ export class Hud {
     this.resetRunButton = getButton("reset-run");
     this.saveStatus = getElement("save-status");
     this.beanExchangePanel = getElement("bean-exchange-panel");
-    this.cavyCouncilPanel = getElement("cavy-council-panel");
     this.automationPanel = getElement("automation-directives-panel");
     this.furnitureCarePanel = getElement("furniture-care-panel");
     this.habitatCarePanel = getElement("habitat-care-panel");
@@ -661,25 +663,6 @@ export class Hud {
             label: trade.label,
             resourceText: getBeanExchangeFeedbackText(trade.id),
             color: getBeanExchangeFeedbackColor(trade.id),
-          },
-          "purchase",
-          "purchase",
-        ),
-      );
-    }
-    for (const decree of getCouncilDecrees()) {
-      const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
-      this.buttons[buttonId].addEventListener("click", () =>
-        this.runAction(
-          () => useCouncilDecree(this.state, decree.id),
-          this.buttons[buttonId],
-          {
-            category: "decree",
-            target: "cage",
-            decreeId: decree.id,
-            label: decree.label,
-            resourceText: getCouncilDecreeFeedbackText(decree.id),
-            color: getCouncilDecreeFeedbackColor(decree.id),
           },
           "purchase",
           "purchase",
@@ -980,10 +963,11 @@ export class Hud {
 
   private runTechTreeClick(event: Event): void {
     const target = event.target instanceof HTMLElement ? event.target : null;
-    const button = target?.closest<HTMLButtonElement>("[data-tech-node-id]");
+    const button = target?.closest<HTMLButtonElement>("button[data-tech-node-id]");
     if (!button || !this.techTree.contains(button)) return;
     const techNodeId = button.dataset.techNodeId as TechNodeId | undefined;
     if (!techNodeId) return;
+    if (button.dataset.techAvailable !== "true") return;
     this.runAction(
       () => unlockTechNode(this.state, techNodeId),
       button,
@@ -1300,12 +1284,7 @@ export class Hud {
       "exchange-squeaks-to-gold",
     ]), "available");
     const readyWelcomeCount = getReadyPigWelcomeCount(this.state);
-    const councilActionCount = countEnabled(this.buttons, [
-      "council-care-mandate",
-      "council-cleanup-ordinance",
-      "council-herd-charter",
-    ]);
-    this.setDockIndicator("herd", readyWelcomeCount > 0 ? readyWelcomeCount : councilActionCount, "available");
+    this.setDockIndicator("herd", readyWelcomeCount, "available");
     this.setDockIndicator("wisdom", getAvailableTechUnlockCount(this.state), "available");
     const contractBoard = getContractBoardView(this.state);
     this.setDockIndicator(
@@ -1619,8 +1598,6 @@ export class Hud {
     setText("bean-exchange-status", getLateGameStatusText(this.state, "beanExchange"));
     setText("golden-scoop-status", getLateGameStatusText(this.state, "goldenScoop"));
     this.renderBeanExchangeStatuses();
-    setText("cavy-council-status", getCavyCouncilStatusText(this.state));
-    this.renderCouncilDecreeStatuses();
   }
 
   private renderBeanExchangeStatuses(): void {
@@ -1628,15 +1605,6 @@ export class Hud {
     for (const trade of getBeanExchangeTrades()) {
       const buttonId = BEAN_EXCHANGE_BUTTONS[trade.id];
       setText(`${buttonId}-status`, getBeanExchangeTradeStatus(this.state, trade.id));
-    }
-  }
-
-  private renderCouncilDecreeStatuses(): void {
-    const councilSeated = hasCavyCouncilEffect(this.state);
-    this.cavyCouncilPanel.hidden = !councilSeated;
-    for (const decree of getCouncilDecrees()) {
-      const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
-      setText(`${buttonId}-status`, getCouncilDecreeStatus(this.state, decree.id));
     }
   }
 
@@ -1650,12 +1618,19 @@ export class Hud {
   }
 
   private renderTechTree(): void {
-    const definitions = getTechNodeDefinitions();
-    const signature = definitions
+    const allDefinitions = getTechNodeDefinitions();
+    const definitions = getVisibleTechNodeDefinitions(this.state);
+    const visibleIds = new Set<TechNodeId>(definitions.map((definition) => definition.id));
+    const signature = allDefinitions
       .map((definition) =>
         [
           definition.id,
+          definition.branch,
+          definition.kind,
+          definition.prerequisites.join(","),
+          visibleIds.has(definition.id) ? "visible" : "hidden",
           getTechLevel(this.state, definition.id),
+          isTechNodeStarted(this.state, definition.id) ? "started" : "unstarted",
           canUnlockTechNode(this.state, definition.id) ? "available" : "locked",
           getTechNodeStatusText(this.state, definition.id),
         ].join(":"),
@@ -1664,62 +1639,178 @@ export class Hud {
     if (signature === this.previousTechTreeSignature && this.techTree.childElementCount > 0) return;
     this.previousTechTreeSignature = signature;
 
-    const branches = getTechBranches().map((branch) => {
-      const branchElement = document.createElement("section");
-      const title = document.createElement("h3");
-      const list = document.createElement("div");
-      branchElement.className = "tech-branch";
-      branchElement.dataset.techBranch = branch.id;
-      title.textContent = branch.label;
-      list.className = "tech-node-list";
-      for (const definition of definitions.filter((candidate) => candidate.branch === branch.id)) {
-        list.append(this.createTechNode(definition));
-      }
-      branchElement.append(title, list);
-      return branchElement;
-    });
+    const viewport = this.getVisibleTechMapViewport(definitions);
+    const map = document.createElement("div");
+    const links = this.createTechMapLinks(definitions, viewport);
+    const nodes = document.createElement("div");
 
-    this.techTree.replaceChildren(...branches);
+    map.className = "tech-map";
+    map.style.setProperty("--tech-map-width", `${viewport.width}px`);
+    map.style.setProperty("--tech-map-height", `${viewport.height}px`);
+    map.style.setProperty("--tech-node-width", `${TECH_NODE_WIDTH}px`);
+    map.style.setProperty("--tech-node-height", `${TECH_NODE_HEIGHT}px`);
+    map.style.width = `${viewport.width}px`;
+    map.style.height = `${viewport.height}px`;
+    nodes.className = "tech-map-nodes";
+
+    for (const definition of definitions) {
+      nodes.append(this.createTechNode(definition, viewport));
+    }
+
+    map.append(links, nodes);
+    this.techTree.replaceChildren(map);
   }
 
-  private createTechNode(definition: TechNodeDefinition): HTMLElement {
+  private getVisibleTechMapViewport(definitions: TechNodeDefinition[]): TechMapViewport {
+    if (definitions.length === 0) {
+      return {
+        originX: 0,
+        originY: 0,
+        width: Math.min(TECH_MAP_WIDTH, TECH_VISIBLE_MAP_MIN_WIDTH),
+        height: Math.min(TECH_MAP_HEIGHT, TECH_VISIBLE_MAP_MIN_HEIGHT),
+      };
+    }
+
+    const halfNodeWidth = TECH_NODE_WIDTH / 2;
+    const halfNodeHeight = TECH_NODE_HEIGHT / 2;
+    const layouts = definitions.map((definition) => TECH_NODE_LAYOUT[definition.id]);
+    const minX = Math.min(...layouts.map((layout) => layout.x - halfNodeWidth));
+    const minY = Math.min(...layouts.map((layout) => layout.y - halfNodeHeight));
+    const maxX = Math.max(...layouts.map((layout) => layout.x + halfNodeWidth));
+    const maxY = Math.max(...layouts.map((layout) => layout.y + halfNodeHeight));
+    const originX = Math.max(0, Math.floor(minX - TECH_VISIBLE_MAP_PADDING));
+    const originY = Math.max(0, Math.floor(minY - TECH_VISIBLE_MAP_PADDING));
+    const targetRight = Math.min(TECH_MAP_WIDTH, Math.ceil(maxX + TECH_VISIBLE_MAP_PADDING));
+    const targetBottom = Math.min(TECH_MAP_HEIGHT, Math.ceil(maxY + TECH_VISIBLE_MAP_PADDING));
+    const maxWidth = TECH_MAP_WIDTH - originX;
+    const maxHeight = TECH_MAP_HEIGHT - originY;
+    const width = Math.min(maxWidth, Math.max(TECH_VISIBLE_MAP_MIN_WIDTH, targetRight - originX));
+    const height = Math.min(maxHeight, Math.max(TECH_VISIBLE_MAP_MIN_HEIGHT, targetBottom - originY));
+
+    return { originX, originY, width, height };
+  }
+
+  private getShiftedTechNodeLayout(id: TechNodeId, viewport: TechMapViewport): { x: number; y: number } {
+    const layout = TECH_NODE_LAYOUT[id];
+    return {
+      x: layout.x - viewport.originX,
+      y: layout.y - viewport.originY,
+    };
+  }
+
+  private createTechMapLinks(definitions: TechNodeDefinition[], viewport: TechMapViewport): SVGSVGElement {
+    const namespace = "http://www.w3.org/2000/svg";
+    const links = document.createElementNS(namespace, "svg");
+    const definitionById = new Map(definitions.map((definition) => [definition.id, definition]));
+
+    links.classList.add("tech-map-links");
+    links.setAttribute("viewBox", `0 0 ${viewport.width} ${viewport.height}`);
+    links.setAttribute("aria-hidden", "true");
+    links.setAttribute("focusable", "false");
+
+    for (const definition of definitions) {
+      const toLayout = this.getShiftedTechNodeLayout(definition.id, viewport);
+      if (!toLayout) continue;
+
+      for (const prerequisite of definition.prerequisites) {
+        const prerequisiteDefinition = definitionById.get(prerequisite);
+        const fromLayout = this.getShiftedTechNodeLayout(prerequisite, viewport);
+        if (!prerequisiteDefinition || !fromLayout) continue;
+
+        const path = document.createElementNS(namespace, "path");
+        const childComplete = isTechComplete(this.state, definition.id);
+        const childStarted = isTechNodeStarted(this.state, definition.id);
+        const childAvailable = canUnlockTechNode(this.state, definition.id);
+        const crossBranch = prerequisiteDefinition.branch !== definition.branch;
+        const stateClass = childComplete ? "complete" : childStarted ? "started" : childAvailable ? "available" : "locked";
+
+        path.classList.add("tech-link", stateClass);
+        path.classList.toggle("derived", definition.kind === "derived");
+        path.classList.toggle("cross-branch", crossBranch);
+        path.dataset.fromTechNodeId = prerequisite;
+        path.dataset.toTechNodeId = definition.id;
+        path.dataset.crossBranch = String(crossBranch);
+        path.setAttribute("d", getTechLinkPath(fromLayout, toLayout));
+        links.append(path);
+      }
+    }
+
+    return links;
+  }
+
+  private createTechNode(definition: TechNodeDefinition, viewport: TechMapViewport): HTMLElement {
     const currentLevel = getTechLevel(this.state, definition.id);
+    const started = isTechNodeStarted(this.state, definition.id);
     const complete = isTechComplete(this.state, definition.id);
     const available = canUnlockTechNode(this.state, definition.id);
     const statusText = getTechNodeStatusText(this.state, definition.id);
+    const layout = this.getShiftedTechNodeLayout(definition.id, viewport);
+    const visual = TECH_BRANCH_VISUALS[definition.branch];
+    const icon = TECH_NODE_ICONS[definition.id];
+    const tooltipId = `tech-tooltip-${definition.id}`;
 
     const row = document.createElement("div");
     const button = document.createElement("button");
-    const header = document.createElement("span");
-    const label = document.createElement("span");
-    const status = document.createElement("strong");
-    const description = document.createElement("em");
+    const iconFrame = document.createElement("span");
+    const iconImage = document.createElement("img");
+    const iconFallback = document.createElement("span");
+    const stateDot = document.createElement("span");
+    const tooltip = document.createElement("span");
+    const tooltipTitle = document.createElement("strong");
+    const tooltipStatus = document.createElement("span");
+    const tooltipDescription = document.createElement("em");
     const pips = document.createElement("span");
 
-    row.className = "tech-node-row";
+    row.className = `tech-node-row branch-${definition.branch}`;
     row.dataset.techNodeId = definition.id;
     row.dataset.techBranch = definition.branch;
+    row.style.left = `${layout.x}px`;
+    row.style.top = `${layout.y}px`;
+    row.style.setProperty("--branch-color", visual.color);
+    row.style.setProperty("--branch-border", visual.border);
+    row.style.setProperty("--branch-soft", visual.soft);
+    row.classList.toggle("tooltip-below", layout.y < 250);
+    row.classList.toggle("tooltip-align-left", layout.x < 240);
+    row.classList.toggle("tooltip-align-right", layout.x > viewport.width - 240);
+    row.classList.toggle("started", started && !complete);
     row.classList.toggle("complete", complete);
     row.classList.toggle("available", available);
-    row.classList.toggle("locked", !complete && !available);
+    row.classList.toggle("locked", !started && !complete && !available);
     row.classList.toggle("derived", definition.kind === "derived");
     row.classList.toggle("action-node", definition.kind === "action");
 
     button.type = "button";
     button.className = "tech-node-button";
     button.dataset.techNodeId = definition.id;
-    button.disabled = !available;
-    button.setAttribute("aria-label", `${definition.label}. ${statusText}`);
+    button.dataset.techAvailable = String(available);
+    button.dataset.techIconCode = icon.code;
+    button.setAttribute("aria-disabled", String(!available));
+    button.setAttribute("aria-describedby", tooltipId);
+    button.setAttribute("aria-label", `${definition.label}. ${statusText}. ${definition.description}`);
 
-    header.className = "tech-node-header";
-    label.className = "tech-node-label";
-    status.className = "tech-node-status";
-    description.className = "tech-node-description";
+    iconFrame.className = "tech-node-icon-frame";
+    iconImage.className = "tech-node-icon";
+    iconImage.src = assetPath(icon.path);
+    iconImage.alt = "";
+    iconImage.draggable = false;
+    iconImage.addEventListener("error", () => iconFrame.classList.add("missing-icon"));
+    iconFallback.className = "tech-node-icon-code";
+    iconFallback.textContent = icon.code;
+    iconFallback.setAttribute("aria-hidden", "true");
+    stateDot.className = "tech-node-state-dot";
+    stateDot.setAttribute("aria-hidden", "true");
+
+    tooltip.className = "tech-node-tooltip";
+    tooltip.id = tooltipId;
+    tooltip.setAttribute("role", "tooltip");
+    tooltipTitle.className = "tech-tooltip-title";
+    tooltipStatus.className = "tech-tooltip-status";
+    tooltipDescription.className = "tech-tooltip-description";
     pips.className = "tech-level-pips";
 
-    label.textContent = definition.label;
-    status.textContent = statusText;
-    description.textContent = definition.description;
+    tooltipTitle.textContent = definition.label;
+    tooltipStatus.textContent = statusText;
+    tooltipDescription.textContent = definition.description;
 
     for (let index = 0; index < definition.maxLevel; index += 1) {
       const pip = document.createElement("span");
@@ -1729,9 +1820,10 @@ export class Hud {
       pips.append(pip);
     }
 
-    header.append(label, status);
-    button.append(header, description, pips);
-    row.append(button);
+    iconFrame.append(iconImage, iconFallback);
+    button.append(iconFrame, stateDot);
+    tooltip.append(tooltipTitle, tooltipStatus, tooltipDescription, pips);
+    row.append(button, tooltip);
     return row;
   }
 
@@ -1853,12 +1945,6 @@ export class Hud {
       const buttonId = BEAN_EXCHANGE_BUTTONS[trade.id];
       this.buttons[buttonId].disabled = getBeanExchangeTradeStatus(this.state, trade.id) !== "Trade";
       this.buttons[buttonId].hidden = !this.state.lateGame.beanExchange;
-    }
-    const councilSeated = hasCavyCouncilEffect(this.state);
-    for (const decree of getCouncilDecrees()) {
-      const buttonId = COUNCIL_DECREE_BUTTONS[decree.id];
-      this.buttons[buttonId].disabled = getCouncilDecreeStatus(this.state, decree.id) !== "Pass";
-      this.buttons[buttonId].hidden = !councilSeated;
     }
   }
 
@@ -2032,18 +2118,6 @@ function getBeanExchangeFeedbackColor(tradeId: BeanExchangeTradeId): number {
   if (tradeId === "compostToSqueaks") return 0xf0d56b;
   if (tradeId === "goldToBeans" || tradeId === "squeaksToGold") return 0xe4b83b;
   return 0x7db46a;
-}
-
-function getCouncilDecreeFeedbackText(decreeId: CouncilDecreeId): string {
-  if (decreeId === "careMandate") return "+Hay / +Water / +Happy";
-  if (decreeId === "cleanupOrdinance") return "Center Cleaned";
-  return "+75 Beans / +1 Gold";
-}
-
-function getCouncilDecreeFeedbackColor(decreeId: CouncilDecreeId): number {
-  if (decreeId === "careMandate") return 0x7db46a;
-  if (decreeId === "cleanupOrdinance") return 0x86d9f0;
-  return 0xb965d2;
 }
 
 function getEventChoiceFeedbackText(choiceId: EventChoiceId): string {
@@ -2318,7 +2392,7 @@ function getRecipeStatusText(state: GameState, id: BeanRecipeId): string {
 
 function getLateGameStatusText(
   state: GameState,
-  id: Exclude<keyof GameState["lateGame"], "hayDimension" | "squeakChoir" | "cavyCouncil" | "beanSingularity">,
+  id: Exclude<keyof GameState["lateGame"], "hayDimension" | "squeakChoir" | "beanSingularity">,
 ): string {
   if (state.lateGame[id]) return "Active";
   if (id === "beanExchange") {
@@ -2341,11 +2415,6 @@ function canUnlockGoldenScoop(state: GameState): boolean {
   if (hasGoldenScoopEffect(state)) return false;
   const cost = getGoldenScoopCost();
   return state.beans >= cost.beans && state.goldenBeans >= cost.goldenBeans;
-}
-
-function getCavyCouncilStatusText(state: GameState): string {
-  if (hasCavyCouncilEffect(state)) return "Council seated";
-  return formatNeed(state.pigs.length, CAVY_COUNCIL_HERD_SIZE, "Pig");
 }
 
 function getPrestigeStatusText(state: GameState): string {

@@ -142,11 +142,12 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
   hydrated.ecology = hydrated.ecology ?? createInitialEcologyState(hydrated.cage.width, hydrated.cage.height);
   hydrated.ecology.stewardship = normalizeStewardshipState(hydrated.ecology.stewardship);
   hydrated.furnitureCare = normalizeFurnitureCareState(hydrated.furnitureCare);
-  hydrated.tech = normalizeTechState(hydrated.tech);
+  hydrated.tech = normalizeTechState(savedState.tech);
   hydrated.contracts = normalizeContractsState(hydrated.contracts);
   hydrated.eventChains = normalizeEventChainsState(hydrated.eventChains);
   hydrated.automation.directive = normalizeAutomationDirective(hydrated.automation.directive);
   hydrated.wisdomSpecialization = normalizeWisdomSpecialization(hydrated.wisdomSpecialization);
+  stripLegacyLateGameState(hydrated);
   if (hydrated.upgrades.feedLevel >= HAY_DIMENSION_FEED_LEVEL) hydrated.lateGame.hayDimension = true;
   if (hydrated.lateGame.beanSingularity) hydrated.recipes.singularityExperiment = true;
   hydrated.pigs = hydrated.pigs.map((pig, index) => hydratePigLifeState(pig, index));
@@ -159,6 +160,10 @@ function hydrateState(defaultState: GameState, savedState: Partial<GameState>): 
 
 function normalizeWisdomSpecialization(value: unknown): WisdomSpecializationId | null {
   return value === "gentleCare" || value === "automationSteward" || value === "rareBeanAlchemy" ? value : null;
+}
+
+function stripLegacyLateGameState(state: GameState): void {
+  delete (state.lateGame as Record<string, unknown>).cavyCouncil;
 }
 
 function hydratePigLifeState(pig: Pig, index: number): Pig {

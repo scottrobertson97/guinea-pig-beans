@@ -146,7 +146,6 @@ Squeaks are used for:
 - Stronger abilities.
 - Bean Recipes.
 - Event choices.
-- Cavy Council decrees.
 - Some Bean Exchange trades.
 
 ### Golden Beans
@@ -457,7 +456,6 @@ Happiness is a weighted score made from:
 - Furniture synergies.
 - Trait penalties.
 - Lone-pig penalty.
-- Cavy Council bonuses.
 
 Current design weighting favors cleanliness and needs first, then enrichment, socialization, and space.
 
@@ -468,7 +466,6 @@ Key happiness modifiers:
 - Cozy Corner adds happiness.
 - Drama Pig creates a water-related penalty when water is low.
 - A lone pig takes a happiness penalty until a second pig is adopted.
-- Cavy Council helps a large herd stay happy.
 
 ### Death Risk
 
@@ -670,7 +667,7 @@ Dirty cages are visible in the playfield through floor tint, dirt wash, and dirt
 
 ## Tech Tree
 
-The Tech Tree is the always-visible progression map. It owns one-time unlock decisions for run upgrades, furniture, automation access, ability licenses, bean recipes, late-game unlocks, Great Composting, Wisdom perks, and Caretaker Philosophies.
+The Tech Tree is the always-visible progression map. It is displayed as a connected node-and-connector map inside the Tech Tree modal, with branch-colored nodes for Care & Cage, Habitat, Automation, Abilities & Rare Beans, and Wisdom Legacy. Nodes render as compact icon buttons so the map stays readable; hover and keyboard focus reveal tooltips with the node label, status, description, and level pips. It owns one-time unlock decisions for run upgrades, furniture, automation access, ability licenses, bean recipes, late-game unlocks, Great Composting, Wisdom perks, and Caretaker Philosophies.
 
 The original sections still own repeatable operations:
 
@@ -678,11 +675,11 @@ The original sections still own repeatable operations:
 - Furniture handles automation fuel, automation directives, furniture care, and habitat tending.
 - Abilities handles using unlocked active abilities.
 - Recipes handles Bean Exchange trades and running Singularity.
-- Herd handles Cavy Council decrees.
+- Herd handles pig identity, Pig Welcome, and relationship visibility.
 
-Nodes can be locked, available, or complete. A child node only becomes available after every prerequisite node is complete. For multi-level nodes, every level must be bought before child nodes unlock.
+Nodes can be locked, available, started, or complete. Fresh runs show only root nodes; future nodes and their connector lines stay hidden until every direct prerequisite has been bought or activated at least once. Multi-level nodes reveal and unlock downstream paths after level 1, while complete styling still requires the node's max level. Prerequisite lines can cross branches, so the map reads as one connected progression graph instead of five independent columns.
 
-The Tech Tree has five branches:
+The Tech Tree uses five branch color families:
 
 - Care & Cage: Better Hay, Better Scoop, Bigger Cage, Hay Dimension, Clean Streak Training, and Care Routines.
 - Habitat: furniture unlocks, furniture synergy completion, Furniture Care Kit, and Habitat Steward Kit.
@@ -690,9 +687,11 @@ The Tech Tree has five branches:
 - Abilities & Rare Beans: active ability licenses, Squeak Training, Rare Catalog, bean recipes, Bean Exchange, Golden Scoop, Singularity Experiment, and Singularity Stabilizers.
 - Wisdom Legacy: Great Composting, all permanent Wisdom perks, and the three Caretaker Philosophies.
 
+The current graph intentionally cross-links systems. Poop Roomba starts from Litter Tray, Litter Method depends on both Litter Tray and Automation Directives, Habitat Steward Kit depends on Furniture Care Kit and started Care Routines, Fresh Bedding depends on Wheek Call and Litter Tray, Zoomie Mode depends on Treat Bag and the Zoomie Playground synergy, and late rare-bean unlocks require matching recipe, furniture, automation, and started training nodes. Wisdom remains gated by Great Composting, then fans into four permanent arms.
+
 The tree does not add a new currency. Nodes spend the same resources their systems already use: Beans, Compost, Squeaks, Golden Beans, or Cavy Wisdom.
 
-Existing save fields remain the source of truth for existing unlocks. If a save already has upgrades, furniture, recipes, late-game flags, Wisdom perks, or a philosophy, the matching Tech Tree nodes show as complete. New levelled tech nodes use `tech.levels` save data and reset with the rest of the run during Great Composting.
+Existing save fields remain the source of truth for existing unlocks. If a save already has upgrades, furniture, recipes, late-game flags, Wisdom perks, or a philosophy, the matching Tech Tree nodes show as complete. New levelled tech nodes use `tech.levels` save data and reset with the rest of the run during Great Composting. `tech.version` marks the shape of the run-scoped tree; saves with an older or missing version reset only `tech.levels` during hydration, preserving durable resources, pigs, furniture, recipes, Wisdom, and other owned state.
 
 Current levelled tech nodes:
 
@@ -954,7 +953,6 @@ Current first-pass Contract offers:
 - Compost Starter: introduce Bean Recipes by turning Compost or rare cleanup into recipe momentum.
 - Rare Sample Order: clean a rare bean, reach a Clean Streak, and hold Gold or Squeaks.
 - Recipe Commission: clean recipe-minded beans, use an ability, and unlock a recipe through the Tech Tree or hold Compost.
-- Council Session: keep an 8-pig herd happy and pass a Cavy Council decree.
 - Great Composting Rumor: introduce the Wisdom Legacy branch by pointing a strong run toward permanent Great Composting progress.
 
 Contracts can reward Beans, Squeaks, Compost, or a short rare-bean odds boost. They are meant to nudge the player across care, ecology, automation, abilities, recipes, herd management, and rare resources without forcing a single play style.
@@ -1197,7 +1195,6 @@ Current homes:
 - Bean Exchange unlocks through the Tech Tree, then its trades appear in Bean Recipes because they shape rare-resource conversion.
 - Golden Scoop unlocks through the Tech Tree and then works as a run-limited cleanup tool.
 - Bean Singularity is no longer a standalone purchase. Its effects live in the Singularity Experiment recipe.
-- Cavy Council seats itself in Herd when the player manages a large herd, then offers repeatable decrees.
 - Squeak Choir is folded into Chorus Training Wisdom because both shape the Squeak ability economy.
 - Great Composting appears in the Wisdom Legacy branch of the Tech Tree because it turns a run into permanent Cavy Wisdom.
 
@@ -1227,25 +1224,9 @@ Unlocks trades:
 - 1 Golden Bean -> 300 Beans.
 - 20 Squeaks + 150 Beans -> 1 Golden Bean.
 
-### Herd Council: Cavy Council
+### Large Herd Support
 
-Convenes when:
-
-- The herd reaches 8 pigs.
-- Old saves that already unlocked Cavy Council keep it seated.
-
-Effects:
-
-- Adds social stability for large herds.
-- Helps large-herd happiness.
-- Unlocks repeatable Council Decrees.
-- Can appear as a Council Session Contract that asks the player to keep morale high and pass a decree.
-
-Council Decrees:
-
-- Care Mandate: spend 6 Squeaks for +30 Hay, +30 Water, and +4 Happiness.
-- Cleanup Ordinance: spend 8 Squeaks to clean a wide center area.
-- Herd Charter: spend 10 Squeaks to gain +75 Beans and +1 Golden Bean, requiring a large happy herd.
+There is no separate Cavy Council or decree system. Large herds are supported through existing core systems: cage capacity, space pressure, relationships, furniture, furniture synergies, Royal Accord, care, and Contracts.
 
 ### Chorus Training Choir
 
@@ -1297,14 +1278,14 @@ The Great Composting should feel like turning a messy, productive run into perma
 
 Wisdom Legacy is permanent progression purchased with Cavy Wisdom inside the Tech Tree.
 
-The tree has four branches:
+Wisdom Legacy appears as four branching arms from Great Composting:
 
 - Care
 - Herd
 - Automation
 - Rare Beans
 
-Each branch currently has three tiers. Later tiers require the previous tier in that branch.
+Each arm currently has three tiers. Later tiers require the previous tier in that arm.
 
 ### Care Branch
 
@@ -1416,7 +1397,7 @@ Primary beats:
 
 - Push Better Hay into its Hay Dimension capstone.
 - Unlock Bean Exchange.
-- Build a large herd to seat Cavy Council.
+- Grow larger herds through cage, furniture, and relationship support.
 - Turn Chorus Training into passive Squeak support.
 - Unlock and run the Singularity Experiment.
 

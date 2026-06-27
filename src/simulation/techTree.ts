@@ -43,13 +43,7 @@ import type {
 } from "./types";
 import { isRecord } from "./utils";
 
-export const TECH_BRANCHES: Array<{ id: TechBranchId; label: string }> = [
-  { id: "care", label: "Care & Cage" },
-  { id: "habitat", label: "Habitat" },
-  { id: "automation", label: "Automation" },
-  { id: "abilities", label: "Abilities & Rare Beans" },
-  { id: "wisdom", label: "Wisdom Legacy" },
-];
+export const TECH_TREE_VERSION = 2;
 
 const TECH_NODES: TechNodeDefinition[] = [
   node("betterHay", "care", "Better Hay", "Faster production and better hay systems.", 7),
@@ -83,13 +77,22 @@ const TECH_NODES: TechNodeDefinition[] = [
     { beans: 180 },
     { beans: 400 },
   ]),
-  node("habitatStewardKit", "habitat", "Habitat Steward Kit", "Better zone tending costs, cooldowns, and care gains.", 3, ["furnitureCareKit"], "unlock", [
-    { beans: 90 },
-    { beans: 220 },
-    { beans: 520 },
-  ]),
+  node(
+    "habitatStewardKit",
+    "habitat",
+    "Habitat Steward Kit",
+    "Better zone tending costs, cooldowns, and care gains.",
+    3,
+    ["furnitureCareKit", "careRoutines"],
+    "unlock",
+    [
+      { beans: 90 },
+      { beans: 220 },
+      { beans: 520 },
+    ],
+  ),
 
-  node("poopRoomba", "automation", "Poop Roomba", "A tiny cleanup operator for loose beans.", 1),
+  node("poopRoomba", "automation", "Poop Roomba", "A tiny cleanup operator for loose beans.", 1, ["litterTray"]),
   node("compostOverdrive", "automation", "Compost Overdrive", "Fuel Automation from the Furniture section.", 1, ["poopRoomba"], "derived"),
   node("automationDirectives", "automation", "Automation Directives", "Choose cleanup priorities from Furniture.", 1, ["poopRoomba"], "derived"),
   node("roombaSensors", "automation", "Roomba Sensors", "Faster Roomba movement and wider detection.", 3, ["poopRoomba"], "unlock", [
@@ -97,21 +100,21 @@ const TECH_NODES: TechNodeDefinition[] = [
     { beans: 320 },
     { beans: 680 },
   ]),
-  node("litterMethod", "automation", "Litter Method", "Better Litter Tray timing and reach.", 3, ["litterTray"], "unlock", [
+  node("litterMethod", "automation", "Litter Method", "Better Litter Tray timing and reach.", 3, ["litterTray", "automationDirectives"], "unlock", [
     { compost: 10 },
     { compost: 25 },
     { compost: 50, squeaks: 4 },
   ]),
-  node("rareGuardProtocol", "automation", "Rare Guard Protocol", "Unlocks Rare Guard automation behavior.", 1, ["automationDirectives"], "unlock", [
+  node("rareGuardProtocol", "automation", "Rare Guard Protocol", "Unlocks Rare Guard automation behavior.", 1, ["automationDirectives", "rareCatalog"], "unlock", [
     { beans: 220, squeaks: 4 },
   ]),
 
   node("abilityWheekCall", "abilities", "Wheek Call", "Calls pigs to snacks and starts the Squeak ability path.", 1, [], "unlock", [{}]),
   node("abilityTreatBag", "abilities", "Treat Bag", "Spend Squeaks for a production burst.", 1, ["abilityWheekCall"], "unlock", [{ squeaks: 2 }]),
-  node("abilityFreshBedding", "abilities", "Fresh Bedding", "Spend Squeaks to restore cage cleanliness.", 1, ["abilityWheekCall"], "unlock", [{ squeaks: 3 }]),
+  node("abilityFreshBedding", "abilities", "Fresh Bedding", "Spend Squeaks to restore cage cleanliness.", 1, ["abilityWheekCall", "litterTray"], "unlock", [{ squeaks: 3 }]),
   node("abilitySnackTime", "abilities", "Snack Time", "Spend Squeaks for happiness and rare odds.", 1, ["abilityTreatBag"], "unlock", [{ squeaks: 4 }]),
-  node("abilityZoomieMode", "abilities", "Zoomie Mode", "Spend Squeaks for fast movement and production.", 1, ["abilityWheekCall"], "unlock", [{ squeaks: 3 }]),
-  node("abilityDeepClean", "abilities", "Deep Clean", "Spend Squeaks to clean the whole cage.", 1, ["abilityFreshBedding"], "unlock", [{ squeaks: 5 }]),
+  node("abilityZoomieMode", "abilities", "Zoomie Mode", "Spend Squeaks for fast movement and production.", 1, ["abilityTreatBag", "zoomiePlayground"], "unlock", [{ squeaks: 3 }]),
+  node("abilityDeepClean", "abilities", "Deep Clean", "Spend Squeaks to clean the whole cage.", 1, ["abilityFreshBedding", "cleanStreakTraining"], "unlock", [{ squeaks: 5 }]),
   node("squeakTraining", "abilities", "Squeak Training", "Improves Wheek Call, ability costs, and ability timing.", 3, ["abilityWheekCall"], "unlock", [
     { squeaks: 3 },
     { squeaks: 8 },
@@ -123,11 +126,11 @@ const TECH_NODES: TechNodeDefinition[] = [
     { squeaks: 20, goldenBeans: 2 },
   ]),
   node("beanBlessing", "abilities", "Bean Blessing", "Rare bean recipe that improves rare odds and legendary discounts.", 1, ["rareCatalog"]),
-  node("compostCatalyst", "abilities", "Compost Catalyst", "Recipe that strengthens Compost and automation fuel.", 1, ["beanBlessing"]),
-  node("royalAccord", "abilities", "Royal Accord", "Recipe for royal herd support and capacity.", 1, ["beanBlessing"]),
+  node("compostCatalyst", "abilities", "Compost Catalyst", "Recipe that strengthens Compost and automation fuel.", 1, ["beanBlessing", "cleanupCircuit"]),
+  node("royalAccord", "abilities", "Royal Accord", "Recipe for royal herd support and capacity.", 1, ["beanBlessing", "royalCompostCourt"]),
   node("beanExchange", "abilities", "Bean Exchange", "Opens rare-resource trades in Recipes.", 1, ["compostCatalyst"]),
-  node("goldenScoop", "abilities", "Golden Scoop", "Pulls nearby beans toward your cleanup path.", 1, ["beanExchange"]),
-  node("singularityExperiment", "abilities", "Singularity Experiment", "Recipe that turns cursed cleanup into strange gravity.", 1, ["compostCatalyst"]),
+  node("goldenScoop", "abilities", "Golden Scoop", "Pulls nearby beans toward your cleanup path.", 1, ["beanExchange", "cleanStreakTraining"]),
+  node("singularityExperiment", "abilities", "Singularity Experiment", "Recipe that turns cursed cleanup into strange gravity.", 1, ["compostCatalyst", "rareCatalog"]),
   node("singularityStabilizers", "abilities", "Singularity Stabilizers", "Cheaper, stronger Singularity runs.", 3, ["singularityExperiment"], "unlock", [
     { compost: 40, squeaks: 6 },
     { compost: 80, squeaks: 10 },
@@ -237,7 +240,11 @@ function node(
 }
 
 export function normalizeTechState(value: unknown): TechState {
-  const saved = isRecord(value) && isRecord(value.levels) ? value.levels : {};
+  const savedRecord = isRecord(value) ? value : {};
+  const savedVersion = typeof savedRecord.version === "number" && Number.isFinite(savedRecord.version) ? Math.floor(savedRecord.version) : 0;
+  if (savedVersion < TECH_TREE_VERSION) return { version: TECH_TREE_VERSION, levels: {} };
+
+  const saved = isRecord(savedRecord.levels) ? savedRecord.levels : {};
   const levels: Partial<Record<TechNodeId, number>> = {};
   for (const definition of TECH_NODES) {
     if (!STORED_TECH_NODES.has(definition.id)) continue;
@@ -245,11 +252,7 @@ export function normalizeTechState(value: unknown): TechState {
     if (typeof rawLevel !== "number" || !Number.isFinite(rawLevel)) continue;
     levels[definition.id] = Math.max(0, Math.min(definition.maxLevel, Math.floor(rawLevel)));
   }
-  return { levels };
-}
-
-export function getTechBranches(): Array<{ id: TechBranchId; label: string }> {
-  return TECH_BRANCHES;
+  return { version: TECH_TREE_VERSION, levels };
 }
 
 export function getTechNodeDefinitions(branch?: TechBranchId): TechNodeDefinition[] {
@@ -268,7 +271,7 @@ export function getTechLevel(state: GameState, id: TechNodeId): number {
   if (id === "hayDimension") return state.lateGame.hayDimension || state.upgrades.feedLevel >= 7 ? 1 : 0;
   if (id === "poopRoomba") return state.robot ? 1 : 0;
   if (id === "compostOverdrive") return state.robot ? 1 : 0;
-  if (id === "automationDirectives") return state.robot || state.furniture.litterTray ? 1 : 0;
+  if (id === "automationDirectives") return state.robot ? 1 : 0;
   if (id === "beanExchange") return state.lateGame.beanExchange ? 1 : 0;
   if (id === "goldenScoop") return hasGoldenScoopEffect(state) ? 1 : 0;
   if (id === "greatComposting") {
@@ -299,6 +302,18 @@ export function isTechComplete(state: GameState, id: TechNodeId): boolean {
   return getTechLevel(state, id) >= getTechNodeDefinition(id).maxLevel;
 }
 
+export function isTechNodeStarted(state: GameState, id: TechNodeId): boolean {
+  return getTechLevel(state, id) >= 1;
+}
+
+export function areTechPrerequisitesStarted(state: GameState, definition: TechNodeDefinition): boolean {
+  return definition.prerequisites.every((prerequisite) => isTechNodeStarted(state, prerequisite));
+}
+
+export function getVisibleTechNodeDefinitions(state: GameState): TechNodeDefinition[] {
+  return TECH_NODES.filter((definition) => definition.prerequisites.length === 0 || areTechPrerequisitesStarted(state, definition));
+}
+
 export function isAbilityTechUnlocked(state: GameState, id: AbilityId): boolean {
   return isTechComplete(state, ABILITY_TECH_NODES[id]);
 }
@@ -308,14 +323,14 @@ export function getAbilityTechNodeId(id: AbilityId): TechNodeId {
 }
 
 export function getAvailableTechUnlockCount(state: GameState): number {
-  return TECH_NODES.reduce((total, definition) => total + Number(canUnlockTechNode(state, definition.id)), 0);
+  return getVisibleTechNodeDefinitions(state).reduce((total, definition) => total + Number(canUnlockTechNode(state, definition.id)), 0);
 }
 
 export function canUnlockTechNode(state: GameState, id: TechNodeId): boolean {
   const definition = getTechNodeDefinition(id);
   if (definition.kind === "derived") return false;
   if (definition.kind === "action") return id === "greatComposting" && getPrestigeWisdomGain(state) > 0;
-  if (isTechComplete(state, id) || !arePrerequisitesComplete(state, definition)) return false;
+  if (isTechComplete(state, id) || !areTechPrerequisitesStarted(state, definition)) return false;
 
   if (id === "betterHay") return state.beans >= getCosts(state).feed;
   if (id === "betterScoop") return state.beans >= getCosts(state).scoop;
@@ -392,7 +407,7 @@ export function getTechNodeStatusText(state: GameState, id: TechNodeId): string 
     return "Active";
   }
 
-  const missingPrerequisite = definition.prerequisites.find((prerequisite) => !isTechComplete(state, prerequisite));
+  const missingPrerequisite = definition.prerequisites.find((prerequisite) => !isTechNodeStarted(state, prerequisite));
   if (missingPrerequisite) return `Requires ${getTechNodeDefinition(missingPrerequisite).label}`;
 
   const wisdomId = WISDOM_TECH_NODES[id];
@@ -449,10 +464,6 @@ export function getTechCostText(cost: TechCost): string {
 export function getNextTechCost(state: GameState, id: TechNodeId): TechCost {
   const definition = getTechNodeDefinition(id);
   return definition.costs?.[getTechLevel(state, id)] ?? {};
-}
-
-function arePrerequisitesComplete(state: GameState, definition: TechNodeDefinition): boolean {
-  return definition.prerequisites.every((prerequisite) => isTechComplete(state, prerequisite));
 }
 
 function hasTechCost(state: GameState, cost: TechCost): boolean {

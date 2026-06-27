@@ -4,7 +4,6 @@ import {
   getCageDimensions,
   getPigCapacity,
   getTotalWisdom,
-  hasCavyCouncilEffect,
   hasFurnitureSynergy,
   hasSingularityExperimentEffect,
   hasSqueakChoirEffect,
@@ -194,7 +193,6 @@ function startRandomEvent(state: GameState): void {
 
 function updateDerivedCageStats(state: GameState): void {
   const pigCapacity = getPigCapacity(state);
-  const councilSeated = hasCavyCouncilEffect(state);
   const supportScore =
     Number(state.furniture.hideyHouse) * 2 +
     Number(state.furniture.tunnel) +
@@ -202,12 +200,11 @@ function updateDerivedCageStats(state: GameState): void {
     Number(state.furniture.cardboardCastle) * 2 +
     (state.recipes.royalAccord ? 2 : 0);
   const unsupportedPigs = Math.max(0, state.pigs.length - 2 - supportScore);
-  const unsupportedPenalty = Math.max(0, unsupportedPigs * 9 - (councilSeated ? 4 : 0));
+  const unsupportedPenalty = unsupportedPigs * 9;
   const bondedPigCount = state.pigs.filter((pig) => pig.bondedPigId !== null).length;
   const bondBonus =
     bondedPigCount * (2 + (state.wisdom.socialMemory ? 1 : 0)) +
     (state.wisdom.bondedBeginnings && bondedPigCount > 0 ? 4 : 0);
-  const councilSocialBonus = councilSeated ? 12 : 0;
   state.cage.enrichment =
     Number(state.furniture.chewToy) * 22 +
     Number(state.furniture.snuggleSack) * 24 +
@@ -231,7 +228,6 @@ function updateDerivedCageStats(state: GameState): void {
       (hasFurnitureSynergy(state, "cozyCorner") ? 8 : 0) +
       bondBonus -
       unsupportedPenalty +
-      councilSocialBonus +
       getRelationshipSocializationBonus(state),
   );
   state.cage.space = Math.max(
@@ -259,7 +255,6 @@ function updateHappiness(state: GameState): void {
   const dramaPenalty =
     state.pigs.some((pig) => pig.trait === "Drama Pig") && state.needs.water < 30 ? 12 : 0;
   const lonePigPenalty = life.recoveryState === "single" ? 14 : 0;
-  const councilHappinessBonus = hasCavyCouncilEffect(state) ? 5 : 0;
   const ecologyStressPenalty = Math.min(16, life.stressPressure * 0.18);
   const ecologyComfortBonus = life.dominantMotive !== "comfort" && state.ecology.zones.some((zone) => zone.appeal >= 80 && zone.pigIds.length > 0) ? 4 : 0;
   state.cage.happiness = Math.max(
@@ -277,7 +272,6 @@ function updateHappiness(state: GameState): void {
           dramaPenalty +
           synergyBonus -
           lonePigPenalty +
-          councilHappinessBonus -
           ecologyStressPenalty +
           ecologyComfortBonus,
       ),

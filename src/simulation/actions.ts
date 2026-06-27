@@ -1,5 +1,4 @@
 import {
-  CAVY_COUNCIL_HERD_SIZE,
   GOLDEN_SCOOP_MAGNET_MAX_STEP,
   GOLDEN_SCOOP_MAGNET_RADIUS_BONUS,
   GOLDEN_SCOOP_MAGNET_STRENGTH,
@@ -22,7 +21,6 @@ import {
   getWisdomCost,
   getWisdomPerk,
   getWisdomSpecialization,
-  hasCavyCouncilEffect,
   hasGoldenScoopEffect,
   hasSingularityExperimentEffect,
   hasWisdomSpecialization,
@@ -59,7 +57,6 @@ import type {
   AutomationDirectiveId,
   BeanExchangeTradeId,
   BeanRecipeId,
-  CouncilDecreeId,
   EventChoiceId,
   EventId,
   FurnitureId,
@@ -73,7 +70,7 @@ import type {
 } from "./types";
 import { awardBeans, clamp, formatNeed, randomBetween } from "./utils";
 
-type LateGamePurchaseId = Exclude<keyof GameState["lateGame"], "hayDimension" | "squeakChoir" | "cavyCouncil" | "beanSingularity">;
+type LateGamePurchaseId = Exclude<keyof GameState["lateGame"], "hayDimension" | "squeakChoir" | "beanSingularity">;
 
 export interface CleanResult {
   cleaned: number;
@@ -97,12 +94,6 @@ export interface BeanExchangeTradeDefinition {
   label: string;
   description: string;
   log: string;
-}
-
-export interface CouncilDecreeDefinition {
-  id: CouncilDecreeId;
-  label: string;
-  description: string;
 }
 
 export interface AutomationDirectiveDefinition {
@@ -146,24 +137,6 @@ const BEAN_EXCHANGE_TRADES: BeanExchangeTradeDefinition[] = [
     label: "Mint Gold",
     description: "Convert Squeaks and Beans into a Golden Bean.",
     log: "Bean Exchange minted 1 Golden Bean from 20 Squeaks and 150 Beans.",
-  },
-];
-
-const COUNCIL_DECREES: CouncilDecreeDefinition[] = [
-  {
-    id: "careMandate",
-    label: "Care Mandate",
-    description: "Spend 6 Squeaks to restore +30 Hay, +30 Water, and +4 Happiness.",
-  },
-  {
-    id: "cleanupOrdinance",
-    label: "Cleanup Ordinance",
-    description: "Spend 8 Squeaks to clean a wide area in the cage center.",
-  },
-  {
-    id: "herdCharter",
-    label: "Herd Charter",
-    description: "Spend 10 Squeaks to grant +75 Beans and +1 Golden Bean to a large, happy herd.",
   },
 ];
 
@@ -940,53 +913,6 @@ function getBeanExchangeTrade(tradeId: BeanExchangeTradeId): BeanExchangeTradeDe
   return BEAN_EXCHANGE_TRADES.find((trade) => trade.id === tradeId) ?? BEAN_EXCHANGE_TRADES[0];
 }
 
-export function getCouncilDecrees(): CouncilDecreeDefinition[] {
-  return COUNCIL_DECREES;
-}
-
-export function useCouncilDecree(state: GameState, decreeId: CouncilDecreeId): boolean {
-  if (getCouncilDecreeStatus(state, decreeId) !== "Pass") return false;
-
-  if (decreeId === "careMandate") {
-    state.squeaks -= 6;
-    state.needs.hay = Math.min(100, state.needs.hay + 30);
-    state.needs.water = Math.min(100, state.needs.water + 30);
-    state.cage.happiness = Math.min(100, state.cage.happiness + 4);
-    addLog(state, "Cavy Council passed a Care Mandate: hay, water, and morale improved.");
-  } else if (decreeId === "cleanupOrdinance") {
-    state.squeaks -= 8;
-    const radius = Math.max(state.cage.width, state.cage.height) * 0.45;
-    const result = cleanPoopsInRadius(state, state.cage.width / 2, state.cage.height / 2, radius, { advanceRequests: false });
-    addLog(state, `Cavy Council passed a Cleanup Ordinance: cleaned ${result.cleaned} beans for +${result.earned}.`);
-  } else {
-    state.squeaks -= 10;
-    awardBeans(state, 75);
-    state.goldenBeans += 1;
-    addLog(state, "Cavy Council ratified a Herd Charter for +75 Beans and +1 Golden Bean.");
-  }
-
-  advanceContractProgress(state, "councilDecree", 1, decreeId);
-  updateMilestones(state);
-  return true;
-}
-
-export function getCouncilDecreeStatus(state: GameState, decreeId: CouncilDecreeId): string {
-  if (!hasCavyCouncilEffect(state)) return formatNeed(state.pigs.length, CAVY_COUNCIL_HERD_SIZE, "Pig");
-  if (decreeId === "careMandate") {
-    if (state.squeaks < 6) return formatNeed(state.squeaks, 6, "Squeak");
-    return "Pass";
-  }
-  if (decreeId === "cleanupOrdinance") {
-    if (state.squeaks < 8) return formatNeed(state.squeaks, 8, "Squeak");
-    if (state.poops.length === 0) return "No beans to clean";
-    return "Pass";
-  }
-  if (state.squeaks < 10) return formatNeed(state.squeaks, 10, "Squeak");
-  if (state.pigs.length < CAVY_COUNCIL_HERD_SIZE) return formatNeed(state.pigs.length, CAVY_COUNCIL_HERD_SIZE, "Pig");
-  if (state.cage.happiness < 70) return "Need 70% Happy";
-  return "Pass";
-}
-
 export function canUnlockBeanRecipe(state: GameState, id: BeanRecipeId): boolean {
   if (state.recipes[id]) return false;
   if (id === "beanBlessing") return state.goldenBeans >= 2 && state.squeaks >= 8 && state.stats.blessedCleaned >= 1;
@@ -1257,7 +1183,6 @@ export function prestige(state: GameState): boolean {
   state.lateGame.hayDimension = false;
   state.lateGame.beanExchange = false;
   state.lateGame.goldenScoop = false;
-  state.lateGame.cavyCouncil = false;
   state.lateGame.squeakChoir = false;
   state.lateGame.beanSingularity = false;
   state.tech.levels = {};

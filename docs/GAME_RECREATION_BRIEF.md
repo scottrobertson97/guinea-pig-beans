@@ -181,7 +181,6 @@ Use Squeaks for:
 
 - Active abilities.
 - Bean Recipes.
-- Cavy Council decrees.
 - Event choices.
 - Bean Exchange trades.
 
@@ -254,7 +253,7 @@ It affects:
 These are supporting welfare scores.
 
 - Enrichment comes from toys, play, furniture, and rare-bean systems.
-- Socialization comes from herd size, bonds, relationships, and council effects.
+- Socialization comes from herd size, bonds, relationships, furniture, and synergies.
 - Space comes from cage size, capacity, and herd pressure.
 
 ## Core Entities
@@ -603,7 +602,6 @@ Current Contract templates:
 - Compost Starter
 - Rare Sample Order
 - Recipe Commission
-- Council Session
 - Great Composting Rumor
 - Caretaker Philosophy
 
@@ -680,20 +678,9 @@ Current trades:
 - Golden Bean to Beans.
 - Squeaks plus Beans to Golden Bean.
 
-### Cavy Council
+### Large Herd Support
 
-Cavy Council seats automatically in Herd when the player manages a large herd.
-
-It provides:
-
-- Social stability.
-- Large-herd happiness support.
-- Repeatable decrees.
-
-Current decrees:
-
-- Care Mandate.
-- Cleanup Ordinance.
+Do not implement Cavy Council or repeatable decrees. Large-herd support should come from ordinary herd growth, cage capacity, space, relationships, furniture, furniture synergies, Royal Accord, care, and Contracts.
 - Herd Charter.
 
 ### Great Composting And Wisdom
@@ -835,7 +822,7 @@ Responsibilities:
 - `types.ts`: shared state and ID unions.
 - `state.ts`: initial state, pig creation, bean spawning, log helpers, entity counters.
 - `balance.ts`: numeric tuning, costs, capacities, formulas, Wisdom definitions, ability costs.
-- `actions.ts`: player-triggered outcomes such as cleaning, refills, purchases, abilities, event responses, recipes, exchange, council decrees, prestige.
+- `actions.ts`: player-triggered outcomes such as cleaning, refills, purchases, abilities, event responses, recipes, exchange, and prestige.
 - `systems.ts`: timed simulation updates, pig behavior, needs, production, cleanliness, events, automation, survival, mess piles.
 - `persistence.ts`: save/load, migration, hydration, old-save compatibility.
 - `techTree.ts`: Tech Tree definitions, costs, prerequisites, unlock behavior, status text.
@@ -1066,7 +1053,6 @@ Add:
 - Bean Exchange.
 - Legendary pigs.
 - Golden Scoop.
-- Cavy Council.
 
 Done when:
 
@@ -1128,7 +1114,6 @@ The first minute should not require understanding:
 - Recipes.
 - Wisdom.
 - Automation directives.
-- Cavy Council.
 - Detailed ecology.
 - Event chains.
 

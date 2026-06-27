@@ -8,7 +8,8 @@ import {
   hasSingularityExperimentEffect,
 } from "../simulation/balance";
 import { getEcologyConcernCount } from "../simulation/ecology";
-import type { ContractTemplateId, GameState } from "../simulation/types";
+import { isAbilityTechUnlocked } from "../simulation/techTree";
+import type { AbilityId, ContractTemplateId, GameState } from "../simulation/types";
 
 export type DockSectionId =
   | "care"
@@ -40,6 +41,7 @@ const ABILITY_CONTRACTS = new Set<ContractTemplateId>(["firstWheek", "compostSta
 const RECIPE_CONTRACTS = new Set<ContractTemplateId>(["compostStarter", "rareSampleOrder", "recipeCommission"]);
 const WISDOM_CONTRACTS = new Set<ContractTemplateId>(["greatCompostingRumor", "caretakerPhilosophy"]);
 const WISDOM_REVEAL_PROGRESS_RATIO = 0.4;
+const ABILITY_IDS: AbilityId[] = ["wheekCall", "treatBag", "deepClean", "freshBedding", "snackTime", "zoomieMode"];
 
 export function getRevealedSections(state: GameState): SectionRevealState {
   return {
@@ -107,6 +109,7 @@ function isFurnitureRevealed(state: GameState): boolean {
 
 function isAbilitiesRevealed(state: GameState): boolean {
   return (
+    ABILITY_IDS.some((id) => isAbilityTechUnlocked(state, id)) ||
     state.squeaks > 0 ||
     state.stats.abilitiesUsed > 0 ||
     state.stats.cleanedPoops >= 8 ||

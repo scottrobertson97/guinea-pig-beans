@@ -1,11 +1,9 @@
 import { addLog } from "./state";
 import {
-  CAVY_COUNCIL_HERD_SIZE,
   getPrestigeCost,
   getPrestigeProgress,
   getUnlockedFurnitureCount,
   getWisdomPerks,
-  hasCavyCouncilEffect,
   hasWisdomSpecialization,
 } from "./balance";
 import { getHerdLifeSnapshot } from "./lifecycle";
@@ -212,20 +210,6 @@ const CONTRACT_TEMPLATES: ContractTemplate[] = [
     ],
   },
   {
-    id: "herdCouncilSession",
-    title: "Council Session",
-    description: "Use a large herd's council to keep morale steady and turn Squeaks into one formal decree.",
-    duration: 240,
-    rewardText: "+135 Beans, +2 Squeaks",
-    reward: { beans: 135, squeaks: 2 },
-    eligible: hasCavyCouncilEffect,
-    requirements: () => [
-      createRequirement("largeHerd", "largeHerdHold", `Keep ${CAVY_COUNCIL_HERD_SIZE} pigs in the herd`, 12),
-      createRequirement("happinessHold", "happinessHold", "Keep happiness at 70%+", 12),
-      createRequirement("decree", "councilDecree", "Pass 1 Council Decree", 1),
-    ],
-  },
-  {
     id: "greatCompostingRumor",
     title: "Great Composting Rumor",
     description: "Introduce Wisdom by pointing a strong run toward the permanent Great Composting layer.",
@@ -364,8 +348,6 @@ export function updateContracts(state: GameState, deltaSeconds: number): void {
   active.timer = Math.max(0, active.timer - deltaSeconds);
   updatePassiveRequirement(state, active, "cleanlinessHold", state.cage.cleanliness >= 75, deltaSeconds);
   updatePassiveRequirement(state, active, "stressHold", state.ecology.averageStress < 35, deltaSeconds);
-  updatePassiveRequirement(state, active, "largeHerdHold", state.pigs.length >= CAVY_COUNCIL_HERD_SIZE, deltaSeconds);
-  updatePassiveRequirement(state, active, "happinessHold", state.cage.happiness >= 70, deltaSeconds);
   updatePassiveRequirement(state, active, "rareResourceHold", state.goldenBeans >= 1 || state.squeaks >= 8, 1);
   updatePassiveRequirement(
     state,
@@ -488,9 +470,6 @@ function getLifecycleContractScore(state: GameState, id: ContractTemplateId): nu
   }
   if (id === "recipeCommission") {
     return 0.45 + (state.compost >= 10 || state.squeaks >= 4 ? 1 : 0) + life.averageNeedPressure / 160;
-  }
-  if (id === "herdCouncilSession") {
-    return 0.5 + life.socialPressure / 38 + (life.recoveryState === "steady" ? 0.35 : 0);
   }
   if (id === "greatCompostingRumor") {
     return 0.4 + Math.max(0, 70 - life.averageNeedPressure) / 100;
@@ -616,9 +595,7 @@ function toRequirementView(requirement: ContractRequirementState): ContractRequi
 function formatRequirementProgress(requirement: ContractRequirementState): string {
   if (
     requirement.kind === "cleanlinessHold" ||
-    requirement.kind === "stressHold" ||
-    requirement.kind === "largeHerdHold" ||
-    requirement.kind === "happinessHold"
+    requirement.kind === "stressHold"
   ) {
     return `${Math.floor(requirement.progress)}/${requirement.target}s`;
   }

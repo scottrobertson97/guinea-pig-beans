@@ -11,7 +11,7 @@
 - Funny cage log: milestone, cleanup, pig, resource, and automation messages surface game personality.
 - Expanded breeds and traits: Skinny Pig, Silkie, Crested, Royal Pig, Shy Beaner, Hay Goblin, Drama Pig, and Compost Mystic are now in the pig generator.
 - Cage zones: fixed Hay Area, Tunnel Zone, Litter Tray corner, Hidey Zone, and Play/Compost areas now influence targeting, movement, cleanliness, and aging.
-- Tech Tree: One always-visible dock button opens a branch-based progression map for run unlocks, levelled upgrades, recipes, automation access, abilities, and permanent Wisdom Legacy nodes.
+- Tech Tree: One always-visible dock button opens a connected icon-and-tooltip constellation map for run unlocks, levelled upgrades, recipes, automation access, abilities, cross-system prerequisites, and permanent Wisdom Legacy nodes.
 - Cage furniture: Hidey House, Tunnel, Litter Tray, Chew Toy, Snuggle Sack, Cardboard Castle, and Royal Throne are one-time static Tech Tree unlocks with distinct buffs.
 - Furniture synergies: matching static furniture pairs now unlock combo bonuses for comfort, Zoomies, cleanup automation, and royal/compost strategy.
 - Additional needs/resources: Enrichment, Socialization, Space, Compost, Squeaks, Golden Beans, and Cavy Wisdom are tracked.
@@ -21,12 +21,12 @@
 - Pig social mechanics: bonded pairs, buddies, nap partners, shy followers, and gentle rivalries affect socialization, stress, zone preferences, requests, and Herd roster copy.
 - Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides, then leave consume/rest actions after a short satisfied-action timer.
 - Lifecycle-driven orchestration: a derived pig/herd lifecycle read model now drives pig activity weights, event weights, pig-request selection, Contract offer priority, automation cleanup targeting, rare bean comfort/stress modifiers, Herd roster copy, and urgent status-line feedback without adding save fields.
-- Dev constants editor: local Vite dev servers expose `/constants` for source-backed tuning of selected scalar literals in `src/simulation/balance.ts`; saves rewrite the source file and production builds do not serve the route.
+- Dev editors: local Vite dev servers expose `/constants` for source-backed balance tuning and `/tech-tree-layout` for dragging Tech Tree nodes; saves rewrite source files and production builds do not serve these routes.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode unlock from the Tech Tree, then remain operational cooldown actions in Abilities.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
 - Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds the Tech Tree's permanent Wisdom Legacy branch.
 - Wisdom specializations: after tier-3 Wisdom, the player chooses one permanent Caretaker Philosophy: Gentle Care, Automation Steward, or Rare Bean Alchemy.
-- Late-game systems: Hay Dimension is now a Better Hay capstone, Squeak Choir is folded into Chorus Training Wisdom, Cavy Council seats automatically from herd size, Golden Scoop turns cleanup into a run-limited magnet tool, and Bean Singularity now lives as the repeatable Singularity Experiment recipe; Bean Exchange remains the rare-resource trade track.
+- Late-game systems: Hay Dimension is now a Better Hay capstone, Squeak Choir is folded into Chorus Training Wisdom, Golden Scoop turns cleanup into a run-limited magnet tool, and Bean Singularity now lives as the repeatable Singularity Experiment recipe; Bean Exchange remains the rare-resource trade track. Cavy Council and repeatable decrees were removed so large-herd support stays inside ordinary herd, furniture, relationship, and Contract systems.
 - Interop pass: Static furniture buffs affect care, movement, herd support, automation, and rare bean odds; stronger abilities spend Squeaks, Compost can fuel automation overdrive, rare bean recipes unlock cross-system bonuses, events are weighted by cage state, and Cavy Wisdom feeds branching permanent Tech Tree perks.
 - Cage ecology: Fixed zones now track mess, comfort, traffic, appeal, pig occupants, and next actions; pigs have favorite zones and stress, and habitat pressure affects happiness, movement, production, bean odds, events, and requests.
 - Automation directives: Roomba and Litter Tray can be switched between Balanced Sweep, Protect Cleanliness, Litter Focus, and Rare Guard modes from the Furniture modal, where Fuel Automation also lives.
@@ -228,16 +228,19 @@ Acceptance criteria:
 
 ### SYS-009: Tech Tree Progression Map
 
-Status: First pass implemented.
+Status: Constellation rework implemented.
 
 Description: Centralize one-time run unlocks and permanent Wisdom into a single progression tree while keeping repeatable operations in their existing gameplay sections.
 
 Acceptance criteria:
 
 - Tech Tree is visible from a fresh run as the progression map.
+- Tech Tree renders as one scrollable node-and-connector map with compact branch-colored icon nodes, hover/focus tooltips, SVG prerequisite connectors, derived synergy nodes, and cross-branch links.
 - Shop, Furniture, Recipes, and Wisdom no longer expose duplicate permanent unlock purchase buttons.
 - Existing owned upgrades, furniture, recipes, late-game flags, Wisdom perks, and philosophies derive completed Tech Tree nodes from current save state.
-- Multi-level tech nodes must be fully completed before child nodes unlock.
+- Older saves with missing or stale `tech.version` reset only run-scoped `tech.levels`; durable game state continues to derive completed nodes.
+- Fresh runs show only root Tech Tree nodes; child nodes and connectors reveal only after every direct prerequisite is bought or activated once.
+- Multi-level tech nodes reveal downstream paths after level 1, but remain visually started until fully completed.
 - New tech levels visibly affect care drain, cleaning combos, furniture care, habitat tending, automation, rare odds, abilities, and Singularity runs.
 - Unlocks produce HUD state, cage log text, modal state changes, and scene feedback.
 
