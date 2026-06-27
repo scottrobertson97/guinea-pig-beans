@@ -302,6 +302,18 @@ export function isTechComplete(state: GameState, id: TechNodeId): boolean {
   return getTechLevel(state, id) >= getTechNodeDefinition(id).maxLevel;
 }
 
+export function isTechNodeStarted(state: GameState, id: TechNodeId): boolean {
+  return getTechLevel(state, id) >= 1;
+}
+
+export function areTechPrerequisitesStarted(state: GameState, definition: TechNodeDefinition): boolean {
+  return definition.prerequisites.every((prerequisite) => isTechNodeStarted(state, prerequisite));
+}
+
+export function getVisibleTechNodeDefinitions(state: GameState): TechNodeDefinition[] {
+  return TECH_NODES.filter((definition) => definition.prerequisites.length === 0 || areTechPrerequisitesStarted(state, definition));
+}
+
 export function isAbilityTechUnlocked(state: GameState, id: AbilityId): boolean {
   return isTechComplete(state, ABILITY_TECH_NODES[id]);
 }
@@ -311,14 +323,14 @@ export function getAbilityTechNodeId(id: AbilityId): TechNodeId {
 }
 
 export function getAvailableTechUnlockCount(state: GameState): number {
-  return TECH_NODES.reduce((total, definition) => total + Number(canUnlockTechNode(state, definition.id)), 0);
+  return getVisibleTechNodeDefinitions(state).reduce((total, definition) => total + Number(canUnlockTechNode(state, definition.id)), 0);
 }
 
 export function canUnlockTechNode(state: GameState, id: TechNodeId): boolean {
   const definition = getTechNodeDefinition(id);
   if (definition.kind === "derived") return false;
   if (definition.kind === "action") return id === "greatComposting" && getPrestigeWisdomGain(state) > 0;
-  if (isTechComplete(state, id) || !arePrerequisitesComplete(state, definition)) return false;
+  if (isTechComplete(state, id) || !areTechPrerequisitesStarted(state, definition)) return false;
 
   if (id === "betterHay") return state.beans >= getCosts(state).feed;
   if (id === "betterScoop") return state.beans >= getCosts(state).scoop;
@@ -395,7 +407,7 @@ export function getTechNodeStatusText(state: GameState, id: TechNodeId): string 
     return "Active";
   }
 
-  const missingPrerequisite = definition.prerequisites.find((prerequisite) => !isTechComplete(state, prerequisite));
+  const missingPrerequisite = definition.prerequisites.find((prerequisite) => !isTechNodeStarted(state, prerequisite));
   if (missingPrerequisite) return `Requires ${getTechNodeDefinition(missingPrerequisite).label}`;
 
   const wisdomId = WISDOM_TECH_NODES[id];
@@ -452,10 +464,6 @@ export function getTechCostText(cost: TechCost): string {
 export function getNextTechCost(state: GameState, id: TechNodeId): TechCost {
   const definition = getTechNodeDefinition(id);
   return definition.costs?.[getTechLevel(state, id)] ?? {};
-}
-
-function arePrerequisitesComplete(state: GameState, definition: TechNodeDefinition): boolean {
-  return definition.prerequisites.every((prerequisite) => isTechComplete(state, prerequisite));
 }
 
 function hasTechCost(state: GameState, cost: TechCost): boolean {

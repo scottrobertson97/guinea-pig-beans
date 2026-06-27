@@ -239,7 +239,8 @@ Acceptance criteria:
 - Shop, Furniture, Recipes, and Wisdom no longer expose duplicate permanent unlock purchase buttons.
 - Existing owned upgrades, furniture, recipes, late-game flags, Wisdom perks, and philosophies derive completed Tech Tree nodes from current save state.
 - Older saves with missing or stale `tech.version` reset only run-scoped `tech.levels`; durable game state continues to derive completed nodes.
-- Multi-level tech nodes must be fully completed before child nodes unlock.
+- Fresh runs show only root Tech Tree nodes; child nodes and connectors reveal only after every direct prerequisite is bought or activated once.
+- Multi-level tech nodes reveal downstream paths after level 1, but remain visually started until fully completed.
 - New tech levels visibly affect care drain, cleaning combos, furniture care, habitat tending, automation, rare odds, abilities, and Singularity runs.
 - Unlocks produce HUD state, cage log text, modal state changes, and scene feedback.
 

@@ -85,8 +85,10 @@ import {
   getTechNodeDefinition,
   getTechNodeDefinitions,
   getTechNodeStatusText,
+  getVisibleTechNodeDefinitions,
   isAbilityTechUnlocked,
   isTechComplete,
+  isTechNodeStarted,
   unlockTechNode,
 } from "../simulation/techTree";
 import {
@@ -300,6 +302,17 @@ const AUTOMATION_DIRECTIVE_BUTTONS: Record<AutomationDirectiveId, ButtonId> = {
   litterFocus: "automation-litter-focus",
   rareGuard: "automation-rare-guard",
 };
+
+const TECH_VISIBLE_MAP_PADDING = 112;
+const TECH_VISIBLE_MAP_MIN_WIDTH = 720;
+const TECH_VISIBLE_MAP_MIN_HEIGHT = 520;
+
+interface TechMapViewport {
+  originX: number;
+  originY: number;
+  width: number;
+  height: number;
+}
 
 export class Hud {
   private buttons: Record<ButtonId, HTMLButtonElement>;
@@ -1606,15 +1619,19 @@ export class Hud {
   }
 
   private renderTechTree(): void {
-    const definitions = getTechNodeDefinitions();
-    const signature = definitions
+    const allDefinitions = getTechNodeDefinitions();
+    const definitions = getVisibleTechNodeDefinitions(this.state);
+    const visibleIds = new Set<TechNodeId>(definitions.map((definition) => definition.id));
+    const signature = allDefinitions
       .map((definition) =>
         [
           definition.id,
           definition.branch,
           definition.kind,
           definition.prerequisites.join(","),
+          visibleIds.has(definition.id) ? "visible" : "hidden",
           getTechLevel(this.state, definition.id),
+          isTechNodeStarted(this.state, definition.id) ? "started" : "unstarted",
           canUnlockTechNode(this.state, definition.id) ? "available" : "locked",
           getTechNodeStatusText(this.state, definition.id),
         ].join(":"),
@@ -1623,43 +1640,87 @@ export class Hud {
     if (signature === this.previousTechTreeSignature && this.techTree.childElementCount > 0) return;
     this.previousTechTreeSignature = signature;
 
+    const viewport = this.getVisibleTechMapViewport(definitions);
     const map = document.createElement("div");
-    const regions = this.createTechMapRegions();
-    const links = this.createTechMapLinks(definitions);
+    const regions = this.createTechMapRegions(viewport);
+    const links = this.createTechMapLinks(definitions, viewport);
     const nodes = document.createElement("div");
 
     map.className = "tech-map";
-    map.style.setProperty("--tech-map-width", `${TECH_MAP_WIDTH}px`);
-    map.style.setProperty("--tech-map-height", `${TECH_MAP_HEIGHT}px`);
+    map.style.setProperty("--tech-map-width", `${viewport.width}px`);
+    map.style.setProperty("--tech-map-height", `${viewport.height}px`);
     map.style.setProperty("--tech-node-width", `${TECH_NODE_WIDTH}px`);
     map.style.setProperty("--tech-node-height", `${TECH_NODE_HEIGHT}px`);
-    map.style.width = `${TECH_MAP_WIDTH}px`;
-    map.style.height = `${TECH_MAP_HEIGHT}px`;
+    map.style.width = `${viewport.width}px`;
+    map.style.height = `${viewport.height}px`;
     nodes.className = "tech-map-nodes";
 
     for (const definition of definitions) {
-      nodes.append(this.createTechNode(definition));
+      nodes.append(this.createTechNode(definition, viewport));
     }
 
     map.append(regions, links, nodes);
     this.techTree.replaceChildren(map);
   }
 
-  private createTechMapRegions(): HTMLElement {
+  private getVisibleTechMapViewport(definitions: TechNodeDefinition[]): TechMapViewport {
+    if (definitions.length === 0) {
+      return {
+        originX: 0,
+        originY: 0,
+        width: Math.min(TECH_MAP_WIDTH, TECH_VISIBLE_MAP_MIN_WIDTH),
+        height: Math.min(TECH_MAP_HEIGHT, TECH_VISIBLE_MAP_MIN_HEIGHT),
+      };
+    }
+
+    const halfNodeWidth = TECH_NODE_WIDTH / 2;
+    const halfNodeHeight = TECH_NODE_HEIGHT / 2;
+    const layouts = definitions.map((definition) => TECH_NODE_LAYOUT[definition.id]);
+    const minX = Math.min(...layouts.map((layout) => layout.x - halfNodeWidth));
+    const minY = Math.min(...layouts.map((layout) => layout.y - halfNodeHeight));
+    const maxX = Math.max(...layouts.map((layout) => layout.x + halfNodeWidth));
+    const maxY = Math.max(...layouts.map((layout) => layout.y + halfNodeHeight));
+    const originX = Math.max(0, Math.floor(minX - TECH_VISIBLE_MAP_PADDING));
+    const originY = Math.max(0, Math.floor(minY - TECH_VISIBLE_MAP_PADDING));
+    const targetRight = Math.min(TECH_MAP_WIDTH, Math.ceil(maxX + TECH_VISIBLE_MAP_PADDING));
+    const targetBottom = Math.min(TECH_MAP_HEIGHT, Math.ceil(maxY + TECH_VISIBLE_MAP_PADDING));
+    const maxWidth = TECH_MAP_WIDTH - originX;
+    const maxHeight = TECH_MAP_HEIGHT - originY;
+    const width = Math.min(maxWidth, Math.max(TECH_VISIBLE_MAP_MIN_WIDTH, targetRight - originX));
+    const height = Math.min(maxHeight, Math.max(TECH_VISIBLE_MAP_MIN_HEIGHT, targetBottom - originY));
+
+    return { originX, originY, width, height };
+  }
+
+  private getShiftedTechNodeLayout(id: TechNodeId, viewport: TechMapViewport): { x: number; y: number } {
+    const layout = TECH_NODE_LAYOUT[id];
+    return {
+      x: layout.x - viewport.originX,
+      y: layout.y - viewport.originY,
+    };
+  }
+
+  private createTechMapRegions(viewport: TechMapViewport): HTMLElement {
     const regions = document.createElement("div");
     regions.className = "tech-map-regions";
 
     for (const region of TECH_BRANCH_REGIONS) {
       const visual = TECH_BRANCH_VISUALS[region.id];
+      const left = Math.max(region.x, viewport.originX);
+      const top = Math.max(region.y, viewport.originY);
+      const right = Math.min(region.x + region.width, viewport.originX + viewport.width);
+      const bottom = Math.min(region.y + region.height, viewport.originY + viewport.height);
+      if (right <= left || bottom <= top) continue;
+
       const element = document.createElement("section");
       const label = document.createElement("span");
 
       element.className = `tech-constellation-region branch-${region.id}`;
       element.dataset.techBranch = region.id;
-      element.style.left = `${region.x}px`;
-      element.style.top = `${region.y}px`;
-      element.style.width = `${region.width}px`;
-      element.style.height = `${region.height}px`;
+      element.style.left = `${left - viewport.originX}px`;
+      element.style.top = `${top - viewport.originY}px`;
+      element.style.width = `${right - left}px`;
+      element.style.height = `${bottom - top}px`;
       element.style.setProperty("--branch-color", visual.color);
       element.style.setProperty("--branch-border", visual.border);
       element.style.setProperty("--branch-soft", visual.soft);
@@ -1673,31 +1734,31 @@ export class Hud {
     return regions;
   }
 
-  private createTechMapLinks(definitions: TechNodeDefinition[]): SVGSVGElement {
+  private createTechMapLinks(definitions: TechNodeDefinition[], viewport: TechMapViewport): SVGSVGElement {
     const namespace = "http://www.w3.org/2000/svg";
     const links = document.createElementNS(namespace, "svg");
     const definitionById = new Map(definitions.map((definition) => [definition.id, definition]));
 
     links.classList.add("tech-map-links");
-    links.setAttribute("viewBox", `0 0 ${TECH_MAP_WIDTH} ${TECH_MAP_HEIGHT}`);
+    links.setAttribute("viewBox", `0 0 ${viewport.width} ${viewport.height}`);
     links.setAttribute("aria-hidden", "true");
     links.setAttribute("focusable", "false");
 
     for (const definition of definitions) {
-      const toLayout = TECH_NODE_LAYOUT[definition.id];
+      const toLayout = this.getShiftedTechNodeLayout(definition.id, viewport);
       if (!toLayout) continue;
 
       for (const prerequisite of definition.prerequisites) {
         const prerequisiteDefinition = definitionById.get(prerequisite);
-        const fromLayout = TECH_NODE_LAYOUT[prerequisite];
+        const fromLayout = this.getShiftedTechNodeLayout(prerequisite, viewport);
         if (!prerequisiteDefinition || !fromLayout) continue;
 
         const path = document.createElementNS(namespace, "path");
-        const prerequisiteComplete = isTechComplete(this.state, prerequisite);
         const childComplete = isTechComplete(this.state, definition.id);
+        const childStarted = isTechNodeStarted(this.state, definition.id);
         const childAvailable = canUnlockTechNode(this.state, definition.id);
         const crossBranch = prerequisiteDefinition.branch !== definition.branch;
-        const stateClass = childComplete && prerequisiteComplete ? "complete" : prerequisiteComplete && childAvailable ? "available" : "locked";
+        const stateClass = childComplete ? "complete" : childStarted ? "started" : childAvailable ? "available" : "locked";
 
         path.classList.add("tech-link", stateClass);
         path.classList.toggle("derived", definition.kind === "derived");
@@ -1713,12 +1774,13 @@ export class Hud {
     return links;
   }
 
-  private createTechNode(definition: TechNodeDefinition): HTMLElement {
+  private createTechNode(definition: TechNodeDefinition, viewport: TechMapViewport): HTMLElement {
     const currentLevel = getTechLevel(this.state, definition.id);
+    const started = isTechNodeStarted(this.state, definition.id);
     const complete = isTechComplete(this.state, definition.id);
     const available = canUnlockTechNode(this.state, definition.id);
     const statusText = getTechNodeStatusText(this.state, definition.id);
-    const layout = TECH_NODE_LAYOUT[definition.id];
+    const layout = this.getShiftedTechNodeLayout(definition.id, viewport);
     const visual = TECH_BRANCH_VISUALS[definition.branch];
     const icon = TECH_NODE_ICONS[definition.id];
     const tooltipId = `tech-tooltip-${definition.id}`;
@@ -1745,10 +1807,11 @@ export class Hud {
     row.style.setProperty("--branch-soft", visual.soft);
     row.classList.toggle("tooltip-below", layout.y < 250);
     row.classList.toggle("tooltip-align-left", layout.x < 240);
-    row.classList.toggle("tooltip-align-right", layout.x > TECH_MAP_WIDTH - 240);
+    row.classList.toggle("tooltip-align-right", layout.x > viewport.width - 240);
+    row.classList.toggle("started", started && !complete);
     row.classList.toggle("complete", complete);
     row.classList.toggle("available", available);
-    row.classList.toggle("locked", !complete && !available);
+    row.classList.toggle("locked", !started && !complete && !available);
     row.classList.toggle("derived", definition.kind === "derived");
     row.classList.toggle("action-node", definition.kind === "action");
 

@@ -1147,12 +1147,16 @@ button.action-success {
   position: absolute;
   top: 8px;
   left: 10px;
+  max-width: calc(100% - 20px);
   color: var(--branch-color);
   font-size: 0.72rem;
   font-weight: 900;
   letter-spacing: 0.04em;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 
 .tech-map-links {
@@ -1171,6 +1175,12 @@ button.action-success {
 .tech-link.locked {
   stroke: rgba(93, 101, 88, 0.3);
   stroke-dasharray: 8 10;
+}
+
+.tech-link.started {
+  stroke: #7f8f48;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 3px rgba(127, 143, 72, 0.24));
 }
 
 .tech-link.available {
@@ -1198,6 +1208,10 @@ button.action-success {
 
 .tech-link.cross-branch.locked {
   stroke: rgba(126, 83, 119, 0.32);
+}
+
+.tech-link.cross-branch.started {
+  stroke: #8b6bb7;
 }
 
 .tech-link.cross-branch.available {
@@ -1247,6 +1261,17 @@ button.action-success {
 
 .shop .tech-node-button[aria-disabled="true"] {
   cursor: default;
+}
+
+.tech-node-row.started .tech-node-button {
+  border-color: var(--branch-color);
+  background:
+    radial-gradient(circle at 42% 36%, rgba(255, 255, 255, 0.96) 0 36%, rgba(255, 255, 255, 0.55) 37% 54%, transparent 55%),
+    linear-gradient(180deg, #fffdf6 0%, #edf4ea 100%);
+  box-shadow:
+    0 7px 14px rgba(31, 48, 35, 0.14),
+    0 0 0 3px var(--branch-soft),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.68);
 }
 
 .tech-node-row.available .tech-node-button[aria-disabled="false"] {
@@ -1348,6 +1373,10 @@ button.action-success {
 
 .tech-node-row.available .tech-node-state-dot {
   background: #5f9d41;
+}
+
+.tech-node-row.started .tech-node-state-dot {
+  background: var(--branch-color);
 }
 
 .tech-node-row.complete .tech-node-state-dot {
@@ -1463,6 +1492,10 @@ button.action-success {
 
 .tech-node-row.available .tech-tooltip-status {
   color: #355c2c;
+}
+
+.tech-node-row.started .tech-tooltip-status {
+  color: var(--branch-color);
 }
 
 .tech-node-row.complete .tech-tooltip-status {

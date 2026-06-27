@@ -677,7 +677,7 @@ The original sections still own repeatable operations:
 - Recipes handles Bean Exchange trades and running Singularity.
 - Herd handles pig identity, Pig Welcome, and relationship visibility.
 
-Nodes can be locked, available, or complete. A child node only becomes available after every prerequisite node is complete. For multi-level nodes, every level must be bought before child nodes unlock. Prerequisite lines can cross regions, so the map reads as one connected progression graph instead of five independent columns.
+Nodes can be locked, available, started, or complete. Fresh runs show only root nodes; future nodes and their connector lines stay hidden until every direct prerequisite has been bought or activated at least once. Multi-level nodes reveal and unlock downstream paths after level 1, while complete styling still requires the node's max level. Prerequisite lines can cross regions, so the map reads as one connected progression graph instead of five independent columns.
 
 The Tech Tree has five constellation regions:
 
@@ -687,7 +687,7 @@ The Tech Tree has five constellation regions:
 - Abilities & Rare Beans: active ability licenses, Squeak Training, Rare Catalog, bean recipes, Bean Exchange, Golden Scoop, Singularity Experiment, and Singularity Stabilizers.
 - Wisdom Legacy: Great Composting, all permanent Wisdom perks, and the three Caretaker Philosophies.
 
-The current graph intentionally cross-links systems. Poop Roomba starts from Litter Tray, Litter Method depends on both Litter Tray and Automation Directives, Habitat Steward Kit depends on Furniture Care Kit and completed Care Routines, Fresh Bedding depends on Wheek Call and Litter Tray, Zoomie Mode depends on Treat Bag and the Zoomie Playground synergy, and late rare-bean unlocks require matching recipe, furniture, automation, and max-level training nodes. Wisdom remains gated by Great Composting, then fans into four permanent arms.
+The current graph intentionally cross-links systems. Poop Roomba starts from Litter Tray, Litter Method depends on both Litter Tray and Automation Directives, Habitat Steward Kit depends on Furniture Care Kit and started Care Routines, Fresh Bedding depends on Wheek Call and Litter Tray, Zoomie Mode depends on Treat Bag and the Zoomie Playground synergy, and late rare-bean unlocks require matching recipe, furniture, automation, and started training nodes. Wisdom remains gated by Great Composting, then fans into four permanent arms.
 
 The tree does not add a new currency. Nodes spend the same resources their systems already use: Beans, Compost, Squeaks, Golden Beans, or Cavy Wisdom.
 
