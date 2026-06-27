@@ -1209,7 +1209,10 @@ button.action-success {
 .shop .tech-node-button {
   position: relative;
   display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
   place-items: center;
+  gap: 0;
   width: 100%;
   height: var(--tech-node-height, 112px);
   min-width: var(--tech-node-width, 158px);
