@@ -202,11 +202,11 @@ export function createInitialState(): GameState {
       hayDimension: false,
       beanExchange: false,
       goldenScoop: false,
-      cavyCouncil: false,
       squeakChoir: false,
       beanSingularity: false,
     },
     tech: {
+      version: 2,
       levels: {},
     },
     combo: {

@@ -66,14 +66,14 @@ Priority: P1
 
 Status: First pass complete
 
-Description: One-off "buy once, passive forever" unlocks add surface area without adding decisions. Collapse Hay Dimension, Squeak Choir, Cavy Council, and Bean Singularity into stronger existing paths unless each gains an active choice or contract hook.
+Description: One-off "buy once, passive forever" unlocks add surface area without adding decisions. Collapse Hay Dimension, Squeak Choir, and Bean Singularity into stronger existing paths, and cut Cavy Council outright because repeatable decrees did not add enough depth.
 
 Acceptance criteria:
 
 - Each passive late-game unlock is either merged into an existing progression path or given a repeatable decision.
 - Hay Dimension becomes an advanced Better Hay/care upgrade or habitat upgrade.
 - Squeak Choir becomes an Ability or Wisdom specialization.
-- Cavy Council becomes a herd-size contract chain or Herd specialization.
+- Cavy Council is removed instead of preserved as a named Herd system.
 - Bean Singularity becomes a rare bean recipe experiment with clear risk/reward.
 - No standalone late-game button remains if it only grants a passive modifier.
 
@@ -83,8 +83,9 @@ Implementation notes:
 - Preserve player-facing effects by moving them into fewer, clearer homes.
 - First slice removed the standalone Hay Dimension button and made it open automatically as the Better Hay level 7 capstone.
 - Second slice removed the standalone Squeak Choir button and folded passive Squeak generation plus the ability-cost discount into Chorus Training Wisdom; old saves keep their choir benefit through the legacy flag.
-- Third slice removed the standalone Cavy Council unlock button, seats the council automatically for 8-pig herds or legacy saves, and adds a Council Session Contract that advances when a decree is passed.
+- Third slice removed the standalone Cavy Council unlock button, seated the council automatically for 8-pig herds or legacy saves, and added a Council Session Contract that advanced when a decree was passed.
 - Fourth slice removed the standalone Bean Singularity button and moved its strange-bean gravity into a Singularity Experiment recipe with a repeatable Compost/Squeak action; legacy saves hydrate the recipe from the old flag.
+- Aggressive prune removed Cavy Council, Council Session, decrees, council UI, council save state, and council passive bonuses; large-herd support remains in ordinary herd, furniture, relationship, and Contract systems.
 - First pass complete: no standalone passive late-game button remains.
 
 ### TTF-004: Promote Automation Out Of Shop

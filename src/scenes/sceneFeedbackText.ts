@@ -55,13 +55,6 @@ export function getAbilityReaction(abilityId?: AbilityId): { label: string; thou
   return { label: "Ability", thought: "!", color: 0xf0d56b, pigCount: 3, burstCount: 5 };
 }
 
-export function getCouncilReactionText(decreeId?: SceneFeedbackDetail["decreeId"]): string {
-  if (decreeId === "careMandate") return "Order!";
-  if (decreeId === "cleanupOrdinance") return "Clean!";
-  if (decreeId === "herdCharter") return "Charter!";
-  return "Council!";
-}
-
 export function getEventReactionText(choiceId?: SceneFeedbackDetail["eventChoiceId"]): string {
   if (!choiceId) return "Event!";
   if (choiceId.includes("litter")) return "Clean!";

@@ -63,7 +63,6 @@ export type FurnitureId =
 export type AbilityId = "wheekCall" | "treatBag" | "deepClean" | "freshBedding" | "snackTime" | "zoomieMode";
 export type BeanRecipeId = "beanBlessing" | "compostCatalyst" | "royalAccord" | "singularityExperiment";
 export type BeanExchangeTradeId = "beansToCompost" | "compostToSqueaks" | "goldToBeans" | "squeaksToGold";
-export type CouncilDecreeId = "careMandate" | "cleanupOrdinance" | "herdCharter";
 export type TechBranchId = "care" | "habitat" | "automation" | "abilities" | "wisdom";
 export type TechNodeId =
   | "betterHay"
@@ -221,7 +220,6 @@ export type ContractTemplateId =
   | "compostStarter"
   | "rareSampleOrder"
   | "recipeCommission"
-  | "herdCouncilSession"
   | "greatCompostingRumor"
   | "caretakerPhilosophy";
 export type ContractProgressKind =
@@ -240,9 +238,6 @@ export type ContractProgressKind =
   | "recipeBeanClean"
   | "ability"
   | "recipeUnlockOrCompostHold"
-  | "largeHerdHold"
-  | "happinessHold"
-  | "councilDecree"
   | "pigRequest";
 
 export interface CageZoneMetrics {
@@ -448,6 +443,7 @@ export interface EventChainsState {
 }
 
 export interface TechState {
+  version: number;
   levels: Partial<Record<TechNodeId, number>>;
 }
 
@@ -538,7 +534,6 @@ export interface GameState {
     hayDimension: boolean;
     beanExchange: boolean;
     goldenScoop: boolean;
-    cavyCouncil: boolean;
     squeakChoir: boolean;
     beanSingularity: boolean;
   };

@@ -6,7 +6,6 @@ export const BASE_POOP_INTERVAL = 5;
 export const MAX_LOG_ITEMS = 8;
 export const ROBOT_COST = 75;
 export const HAY_DIMENSION_FEED_LEVEL = 7;
-export const CAVY_COUNCIL_HERD_SIZE = 8;
 export const GOLDEN_SCOOP_BEAN_COST = 900;
 export const GOLDEN_SCOOP_GOLDEN_BEAN_COST = 3;
 export const GOLDEN_SCOOP_MAGNET_RADIUS_BONUS = 90;
@@ -350,10 +349,6 @@ export function getUnlockedFurnitureCount(state: GameState): number {
 
 export function hasSqueakChoirEffect(state: GameState): boolean {
   return state.wisdom.chorusTraining || state.lateGame.squeakChoir;
-}
-
-export function hasCavyCouncilEffect(state: GameState): boolean {
-  return state.lateGame.cavyCouncil || state.pigs.length >= CAVY_COUNCIL_HERD_SIZE;
 }
 
 export function hasSingularityExperimentEffect(state: GameState): boolean {

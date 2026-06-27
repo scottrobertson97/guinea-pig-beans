@@ -31,7 +31,6 @@ export type SceneFeedbackCategory =
   | "unlock"
   | "trade"
   | "experiment"
-  | "decree"
   | "event"
   | "prestige"
   | "adoption"
@@ -60,7 +59,6 @@ export interface SceneFeedbackDetail {
   abilityId?: import("../simulation/types").AbilityId;
   furnitureId?: import("../simulation/types").FurnitureId;
   tradeId?: import("../simulation/types").BeanExchangeTradeId;
-  decreeId?: import("../simulation/types").CouncilDecreeId;
   eventChoiceId?: import("../simulation/types").EventChoiceId;
   zoneId?: import("../simulation/types").CageZoneId;
   milestoneKind?: "quest" | "achievement";

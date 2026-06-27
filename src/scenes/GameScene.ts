@@ -11,7 +11,6 @@ import {
   getAbilityReaction,
   getCleanRewardText,
   getClickReactionText,
-  getCouncilReactionText,
   getEventReactionText,
   getPigLifecycleStatusMessage,
 } from "./sceneFeedbackText";
@@ -771,11 +770,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    if (detail.category === "decree") {
-      this.playCouncilDecreeFeedback(detail);
-      return;
-    }
-
     if (detail.category === "event") {
       this.playEventChoiceFeedback(detail);
       return;
@@ -888,14 +882,6 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     this.playCenterFeedback(detail.label ?? "Unlocked", detail.resourceText, detail.color ?? 0xf0d56b, "New!");
-  }
-
-  private playCouncilDecreeFeedback(detail: SceneFeedbackDetail): void {
-    const color = detail.color ?? 0xb965d2;
-    this.playCageFlash(detail.label ?? "Council Decree", color);
-    if (detail.resourceText) this.addFloatingText(this.state.cage.width / 2, 92, detail.resourceText, color, 0.94, true);
-    this.reactHerd(getCouncilReactionText(detail.decreeId), 5);
-    if (!this.prefersReducedMotion) this.addBurst(this.state.cage.width / 2, this.state.cage.height / 2, color, 12);
   }
 
   private playEventChoiceFeedback(detail: SceneFeedbackDetail): void {
