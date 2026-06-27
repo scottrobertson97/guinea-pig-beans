@@ -595,7 +595,20 @@ function layoutEditorHtml() {
         justify-content: end;
       }
 
-      .button {
+      .dev-page-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f7faf4;
+      }
+
+      .button,
+      a.button {
+        display: inline-grid;
+        place-items: center;
         min-height: 36px;
         border: 1px solid var(--line);
         border-radius: 6px;
@@ -603,7 +616,19 @@ function layoutEditorHtml() {
         color: var(--ink);
         padding: 7px 11px;
         font-weight: 800;
+        text-decoration: none;
         cursor: pointer;
+      }
+
+      .dev-page-nav .button {
+        min-height: 34px;
+        padding: 7px 10px;
+      }
+
+      .dev-page-nav .button[aria-current="page"] {
+        border-color: var(--accent);
+        background: #e8f3ec;
+        color: var(--accent-strong);
       }
 
       .button.primary {
@@ -926,6 +951,11 @@ function layoutEditorHtml() {
           <div class="meta" id="meta">Loading layout...</div>
         </div>
         <div class="top-actions">
+          <nav class="dev-page-nav" aria-label="Developer pages">
+            <a class="button" href="/">Game</a>
+            <a class="button" href="/constants">Constants</a>
+            <a class="button" href="/tech-tree-layout" aria-current="page">Tech Tree</a>
+          </nav>
           <button class="button" id="reload" type="button">Reload From Source</button>
           <button class="button" id="reset" type="button" disabled>Reset Draft</button>
           <button class="button primary" id="save" type="button" disabled>Save</button>

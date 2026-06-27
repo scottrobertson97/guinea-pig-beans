@@ -35,6 +35,7 @@ export class DevTools {
     this.panel.className = "dev-tools-panel";
     this.panel.hidden = true;
     this.panel.append(
+      this.createDevNav(),
       this.createButton("+100 Beans", () => addBeans(this.state, 100)),
       this.createButton("+1,000 Beans", () => addBeans(this.state, 1000)),
       this.createButton("Set Beans 10k", () => setBeans(this.state, 10000)),
@@ -68,6 +69,32 @@ export class DevTools {
   private setOpen(open: boolean): void {
     this.open = open;
     this.panel.hidden = !open;
+  }
+
+  private createDevNav(): HTMLElement {
+    const nav = document.createElement("nav");
+    nav.className = "dev-tools-nav";
+    nav.setAttribute("aria-label", "Developer pages");
+    nav.append(
+      this.createNavLink("Game", "/"),
+      this.createNavLink("Constants", "/constants"),
+      this.createNavLink("Tech Tree", "/tech-tree-layout"),
+    );
+    return nav;
+  }
+
+  private createNavLink(label: string, href: string): HTMLAnchorElement {
+    const link = document.createElement("a");
+    link.href = href;
+    link.textContent = label;
+
+    const currentPath = normalizePath(window.location.pathname);
+    const targetPath = normalizePath(href);
+    if (currentPath === targetPath || (targetPath === "/" && currentPath === "/index.html")) {
+      link.setAttribute("aria-current", "page");
+    }
+
+    return link;
   }
 
   private createButton(label: string, action: () => void): HTMLButtonElement {
@@ -244,4 +271,9 @@ export class DevTools {
     refreshEcology(this.state);
     addLog(this.state, "Dev tools seeded bonded, buddy, nap partner, shy follower, and rival relationships.");
   }
+}
+
+function normalizePath(path: string): string {
+  const normalized = path.replace(/\/+$/, "");
+  return normalized.length === 0 ? "/" : normalized;
 }

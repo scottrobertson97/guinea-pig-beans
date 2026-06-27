@@ -509,6 +509,16 @@ function constantsDashboardHtml() {
         justify-content: end;
       }
 
+      .dev-page-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 4px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: #f7faf4;
+      }
+
       main {
         display: grid;
         grid-template-columns: minmax(230px, 300px) minmax(0, 1fr);
@@ -653,6 +663,8 @@ function constantsDashboardHtml() {
 
       .button,
       a.button {
+        display: inline-grid;
+        place-items: center;
         border: 1px solid var(--accent);
         border-radius: 6px;
         color: var(--accent-strong);
@@ -661,6 +673,18 @@ function constantsDashboardHtml() {
         padding: 8px 12px;
         text-decoration: none;
         cursor: pointer;
+      }
+
+      .dev-page-nav .button {
+        min-height: 34px;
+        border-color: var(--line);
+        padding: 7px 10px;
+      }
+
+      .dev-page-nav .button[aria-current="page"] {
+        border-color: var(--accent);
+        background: #e8f3ec;
+        color: var(--accent-strong);
       }
 
       .button.primary {
@@ -756,7 +780,11 @@ function constantsDashboardHtml() {
           <div class="meta" id="meta">Loading src/simulation/balance.ts</div>
         </div>
         <div class="top-actions">
-          <a class="button" href="/">Game</a>
+          <nav class="dev-page-nav" aria-label="Developer pages">
+            <a class="button" href="/">Game</a>
+            <a class="button" href="/constants" aria-current="page">Constants</a>
+            <a class="button" href="/tech-tree-layout">Tech Tree</a>
+          </nav>
           <button class="button" id="refresh" type="button">Refresh</button>
         </div>
       </header>

@@ -2185,7 +2185,8 @@ button.action-success {
   pointer-events: none;
 }
 
-#dev-tools button {
+#dev-tools button,
+#dev-tools a {
   pointer-events: auto;
 }
 
@@ -2207,6 +2208,44 @@ button.action-success {
   background: rgba(255, 252, 244, 0.96);
   box-shadow: 0 12px 28px rgba(31, 48, 35, 0.16);
   pointer-events: auto;
+}
+
+.dev-tools-nav {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(23, 32, 26, 0.12);
+}
+
+.dev-tools-nav a {
+  display: grid;
+  min-height: 30px;
+  place-items: center;
+  padding: 6px 4px;
+  border: 1px solid rgba(23, 32, 26, 0.14);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.76);
+  color: #2f3c32;
+  font-size: 0.68rem;
+  font-weight: 850;
+  line-height: 1.05;
+  overflow-wrap: anywhere;
+  text-align: center;
+  text-decoration: none;
+}
+
+.dev-tools-nav a:hover,
+.dev-tools-nav a:focus-visible {
+  border-color: rgba(39, 111, 91, 0.54);
+  color: #164f41;
+}
+
+.dev-tools-nav a[aria-current="page"] {
+  border-color: rgba(39, 111, 91, 0.62);
+  background: #e8f3ec;
+  color: #164f41;
 }
 
 .dev-tools-panel[hidden] {
