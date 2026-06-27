@@ -21,7 +21,7 @@
 - Pig social mechanics: bonded pairs, buddies, nap partners, shy followers, and gentle rivalries affect socialization, stress, zone preferences, requests, and Herd roster copy.
 - Weighted pig lifecycle: pigs now choose between roaming, seeking hay/water, sleeping, social play, and furniture play through tunable simulation weights with urgent hunger/thirst overrides, then leave consume/rest actions after a short satisfied-action timer.
 - Lifecycle-driven orchestration: a derived pig/herd lifecycle read model now drives pig activity weights, event weights, pig-request selection, Contract offer priority, automation cleanup targeting, rare bean comfort/stress modifiers, Herd roster copy, and urgent status-line feedback without adding save fields.
-- Dev constants editor: local Vite dev servers expose `/constants` for source-backed tuning of selected scalar literals in `src/simulation/balance.ts`; saves rewrite the source file and production builds do not serve the route.
+- Dev editors: local Vite dev servers expose `/constants` for source-backed balance tuning and `/tech-tree-layout` for dragging Tech Tree nodes; saves rewrite source files and production builds do not serve these routes.
 - Active abilities: Wheek Call, Treat Bag, Deep Clean, Fresh Bedding, Snack Time, and Zoomie Mode unlock from the Tech Tree, then remain operational cooldown actions in Abilities.
 - Rare/legendary pigs: legendary pig adoption uses Beans plus Golden Beans and creates stronger named pigs.
 - Prestige: The Great Composting soft-resets the run, previews gained Wisdom, and feeds the Tech Tree's permanent Wisdom Legacy branch.
@@ -235,7 +235,7 @@ Description: Centralize one-time run unlocks and permanent Wisdom into a single 
 Acceptance criteria:
 
 - Tech Tree is visible from a fresh run as the progression map.
-- Tech Tree renders as one scrollable constellation map with compact icon nodes, hover/focus tooltips, SVG prerequisite connectors, colored system regions, derived synergy nodes, and cross-branch links.
+- Tech Tree renders as one scrollable node-and-connector map with compact branch-colored icon nodes, hover/focus tooltips, SVG prerequisite connectors, derived synergy nodes, and cross-branch links.
 - Shop, Furniture, Recipes, and Wisdom no longer expose duplicate permanent unlock purchase buttons.
 - Existing owned upgrades, furniture, recipes, late-game flags, Wisdom perks, and philosophies derive completed Tech Tree nodes from current save state.
 - Older saves with missing or stale `tech.version` reset only run-scoped `tech.levels`; durable game state continues to derive completed nodes.

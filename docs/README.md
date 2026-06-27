@@ -11,6 +11,7 @@ Use this folder for long-form project references, planning notes, and production
 ## Developer Tooling
 
 - Constants editor: while Vite is running in dev mode, open `http://127.0.0.1:5176/constants` to tune selected literal values from `src/simulation/balance.ts`. Save writes the source file itself, so changes persist through server restarts and should be reviewed as code.
+- Tech Tree layout editor: while Vite is running in dev mode, open `http://127.0.0.1:5176/tech-tree-layout` to drag Tech Tree nodes from `src/ui/techTreeConstellation.ts`. Save rewrites the source file and is not available from production builds.
 
 ## Planning And Backlog
 

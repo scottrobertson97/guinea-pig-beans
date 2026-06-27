@@ -92,7 +92,6 @@ import {
   unlockTechNode,
 } from "../simulation/techTree";
 import {
-  TECH_BRANCH_REGIONS,
   TECH_BRANCH_VISUALS,
   TECH_MAP_HEIGHT,
   TECH_MAP_WIDTH,
@@ -1642,7 +1641,6 @@ export class Hud {
 
     const viewport = this.getVisibleTechMapViewport(definitions);
     const map = document.createElement("div");
-    const regions = this.createTechMapRegions(viewport);
     const links = this.createTechMapLinks(definitions, viewport);
     const nodes = document.createElement("div");
 
@@ -1659,7 +1657,7 @@ export class Hud {
       nodes.append(this.createTechNode(definition, viewport));
     }
 
-    map.append(regions, links, nodes);
+    map.append(links, nodes);
     this.techTree.replaceChildren(map);
   }
 
@@ -1698,40 +1696,6 @@ export class Hud {
       x: layout.x - viewport.originX,
       y: layout.y - viewport.originY,
     };
-  }
-
-  private createTechMapRegions(viewport: TechMapViewport): HTMLElement {
-    const regions = document.createElement("div");
-    regions.className = "tech-map-regions";
-
-    for (const region of TECH_BRANCH_REGIONS) {
-      const visual = TECH_BRANCH_VISUALS[region.id];
-      const left = Math.max(region.x, viewport.originX);
-      const top = Math.max(region.y, viewport.originY);
-      const right = Math.min(region.x + region.width, viewport.originX + viewport.width);
-      const bottom = Math.min(region.y + region.height, viewport.originY + viewport.height);
-      if (right <= left || bottom <= top) continue;
-
-      const element = document.createElement("section");
-      const label = document.createElement("span");
-
-      element.className = `tech-constellation-region branch-${region.id}`;
-      element.dataset.techBranch = region.id;
-      element.style.left = `${left - viewport.originX}px`;
-      element.style.top = `${top - viewport.originY}px`;
-      element.style.width = `${right - left}px`;
-      element.style.height = `${bottom - top}px`;
-      element.style.setProperty("--branch-color", visual.color);
-      element.style.setProperty("--branch-border", visual.border);
-      element.style.setProperty("--branch-soft", visual.soft);
-
-      label.className = "tech-region-label";
-      label.textContent = `${visual.icon} ${visual.label}`;
-      element.append(label);
-      regions.append(element);
-    }
-
-    return regions;
   }
 
   private createTechMapLinks(definitions: TechNodeDefinition[], viewport: TechMapViewport): SVGSVGElement {

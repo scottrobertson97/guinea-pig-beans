@@ -667,7 +667,7 @@ Dirty cages are visible in the playfield through floor tint, dirt wash, and dirt
 
 ## Tech Tree
 
-The Tech Tree is the always-visible progression map. It is displayed as a connected constellation inside the Tech Tree modal, with colored regions for Care & Cage, Habitat, Automation, Abilities & Rare Beans, and Wisdom Legacy. Nodes render as compact icon buttons so the map stays readable; hover and keyboard focus reveal tooltips with the node label, status, description, and level pips. It owns one-time unlock decisions for run upgrades, furniture, automation access, ability licenses, bean recipes, late-game unlocks, Great Composting, Wisdom perks, and Caretaker Philosophies.
+The Tech Tree is the always-visible progression map. It is displayed as a connected node-and-connector map inside the Tech Tree modal, with branch-colored nodes for Care & Cage, Habitat, Automation, Abilities & Rare Beans, and Wisdom Legacy. Nodes render as compact icon buttons so the map stays readable; hover and keyboard focus reveal tooltips with the node label, status, description, and level pips. It owns one-time unlock decisions for run upgrades, furniture, automation access, ability licenses, bean recipes, late-game unlocks, Great Composting, Wisdom perks, and Caretaker Philosophies.
 
 The original sections still own repeatable operations:
 
@@ -677,9 +677,9 @@ The original sections still own repeatable operations:
 - Recipes handles Bean Exchange trades and running Singularity.
 - Herd handles pig identity, Pig Welcome, and relationship visibility.
 
-Nodes can be locked, available, started, or complete. Fresh runs show only root nodes; future nodes and their connector lines stay hidden until every direct prerequisite has been bought or activated at least once. Multi-level nodes reveal and unlock downstream paths after level 1, while complete styling still requires the node's max level. Prerequisite lines can cross regions, so the map reads as one connected progression graph instead of five independent columns.
+Nodes can be locked, available, started, or complete. Fresh runs show only root nodes; future nodes and their connector lines stay hidden until every direct prerequisite has been bought or activated at least once. Multi-level nodes reveal and unlock downstream paths after level 1, while complete styling still requires the node's max level. Prerequisite lines can cross branches, so the map reads as one connected progression graph instead of five independent columns.
 
-The Tech Tree has five constellation regions:
+The Tech Tree uses five branch color families:
 
 - Care & Cage: Better Hay, Better Scoop, Bigger Cage, Hay Dimension, Clean Streak Training, and Care Routines.
 - Habitat: furniture unlocks, furniture synergy completion, Furniture Care Kit, and Habitat Steward Kit.
@@ -1278,7 +1278,7 @@ The Great Composting should feel like turning a messy, productive run into perma
 
 Wisdom Legacy is permanent progression purchased with Cavy Wisdom inside the Tech Tree.
 
-The Wisdom region appears as four branching arms from Great Composting:
+Wisdom Legacy appears as four branching arms from Great Composting:
 
 - Care
 - Herd

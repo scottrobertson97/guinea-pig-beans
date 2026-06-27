@@ -1124,44 +1124,15 @@ button.action-success {
   z-index: 0;
 }
 
-.tech-map-regions,
 .tech-map-links,
 .tech-map-nodes {
   position: absolute;
   inset: 0;
 }
 
-.tech-map-regions {
-  pointer-events: none;
-  z-index: 1;
-}
-
-.tech-constellation-region {
-  position: absolute;
-  border: 1px solid var(--branch-border);
-  border-radius: 8px;
-  background: var(--branch-soft);
-}
-
-.tech-region-label {
-  position: absolute;
-  top: 8px;
-  left: 10px;
-  max-width: calc(100% - 20px);
-  color: var(--branch-color);
-  font-size: 0.72rem;
-  font-weight: 900;
-  letter-spacing: 0.04em;
-  line-height: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  text-transform: uppercase;
-  white-space: nowrap;
-}
-
 .tech-map-links {
   pointer-events: none;
-  z-index: 2;
+  z-index: 1;
 }
 
 .tech-link {
@@ -1219,7 +1190,7 @@ button.action-success {
 }
 
 .tech-map-nodes {
-  z-index: 3;
+  z-index: 2;
 }
 
 .tech-node-row {

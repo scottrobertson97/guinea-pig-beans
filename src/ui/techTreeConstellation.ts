@@ -20,14 +20,6 @@ export interface TechNodeLayout {
   y: number;
 }
 
-export interface TechBranchRegion {
-  id: TechBranchId;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 export interface TechNodeIcon {
   path: string;
   code: string;
@@ -75,14 +67,6 @@ export const TECH_BRANCH_VISUALS: Record<TechBranchId, TechBranchVisual> = {
     soft: "rgba(139, 119, 194, 0.13)",
   },
 };
-
-export const TECH_BRANCH_REGIONS: TechBranchRegion[] = [
-  { id: "care", x: 36, y: 52, width: 620, height: 360 },
-  { id: "automation", x: 490, y: 250, width: 720, height: 430 },
-  { id: "habitat", x: 36, y: 438, width: 1160, height: 590 },
-  { id: "wisdom", x: 1040, y: 220, width: 860, height: 720 },
-  { id: "abilities", x: 36, y: 948, width: 1840, height: 440 },
-];
 
 export const TECH_NODE_ICONS: Record<TechNodeId, TechNodeIcon> = {
   betterHay: { path: "assets/sprites/decor/hay_rack_full.png", code: "HY" },
@@ -148,66 +132,66 @@ export const TECH_NODE_ICONS: Record<TechNodeId, TechNodeIcon> = {
 };
 
 export const TECH_NODE_LAYOUT: Record<TechNodeId, TechNodeLayout> = {
-  betterScoop: { x: 130, y: 160 },
-  cleanStreakTraining: { x: 330, y: 150 },
-  careRoutines: { x: 530, y: 150 },
-  biggerCage: { x: 130, y: 330 },
-  betterHay: { x: 330, y: 330 },
-  hayDimension: { x: 530, y: 330 },
+  betterHay: { x: 140, y: 140 },
+  hayDimension: { x: 340, y: 140 },
+  betterScoop: { x: 140, y: 280 },
+  cleanStreakTraining: { x: 340, y: 280 },
+  careRoutines: { x: 540, y: 280 },
+  biggerCage: { x: 140, y: 420 },
 
-  litterTray: { x: 330, y: 520 },
-  poopRoomba: { x: 560, y: 500 },
-  automationDirectives: { x: 760, y: 430 },
-  roombaSensors: { x: 960, y: 430 },
-  compostOverdrive: { x: 760, y: 300 },
-  litterMethod: { x: 960, y: 560 },
-  rareGuardProtocol: { x: 1160, y: 500 },
+  hideyHouse: { x: 140, y: 560 },
+  snuggleSack: { x: 340, y: 560 },
+  cozyCorner: { x: 540, y: 560 },
+  furnitureCareKit: { x: 540, y: 680 },
+  habitatStewardKit: { x: 740, y: 560 },
+  tunnel: { x: 140, y: 700 },
+  chewToy: { x: 340, y: 700 },
+  zoomiePlayground: { x: 740, y: 700 },
+  litterTray: { x: 140, y: 840 },
+  cleanupCircuit: { x: 740, y: 960 },
+  cardboardCastle: { x: 140, y: 1020 },
+  royalThrone: { x: 340, y: 1020 },
+  royalCompostCourt: { x: 540, y: 1080 },
 
-  tunnel: { x: 130, y: 610 },
-  chewToy: { x: 330, y: 690 },
-  cleanupCircuit: { x: 560, y: 640 },
-  zoomiePlayground: { x: 760, y: 650 },
-  abilityZoomieMode: { x: 960, y: 710 },
-  hideyHouse: { x: 130, y: 790 },
-  snuggleSack: { x: 330, y: 870 },
-  cozyCorner: { x: 130, y: 930 },
-  furnitureCareKit: { x: 560, y: 780 },
-  habitatStewardKit: { x: 760, y: 790 },
-  cardboardCastle: { x: 760, y: 960 },
-  royalThrone: { x: 960, y: 960 },
-  royalCompostCourt: { x: 1160, y: 960 },
+  poopRoomba: { x: 340, y: 840 },
+  automationDirectives: { x: 540, y: 760 },
+  compostOverdrive: { x: 540, y: 840 },
+  roombaSensors: { x: 540, y: 920 },
+  litterMethod: { x: 740, y: 840 },
+  rareGuardProtocol: { x: 940, y: 760 },
 
-  abilityWheekCall: { x: 130, y: 1080 },
-  abilityTreatBag: { x: 330, y: 1040 },
-  abilitySnackTime: { x: 530, y: 1040 },
-  abilityFreshBedding: { x: 330, y: 1178 },
-  abilityDeepClean: { x: 560, y: 1178 },
-  squeakTraining: { x: 760, y: 1110 },
-  rareCatalog: { x: 760, y: 1240 },
-  beanBlessing: { x: 960, y: 1240 },
-  compostCatalyst: { x: 1160, y: 1160 },
-  royalAccord: { x: 1360, y: 1100 },
-  beanExchange: { x: 1360, y: 1240 },
-  goldenScoop: { x: 1580, y: 1160 },
-  singularityExperiment: { x: 1580, y: 1320 },
-  singularityStabilizers: { x: 1760, y: 1320 },
+  abilityWheekCall: { x: 140, y: 1180 },
+  abilityTreatBag: { x: 340, y: 1180 },
+  abilitySnackTime: { x: 540, y: 1180 },
+  abilityFreshBedding: { x: 340, y: 1100 },
+  abilityDeepClean: { x: 740, y: 1040 },
+  abilityZoomieMode: { x: 740, y: 1120 },
+  squeakTraining: { x: 340, y: 1300 },
+  rareCatalog: { x: 540, y: 1300 },
+  beanBlessing: { x: 740, y: 1300 },
+  compostCatalyst: { x: 940, y: 1240 },
+  royalAccord: { x: 940, y: 1360 },
+  beanExchange: { x: 1140, y: 1240 },
+  goldenScoop: { x: 1340, y: 1180 },
+  singularityExperiment: { x: 1140, y: 1360 },
+  singularityStabilizers: { x: 1340, y: 1360 },
 
-  greatComposting: { x: 1120, y: 650 },
-  roomyStart: { x: 1320, y: 430 },
-  steadySupplies: { x: 1500, y: 330 },
-  freshStart: { x: 1680, y: 250 },
-  gentleCare: { x: 1840, y: 250 },
-  bondedBeginnings: { x: 1320, y: 570 },
-  socialMemory: { x: 1500, y: 570 },
-  chorusTraining: { x: 1680, y: 570 },
-  gentleAutomation: { x: 1320, y: 700 },
-  compostEngine: { x: 1500, y: 700 },
-  trayAffinity: { x: 1680, y: 700 },
-  automationSteward: { x: 1840, y: 700 },
-  rareInstinct: { x: 1320, y: 840 },
-  goldenNose: { x: 1500, y: 840 },
-  royalMemory: { x: 1680, y: 840 },
-  rareBeanAlchemy: { x: 1840, y: 840 },
+  greatComposting: { x: 980, y: 560 },
+  roomyStart: { x: 1160, y: 340 },
+  steadySupplies: { x: 1340, y: 260 },
+  freshStart: { x: 1520, y: 200 },
+  gentleCare: { x: 1700, y: 200 },
+  bondedBeginnings: { x: 1160, y: 480 },
+  socialMemory: { x: 1340, y: 480 },
+  chorusTraining: { x: 1520, y: 480 },
+  gentleAutomation: { x: 1160, y: 620 },
+  compostEngine: { x: 1340, y: 620 },
+  trayAffinity: { x: 1520, y: 620 },
+  automationSteward: { x: 1700, y: 620 },
+  rareInstinct: { x: 1160, y: 760 },
+  goldenNose: { x: 1340, y: 820 },
+  royalMemory: { x: 1520, y: 880 },
+  rareBeanAlchemy: { x: 1700, y: 880 },
 };
 
 export function getTechLinkPath(from: TechNodeLayout, to: TechNodeLayout): string {
